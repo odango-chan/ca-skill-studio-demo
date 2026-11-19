@@ -272,9 +272,9 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
           const {createSkillLanguageClient}=await import("../../lsp-browser/client/src/browserClient.mjs");
           const epoch=++languageClientEpoch;
           candidate=createSkillLanguageClient(vscode,context,{
-            // The primary extension provides source-local semantic tokens in
-            // Theia. LSP remains responsible for diagnostics and navigation.
-            manualSemanticTokens:false,
+            // The primary extension owns semantic tokens in Theia.
+            // Keep the LSP Worker responsible for diagnostics and navigation.
+            localSemanticTokens:typeof STUDIO_THEIA_HOST!=="undefined"&&STUDIO_THEIA_HOST,
             onStatus:status=>{
               if(epoch!==languageClientEpoch)return;
               const state=languagePackages.get(status?.rootUri);
