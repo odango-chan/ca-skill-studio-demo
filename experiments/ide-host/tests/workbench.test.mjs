@@ -258,7 +258,7 @@ test('Native views track unsaved Source, audit Package, reject stale selection a
       workspaceFolders:[{uri:uri('/workspace'),name:'workspace'}],
       getWorkspaceFolder:()=>({uri:uri('/workspace')}),
       findFiles:async pattern=>{
-        if(pattern==='**/SKILL.md')return [markdownUri];
+        if(pattern==='**/SKILL.md'||pattern==='**/establish-pdu-session/SKILL.md')return [markdownUri];
         if(v1alpha5Mode&&pattern?.pattern==='**/*')
           return v1SampleManifest.files.filter(path=>path.startsWith('establish-pdu-session/'))
             .map(path=>uri('/workspace/establish-pdu-session/'+path.slice('establish-pdu-session/'.length)));
@@ -740,24 +740,19 @@ test('Native views track unsaved Source, audit Package, reject stale selection a
   assert.ok(dataflow.children.some(x=>x.label.includes('Consumer ABI')));
   assert.match(dataflow.description,/Runtime NOT_RUN/);
   assert.ok(dataflow.children.some(x=>x.label.includes('Source lineage')));
-  const previewOpened=await commands.get('skillStudio.internal.nativeMarkdownPreviewAcceptance')('establish-pdu-session');
-  assert.equal(typeof previewOpened,'string','internal Chromium acceptance opens native Markdown without a public Studio command');
+  const previewOpened=await commands.get(
+    'skillStudio.internal.markdownPreviewOpenAcceptance')('establish-pdu-session','SKILL.md');
+  assert.equal(previewOpened,markdownUri.toString(),
+    'internal acceptance opens the exact native Markdown Source without a public Preview command');
   assert.equal(showDocumentCalls.at(-1).document,markdownDoc);
   assert.equal(showDocumentCalls.at(-1).options.viewColumn,vscode.ViewColumn.One,
     'editable Markdown Source stays in the first editor column');
   assert.equal(showDocumentCalls.at(-1).options.preview,false,
     'Markdown Source is persistent, not a transient preview tab');
-  assert.equal(markdownExtensionActivated,true,
-    'the exact pinned Markdown extension is activated before its command is used');
-  assert.ok(nativeCommands.some(call=>call.id==='vscode.openWith'&&
-    call.args[0]?.path?.endsWith('/establish-pdu-session/SKILL.md')&&
-    call.args[1]==='vscode.markdown.preview.editor'&&
-    call.args[2]?.viewColumn===vscode.ViewColumn.Two),
-    'the native Markdown Preview CustomEditor must target the shared second group');
-  const nativeSettings=await commands.get(
-    'skillStudio.internal.nativeMarkdownSettingsAcceptance')();
-  assert.equal(nativeSettings.scrollEditorWithPreview,true);
-  assert.equal(nativeSettings.scrollPreviewWithEditor,true);
+  assert.equal(markdownExtensionActivated,false,
+    'opening Markdown Source does not activate or open the native Markdown Preview CustomEditor');
+  assert.equal(nativeCommands.some(call=>call.id==='vscode.openWith'),false,
+    'the shared right-side Preview must not invoke a second Main Editor CustomEditor');
 
   // The v1alpha5 Example must keep showing deterministic local and NOT_CHECKED
   // Package diagnostics while the Compiler provider is disconnected.
