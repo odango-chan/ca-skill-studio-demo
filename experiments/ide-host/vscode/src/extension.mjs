@@ -335,9 +335,9 @@ export function activate(context){
   context.subscriptions.push(vscode.window.registerCustomEditorProvider(VIEW,provider,{
     webviewOptions:{retainContextWhenHidden:true}
   }));
-  // Experimental right-side Preview Host shares the exact Procedure webview,
-  // parser and Source-backed mutation path with the established CustomEditor.
-  // The view stays hidden until the fixed layout migration is accepted.
+  // The single right-side Preview Host owns all contextual visualizations.
+  // Visual open commands reveal only the native Source editor; the Preview
+  // follows active Source documents without creating another EditorGroup.
   registerPreviewHost(vscode,context,{
     mountProcedure:mountProcedurePreview,
     mountContract:(document,panel,options)=>mountContractPreview(vscode,document,panel,options),
