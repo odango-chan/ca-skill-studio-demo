@@ -24,5 +24,6 @@
   "command.inspectDependencyContract": "Inspect Locked Contract",
   "command.checkSkill": "Check Skill",
   "command.buildSkill": "Build Skill",
-  "command.inspectCompilerDependencies": "Inspect Dependencies"
+  "command.inspectCompilerDependencies": "Inspect Dependencies",
+  "command.showActivationDiagnostics": "Show Activation Diagnostics"
 }

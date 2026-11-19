@@ -24,5 +24,6 @@
   "command.inspectDependencyContract": "检查锁定契约",
   "command.checkSkill": "检查 Skill",
   "command.buildSkill": "构建 Skill",
-  "command.inspectCompilerDependencies": "检查依赖"
+  "command.inspectCompilerDependencies": "检查依赖",
+  "command.showActivationDiagnostics": "查看激活诊断"
 }
