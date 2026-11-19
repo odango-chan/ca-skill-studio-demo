@@ -90,6 +90,8 @@ function markdownViewHtml(webview,style,sessionKey){
           scrollToLine(data.line);
         }else if(data.type==="fragment"&&uri===data.uri){
           scrollFragment(data.fragment);
+        }else if(data.type==="previewScrollAck"&&uri===data.uri){
+          window.__skillStudioLastPreviewScrollAck=data;
         }else if(data.type==="error"&&uri===data.uri){
           status.textContent=data.message;
         }
@@ -116,6 +118,7 @@ function markdownViewHtml(webview,style,sessionKey){
           const line=firstVisible(),now=Date.now();
           if(now-lastPreviewSent<80)return;
           lastPreviewSent=now;
+          window.__skillStudioLastPreviewScroll={line,version,scrollY:window.scrollY,at:now};
           api.postMessage({type:"previewScroll",sessionKey:key,uri,version,line});
         });
       },{passive:true});
@@ -170,18 +173,33 @@ export function mountMarkdownPreview(vscode,context,document,panel,{isCurrent=()
     if(!stillCurrent()||!message||message.sessionKey!==sessionKey||message.uri&&message.uri!==uri)
       return;
     if(message.type==="ready"){ready=true;await push();return;}
-    if(message.version!==document.version)return;
     if(message.type==="previewScroll"){
       const line=message.line;
-      if(!Number.isSafeInteger(line)||line<1||line>document.lineCount)return;
-      const editor=(vscode.window.visibleTextEditors??[]).find(e=>e.document.uri.toString()===uri);
-      if(editor){
-        const position=new vscode.Position(line-1,0);
-        editor.revealRange(new vscode.Range(position,position),
-          vscode.TextEditorRevealType.AtTop);
+      if(message.version!==document.version){
+        send({type:"previewScrollAck",status:"stale-version",line,
+          messageVersion:message.version,documentVersion:document.version});
+        return;
       }
+      if(!Number.isSafeInteger(line)||line<1||line>document.lineCount){
+        send({type:"previewScrollAck",status:"invalid-line",line,
+          documentLineCount:document.lineCount});
+        return;
+      }
+      const editor=(vscode.window.visibleTextEditors??[]).find(e=>e.document.uri.toString()===uri);
+      if(!editor){
+        send({type:"previewScrollAck",status:"editor-not-visible",line});
+        return;
+      }
+      const position=new vscode.Position(line-1,0);
+      editor.revealRange(new vscode.Range(position,position),
+        vscode.TextEditorRevealType.AtTop);
+      send({type:"previewScrollAck",status:"revealed",line,
+        visibleRanges:editor.visibleRanges?.map(range=>({
+          start:range.start.line+1,end:range.end.line+1
+        }))??[]});
       return;
     }
+    if(message.version!==document.version)return;
     if(message.type!=="link"||typeof message.href!=="string")return;
     const target=policyReady&&!blocked
       ?resolveNativeMarkdownPackageLink(document.uri,message.href):null;
