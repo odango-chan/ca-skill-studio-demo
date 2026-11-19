@@ -174,6 +174,41 @@ async function lspRequest(worker,id,method,params) {
   return result.result;
 }
 
+test("semantic tokens retain the latest accepted source when Package analysis is unavailable",async()=>{
+  const worker=new Worker(workerEntry,{workerData:{serverUrl:serverBundle}});
+  try{
+    worker.postMessage({jsonrpc:"2.0",id:201,method:"initialize",
+      params:{processId:null,rootUri:"file:///workspace",capabilities:{}}});
+    const initialized=await waitForMessage(worker,message=>message?.id===201);
+    assert.equal(initialized.result.capabilities.semanticTokensProvider.full,true);
+    worker.postMessage({jsonrpc:"2.0",method:"initialized",params:{}});
+
+    const snapshot=samplePackageSnapshot();
+    // Force the diagnostic analyzer to reject this otherwise valid source
+    // snapshot. The semantic-token provider must still use the accepted bytes.
+    snapshot.packageName="";
+    const unavailable=waitForMessage(worker,message=>
+      message?.method==="skillStudio/analysisStatus"&&
+      message.params?.rootUri===snapshot.rootUri&&
+      message.params?.generation===snapshot.generation&&
+      message.params?.state==="UNAVAILABLE",15000);
+    worker.postMessage({jsonrpc:"2.0",method:"skillStudio/packageSnapshot",params:snapshot});
+    const status=await unavailable;
+    assert.match(status.params.reason,/Package name is invalid/);
+
+    const procedure=snapshot.documents.find(item=>
+      item.relativePath==="assurance/procedure.yaml");
+    const semantic=await lspRequest(worker,202,"textDocument/semanticTokens/full",{
+      textDocument:{uri:procedure.uri}
+    });
+    assert.ok(Array.isArray(semantic.data)&&semantic.data.length>0,
+      "analysis rejection must not evict the source snapshot used for coloring");
+    assert.equal(semantic.data.length%5,0);
+  }finally{
+    await worker.terminate();
+  }
+});
+
 test("browser LSP provides v1alpha5 Definition, References, Hover, Python symbols and Package completions",async()=>{
   const worker=new Worker(workerEntry,{workerData:{serverUrl:serverBundle}});
   try{
