@@ -46,19 +46,21 @@ test("Theia plugin is the exact Web extension, with native editor + view contrib
   assert.equal(plugin.contributes.customEditors,undefined,
     "visualizers must not create Main Editor CustomEditors");
   const explorerViews=new Set((plugin.contributes.views.explorer??[]).map(x=>x.id));
-  const secondaryViews=new Set(plugin.contributes.views.skillStudioInspector.map(x=>x.id));
+  const previewViews=new Set(plugin.contributes.views.skillStudioPreview.map(x=>x.id));
+  const inspectorViews=new Set(plugin.contributes.views.skillStudioInspector.map(x=>x.id));
   const secondaryContainers=plugin.contributes.viewsContainers.secondarySidebar??[];
   assert.deepEqual([...explorerViews],[
     "skillStudio.packages","skillStudio.outline","skillStudio.problems"
   ],"authoring/navigation views are contributed directly below native File Explorer");
   assert.ok(!explorerViews.has("skillStudio.evidence"),"Data Flow belongs to right-side Inspector, not a separate Evidence view");
   assert.ok(!plugin.activationEvents.includes("onView:skillStudio.evidence"));
-  assert.ok(secondaryViews.has("skillStudio.preview"),
-    "all visualizers use the single right-side Preview WebviewView");
-  assert.ok(secondaryViews.has("skillStudio.inspection"),
-    "Inspector view must be contributed to the native right-side container");
-  assert.ok(secondaryContainers.some(x=>x.id==="skillStudioInspector"),
-    "Inspector container must use the host secondarySidebar location");
+  assert.deepEqual([...previewViews],["skillStudio.preview"],
+    "all visualizers share one dedicated right Preview WebviewView");
+  assert.deepEqual([...inspectorViews],["skillStudio.inspection"],
+    "Inspector is a distinct native right-hand container");
+  assert.deepEqual(secondaryContainers.map(x=>x.id),
+    ["skillStudioPreview","skillStudioInspector"],
+    "Preview is the primary discoverable right panel; Inspector is selectable separately");
   assert.equal(plugin.contributes.viewsContainers.activitybar,undefined,
     "no separate Skill Studio Activity Bar container");
   assert.ok(!explorerViews.has("skillStudio.inspection"),
