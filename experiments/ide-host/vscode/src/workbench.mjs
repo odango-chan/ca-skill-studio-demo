@@ -1,4 +1,5 @@
 import {openNativeSource} from "./native-source.mjs";
+import {diagnosticSourcePosition} from "./diagnostic-navigation.mjs";
 
 import {staticPreviewResourceUrl} from "./webview-resource-url.mjs";
 import {assertStudioMutation} from "./project-policy.mjs";
@@ -2326,6 +2327,7 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
         code:diagnostic.code,severity:diagnostic.severity,
         status:diagnostic.status,domain,category:diagnostic.category,
         path:sourcePath,sourcePath:diagnostic.sourcePath,
+        range:diagnostic.range,analysisGeneration:diagnostic.analysisGeneration,
         locationKind:diagnostic.locationKind,phase:diagnostic.phase,
         source:diagnostic.source,children:[]
       });
@@ -2388,7 +2390,8 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
           tree.procedureId=item.procedureId;tree.nodeId=item.nodeId;
           tree.sourceVersion=item.sourceVersion;tree.documentUri=item.documentUri;
         }
-        if(document&&item.line&&item.kind!=='compiler-diagnostic'){
+        if(document&&(item.line||item.range)&&item.kind!=='compiler-diagnostic'&&
+           (item.kind!=='package-diagnostic'||item.uri)){
           const rootInfo=packageRootForProcedure(vscode,document);
           const uri=item.uri
             ?(typeof item.uri==="string"?vscode.Uri.parse(item.uri):item.uri)
@@ -2416,15 +2419,21 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
       ?status.analysisDiagnostics:[];
     audit=sourceDiagnostics.map(item=>{
       const relativePath=item.relativePath??"";
-      const uri=relativePath
-        ?vscode.Uri.joinPath(rootInfo.uri,...relativePath.split("/"))
-        :rootInfo.uri;
+      const segments=relativePath.split("/");
+      const candidate=relativePath&&!relativePath.startsWith("/")&&
+        segments.every(part=>part&&part!=="."&&part!=="..")
+          ?vscode.Uri.joinPath(rootInfo.uri,...segments):null;
+      // Missing files and Package-level findings have a Package-root URI.
+      // Never manufacture a clickable Source path for those findings.
+      const sourceUri=candidate&&item.uri===candidate.toString()?candidate:null;
       return {
         kind:"package-diagnostic",code:item.code,message:item.message,
         severity:item.severity,status:item.status,domain:item.domain??"source",
         category:item.category,path:relativePath,relativePath,
-        sourcePath:relativePath,line:item.line,column:item.column,
-        range:item.range,uri,source:item.source
+        sourcePath:relativePath,
+        line:sourceUri?item.line:undefined,column:sourceUri?item.column:undefined,
+        range:sourceUri?item.range:undefined,uri:sourceUri,
+        analysisGeneration:status.generation,source:item.source
       };
     });
     const errors=audit.filter(item=>item.severity==="error").length;
@@ -2562,12 +2571,27 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
     vscode.commands.registerCommand('skillStudio.revealInspection',async item=>{
       if(!document||item.version!==document.version||
          (item.auditGeneration!==undefined&&item.auditGeneration!==generation))return;
+      if(item.kind==='package-diagnostic'){
+        const root=packageRootForProcedure(vscode,document);
+        const state=root&&languagePackages.get(root.uri.toString());
+        const accepted=root&&languagePackageStatuses.get(root.uri.toString());
+        if(!item.uri||!state||!accepted||
+           item.analysisGeneration!==state.generation||
+           accepted.generation!==state.generation)return;
+      }
       if(item.nodeId){selection={procedureId:item.procedureId,nodeId:item.nodeId};update(document);sessions.get(document.uri.toString())?.({type:'focusNode',...selection,version:document.version});}
       const doc=await vscode.workspace.openTextDocument(item.uri);
-      const line=Math.min(Math.max(0,(item.line??1)-1),doc.lineCount-1);
-      const column=Math.max(0,(item.column??1)-1);
+      const position=diagnosticSourcePosition(doc,item);
+      if(!position)return;
+      // Edits during the async Source open invalidate the selection.
+      if(item.kind==='package-diagnostic'){
+        const root=packageRootForProcedure(vscode,document);
+        const state=root&&languagePackages.get(root.uri.toString());
+        if(!state||item.analysisGeneration!==state.generation)return;
+      }
       await openNativeSource(vscode,doc.uri,{
-        preview:true,selection:new vscode.Range(line,column,line,column)
+        preview:true,selection:new vscode.Range(
+          position.line,position.character,position.line,position.character)
       });
     }),
     vscode.commands.registerCommand('skillStudio.auditPackage',auditCurrent),
