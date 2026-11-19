@@ -146,7 +146,15 @@ export function indexV1Alpha4ToolCatalogCallables(dependencyId,files){
       if(callableKind==="observation"&&get(item,"inputSchema")!=null||
          callableKind==="operation"&&get(item,"queryContextSchema")!=null)
         return fail("ToolCatalog "+file.path+" mixes Operation and Observation input Schema fields");
-      operations.push({dependencyId,id,kind:callableKind,owner,effect});
+      const idNode=get(item,"id");
+      const idRange=Array.isArray(idNode?.range)&&
+        Number.isSafeInteger(idNode.range[0])&&
+        Number.isSafeInteger(idNode.range[1])
+          ?{start:idNode.range[0],end:idNode.range[1]}:null;
+      operations.push({
+        dependencyId,id,kind:callableKind,owner,effect,
+        catalogPath:file.path,idRange
+      });
     }
   }
   if(!catalogCount)
