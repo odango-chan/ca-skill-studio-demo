@@ -213,14 +213,13 @@ export function analyzePackageSnapshot(snapshot: PackageSnapshot): SkillLanguage
 
   const documentsByPath = new Map(normalizedDocuments.map(document => [document.relativePath, document] as const));
   const files = new Map(normalizedDocuments.map(document => [document.relativePath, { text: document.text }] as const));
-  const procedureDocument = documentsByPath.get("assurance/procedure.yaml");
 
   // The current CA-SL grammar is authoritative. Do not run the historical
   // procedures/call/with Package analyzer.
   // Source projection can supply exact editor locations without any claim
   // that trusted ToolCatalog, CapabilityContracts or Host Schema
   // publications have been linked.
-  if (procedureDocument) {
+  {
     const projected = analyzeCurrentSource(documentsByPath, snapshot.packageName);
     const packageContextComplete = snapshot.completeness === "complete" &&
       projected.procedure.state === "READY";
@@ -329,13 +328,13 @@ export function analyzePackageSnapshot(snapshot: PackageSnapshot): SkillLanguage
       snapshotReason: snapshot.reason ?? ""
     });
     const packageAuditDiagnostics: LanguageDiagnostic[] = packageAuditSource.map(item => {
-      const sourceDocument = documentsByPath.get(item.path) ?? procedureDocument;
+      const sourceDocument = documentsByPath.get(item.path);
       return {
         code: item.code,
         message: item.message,
         severity: item.severity,
-        uri: sourceDocument.uri,
-        relativePath: sourceDocument.relativePath,
+        uri: sourceDocument?.uri ?? snapshot.rootUri,
+        relativePath: item.path,
         source: "package-audit",
         confidence: "exact",
         ...(Number.isSafeInteger(item.line) && item.line > 0 ? { line: item.line } : {}),
@@ -376,11 +375,6 @@ export function analyzePackageSnapshot(snapshot: PackageSnapshot): SkillLanguage
       diagnostics
     };
   }
-  // Every Package is analyzed by the current grammar. A missing Procedure is a
-  // concrete Package defect, not a language-version selection failure.
-  return unavailable(snapshot, "PROCEDURE_FILE_MISSING",
-    "Package is missing assurance/procedure.yaml");
-
 
 }
 
