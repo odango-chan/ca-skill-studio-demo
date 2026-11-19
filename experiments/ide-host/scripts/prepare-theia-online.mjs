@@ -58,27 +58,28 @@ console.log("STUDIO_THEIA_PREPARED_THEME_EXTENSION",JSON.stringify({
   runtimeDependencies:Object.keys(themeManifest.dependencies??{}).length
 }));
 
-// Syntax highlighting must not depend on the deferred LSP workstream.
-// Browser-only Theia does not ship VS Code's default language extensions:
-// bundle a declarative, pinned YAML/Python TextMate plugin at build time.
-const syntaxSource="extensions/skill-studio-languages";
-const syntaxTarget=join(app,"plugins","odango-chan.skill-studio-languages");
-const syntaxManifest=JSON.parse(await readFile(join(syntaxSource,"package.json"),"utf8"));
+// Basic YAML/Python syntax belongs to the primary extension, not a second
+// declarative plugin whose discovery order can vary between Theia hosts.
+const staleSyntaxPlugin=join(app,"plugins","odango-chan.skill-studio-languages");
+await rm(staleSyntaxPlugin,{recursive:true,force:true});
 for(const language of ["yaml","python"]){
-  if(!syntaxManifest.contributes?.languages?.some(x=>x.id===language)||
-     !syntaxManifest.contributes.grammars?.some(x=>x.language===language))
-    throw Error("Missing bundled "+language+" language and TextMate grammar");
+  if(!manifest.contributes?.languages?.some(item=>item.id===language)||
+     !manifest.contributes?.grammars?.some(item=>item.language===language))
+    throw Error("Primary Web extension is missing "+language+" TextMate contributions");
 }
-if(syntaxManifest.main||syntaxManifest.browser)
-  throw Error("Syntax extension must remain declarative");
-for(const grammar of syntaxManifest.contributes.grammars){
-  const info=await stat(join(syntaxSource,grammar.path));
-  if(!info.isFile()||info.size<100)
-    throw Error("Bundled grammar missing: "+grammar.path);
+const missingGrammarAssets=[];
+for(const grammar of manifest.contributes.grammars){
+  if(!String(grammar.path??"").startsWith("./media/languages/"))
+    throw Error("Primary Web extension grammar path must remain package-local: "+grammar.path);
+  const asset=join(target,grammar.path);
+  try{
+    const info=await stat(asset);
+    if(!info.isFile()||info.size<100)missingGrammarAssets.push(grammar.path);
+  }catch{missingGrammarAssets.push(grammar.path);}
 }
-await rm(syntaxTarget,{recursive:true,force:true});
-await cp(syntaxSource,syntaxTarget,{recursive:true});
-console.log("STUDIO_THEIA_PREPARED_SYNTAX_EXTENSION",JSON.stringify({
-  target:syntaxTarget,syntaxes:syntaxManifest.contributes.languages.map(x=>x.id),
-  grammarCount:syntaxManifest.contributes.grammars.length
+if(missingGrammarAssets.length)
+  throw Error("Primary Web extension TextMate assets missing: "+missingGrammarAssets.join(", "));
+console.log("STUDIO_THEIA_PREPARED_PRIMARY_SYNTAX",JSON.stringify({
+  target,languages:["yaml","python"],grammarCount:manifest.contributes.grammars.length,
+  independentOfLsp:true
 }));
