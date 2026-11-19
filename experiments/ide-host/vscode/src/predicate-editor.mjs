@@ -169,6 +169,9 @@ export function registerPredicateCommands(vscode,context) {
   context.subscriptions.push(vscode.commands.registerCommand('skillStudio.openPredicates',
     async uri => {
       const target = await choosePredicateSet(vscode, uri);
-      if (target) await openNativeSource(vscode,target,{viewColumn:vscode.ViewColumn.One,preserveFocus:false,preview:false});
+      if (target) {
+        await openNativeSource(vscode,target,{viewColumn:vscode.ViewColumn.One,preserveFocus:false,preview:false});
+        await vscode.commands.executeCommand("skillStudio.showPreview",target);
+      }
     }));
 }

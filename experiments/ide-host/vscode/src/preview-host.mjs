@@ -221,6 +221,31 @@ export function registerPreviewHost(vscode,context,renderers) {
     if(kind==="markdown")void activateMarkdownLanguageFeatures();
     if(kind!=="none"&&previewVisibilityPreference!==false)void revealContainer();
   }
-  context.subscriptions.push(subscription,active,{dispose:()=>controller.dispose()});
+  // Explorer commands must retain an explicit Designer entry after retiring
+  // CustomEditors. Theia registers <view-id>.open for contributed WebviewViews,
+  // so this command reveals the nested Preview without a new EditorGroup.
+  const explicitPreview=vscode.commands.registerCommand?.("skillStudio.showPreview",async uri=>{
+    const target=typeof uri==="string"?vscode.Uri.parse(uri):
+      uri?.scheme&&uri?.path!==undefined
+        ?vscode.Uri.from({scheme:uri.scheme,authority:uri.authority??"",
+          path:uri.path,query:uri.query??"",fragment:uri.fragment??""})
+        :uri;
+    const document=target
+      ?await vscode.workspace.openTextDocument(target)
+      :vscode.window.activeTextEditor?.document??lastDocument;
+    if(!document||previewDocumentKind(document.uri)==="none")return false;
+    lastDocument=document;
+    try{
+      await vscode.commands.executeCommand(isTheiaHost
+        ? PREVIEW_VIEW_ID+".open" : containerCommand);
+      controller.update(document);
+      return true;
+    }catch(error){
+      console.warn("SKILL Studio could not open contextual Preview:",String(error?.message??error));
+      return false;
+    }
+  });
+  context.subscriptions.push(subscription,active,...(explicitPreview?[explicitPreview]:[]),
+    {dispose:()=>controller.dispose()});
   return controller;
 }

@@ -203,6 +203,9 @@ export function registerSchemaCommands(vscode,context) {
   context.subscriptions.push(vscode.commands.registerCommand('skillStudio.openSchema',
     async uri=>{
       const target=await chooseSchema(vscode,uri);
-      if(target)await openNativeSource(vscode,target,{viewColumn:vscode.ViewColumn.One,preserveFocus:false,preview:false});
+      if(target){
+        await openNativeSource(vscode,target,{viewColumn:vscode.ViewColumn.One,preserveFocus:false,preview:false});
+        await vscode.commands.executeCommand("skillStudio.showPreview",target);
+      }
     }));
 }

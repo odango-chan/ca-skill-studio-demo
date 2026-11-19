@@ -156,7 +156,10 @@ test("Bundled CustomTextEditor uses native document, guarded WorkspaceEdit and n
     "the native Procedure Webview routes ZIP export to the host command");
 
   await commands.get("skillStudio.openProcedure")(uri);
-  assert.equal(registered.at(-1)[0],"vscode.openWith");
+  assert.ok(registered.some(args=>args[0]==="vscode.openWith"),
+    "the Procedure command must still open the native YAML Source");
+  assert.equal(registered.at(-1)[0],"skillStudio.showPreview",
+    "the explicit YAML Designer entry must also reveal the right Preview");
   await onMessage({type:"openSource"});
   assert.equal(opened.at(-1).doc,document);
   assert.equal(opened.at(-1).opts.viewColumn,1);

@@ -49,3 +49,18 @@ export function hasVisibleSourceEditor(widgets) {
   return Array.from(widgets ?? []).some(widget =>
     Boolean(widget?.editor) && widget.isHidden !== true);
 }
+
+// A contextual visualization is supported only for the authored CA-SL
+// procedure/contract/predicate/schema sources and Markdown documents.
+// Ordinary YAML/Python are native Source-only; never open an empty Preview.
+export function hasVisualizableSourceEditor(widgets) {
+  return Array.from(widgets ?? []).some(widget => {
+    if (!widget?.editor || widget.isHidden === true) return false;
+    const raw = widget.editor.uri ?? widget.resource;
+    const uri = typeof raw?.toString === "function" ? raw.toString() : "";
+    const path = uri.split(/[?#]/, 1)[0].toLowerCase();
+    return /\/assurance\/(?:procedure|contract|predicates)\.yaml$/.test(path) ||
+      /\/schemas\/[^/]+\.schema\.yaml$/.test(path) ||
+      /\.(?:md|markdown)$/.test(path);
+  });
+}

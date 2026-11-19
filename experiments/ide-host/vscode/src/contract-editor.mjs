@@ -223,6 +223,9 @@ export function registerContractCommands(vscode,context) {
   context.subscriptions.push(vscode.commands.registerCommand('skillStudio.openContract',
     async uri => {
       const target = await chooseContract(vscode, uri);
-      if (target) await openNativeSource(vscode,target,{viewColumn:vscode.ViewColumn.One,preserveFocus:false,preview:false});
+      if (target) {
+        await openNativeSource(vscode,target,{viewColumn:vscode.ViewColumn.One,preserveFocus:false,preview:false});
+        await vscode.commands.executeCommand("skillStudio.showPreview",target);
+      }
     }));
 }
