@@ -37,7 +37,7 @@ export function previewEmptyHtml(kind) {
     <body><h2>${title}</h2><p>${message}</p></body></html>`;
 }
 
-export function createPreviewHostController({mountProcedure}) {
+export function createPreviewHostController({mountProcedure,mountContract,mountPredicate,mountSchema}) {
   let view=null,activeSession=null,activeUri=null,activeKind=null,closed=false,generation=0;
   const clear=()=>{
     const former=activeSession;
@@ -55,7 +55,13 @@ export function createPreviewHostController({mountProcedure}) {
     clear();
     const selectedGeneration=++generation;
     activeUri=uri;activeKind=kind;
-    if(kind!=="procedure"){
+    const mountForKind={
+      procedure:mountProcedure,
+      "skillStudio.contractPreview":mountContract,
+      "skillStudio.predicatePreview":mountPredicate,
+      "skillStudio.schemaPreview":mountSchema
+    }[kind];
+    if(!mountForKind){
       view.webview.options={enableScripts:false};
       view.webview.html=previewEmptyHtml(kind);
       return true;
@@ -71,7 +77,7 @@ export function createPreviewHostController({mountProcedure}) {
       onDidDispose:listener=>currentView.onDidDispose(listener)
     };
     try{
-      const session=mountProcedure(document,panel,{
+      const session=mountForKind(document,panel,{
         forgetPairOnDispose:false,
         isCurrent:()=>!closed&&generation===selectedGeneration&&view===currentView&&
           activeUri===uri
@@ -110,8 +116,8 @@ export function createPreviewHostController({mountProcedure}) {
   };
 }
 
-export function registerPreviewHost(vscode,context,{mountProcedure}) {
-  const controller=createPreviewHostController({mountProcedure});
+export function registerPreviewHost(vscode,context,renderers) {
+  const controller=createPreviewHostController(renderers);
   const subscription=vscode.window.registerWebviewViewProvider(PREVIEW_VIEW_ID,{
     resolveWebviewView(view){
       controller.resolve(view,vscode.window.activeTextEditor?.document??null);
