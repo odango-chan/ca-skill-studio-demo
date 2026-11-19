@@ -118,6 +118,13 @@ export function createPreviewHostController({mountProcedure,mountContract,mountP
 
 export function registerPreviewHost(vscode,context,renderers) {
   const controller=createPreviewHostController(renderers);
+  // A non-Theia/older VS Code-compatible host may not expose WebviewView.
+  // Preserve native Source/CustomEditor behavior rather than blocking startup.
+  if(typeof vscode.window.registerWebviewViewProvider!=="function"){
+    console.warn("SKILL Studio Preview Host unavailable: WebviewViewProvider API missing");
+    context.subscriptions.push({dispose:()=>controller.dispose()});
+    return controller;
+  }
   const subscription=vscode.window.registerWebviewViewProvider(PREVIEW_VIEW_ID,{
     resolveWebviewView(view){
       controller.resolve(view,vscode.window.activeTextEditor?.document??null);
