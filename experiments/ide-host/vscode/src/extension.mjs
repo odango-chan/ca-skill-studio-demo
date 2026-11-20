@@ -464,8 +464,29 @@ export function activate(context){
   // This command is internal (not contributed to the Command Palette) and
   // returns the authoritative workspace and the two current Skill URIs.
   context.subscriptions.push(vscode.commands.registerCommand(
-    "skillStudio.internal.workspaceIdentityAcceptance",async()=>{
+    "skillStudio.internal.workspaceIdentityAcceptance",async(options={})=>{
       const folders=vscode.workspace.workspaceFolders??[];
+      const exampleRoot=vscode.Uri.joinPath(context.globalStorageUri,EXAMPLE_PROJECT_NAME);
+      let seededApiVersion=null;
+      if(options?.seedLegacyExample===true){
+        if(folders.length!==1||folders[0].uri.toString()!==exampleRoot.toString())
+          throw Error("Refusing to seed a legacy fixture outside the built-in Example workspace");
+        const contract=vscode.Uri.joinPath(exampleRoot,"skills","establish-pdu-session",
+          "assurance","contract.yaml");
+        const procedure=vscode.Uri.joinPath(exampleRoot,"skills","establish-pdu-session",
+          "assurance","procedure.yaml");
+        await vscode.workspace.fs.createDirectory(vscode.Uri.joinPath(exampleRoot,"lib"));
+        await vscode.workspace.fs.createDirectory(vscode.Uri.joinPath(exampleRoot,"output"));
+        await vscode.workspace.fs.writeFile(contract,new TextEncoder().encode(
+          "apiVersion: connectionagent.io/v1alpha1\\n"+
+          "kind: Contract\\nmetadata:\\n  name: legacy-example\\n"
+        ));
+        await vscode.workspace.fs.writeFile(procedure,new TextEncoder().encode(
+          "apiVersion: connectionagent.io/v1alpha1\\n"+
+          "kind: Procedure\\nstart: legacy\\nnodes: {}\\n"
+        ));
+        seededApiVersion="connectionagent.io/v1alpha1";
+      }
       const root=folders.length===1?folders[0].uri:null;
       const defaultProcedure=root?vscode.Uri.joinPath(root,
         "skills","establish-pdu-session","assurance","procedure.yaml"):null;
@@ -501,41 +522,11 @@ export function activate(context){
         masProcedureExists:await exists(masProcedure),
         contractApiVersion,procedureApiVersion,
         libExists:await exists(lib),
-        outputExists:await exists(output)
+        outputExists:await exists(output),
+        ...(seededApiVersion?{seededApiVersion}:{})
       };
     }
   ));
-  // Localhost-only acceptance fixture: simulate an existing, pre-v1alpha5
-  // Example profile without exposing a destructive command in the public Pages
-  // build. The real loadExample command must still ask before replacing it.
-  const localAcceptanceHost=(
-    typeof globalThis.location!=="undefined"&&
-    /^(localhost|127(?:\.\d{1,3}){3})$/.test(globalThis.location.hostname)
-  )||(typeof process!=="undefined"&&
-    process.env?.THEIA_ACCEPTANCE_FIXTURES==="1");
-  if(localAcceptanceHost){
-    context.subscriptions.push(vscode.commands.registerCommand(
-      "skillStudio.internal.seedLegacyExampleAcceptance",async()=>{
-        const root=vscode.Uri.joinPath(context.globalStorageUri,EXAMPLE_PROJECT_NAME);
-        const contract=vscode.Uri.joinPath(root,"skills","establish-pdu-session",
-          "assurance","contract.yaml");
-        const procedure=vscode.Uri.joinPath(root,"skills","establish-pdu-session",
-          "assurance","procedure.yaml");
-        await vscode.workspace.fs.createDirectory(vscode.Uri.joinPath(root,"lib"));
-        await vscode.workspace.fs.createDirectory(vscode.Uri.joinPath(root,"output"));
-        await vscode.workspace.fs.writeFile(contract,new TextEncoder().encode(
-          "apiVersion: connectionagent.io/v1alpha1\n"+
-          "kind: Contract\nmetadata:\n  name: legacy-example\n"
-        ));
-        await vscode.workspace.fs.writeFile(procedure,new TextEncoder().encode(
-          "apiVersion: connectionagent.io/v1alpha1\n"+
-          "kind: Procedure\nstart: legacy\nnodes: {}\n"
-        ));
-        return {root:root.toString(),contract:contract.toString(),
-          procedure:procedure.toString(),seededApiVersion:"connectionagent.io/v1alpha1"};
-      })
-    );
-  }
   let exampleLoadPromise=null;
   let projectWelcome=null;
   const progressZh=String(vscode.env?.language??"en").toLowerCase().startsWith("zh");
