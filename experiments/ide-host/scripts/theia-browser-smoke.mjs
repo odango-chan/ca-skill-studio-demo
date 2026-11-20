@@ -469,35 +469,31 @@ try{
         throw Error(path+' is missing '+label+': '+JSON.stringify(nativeStudioMenuWidget.fileActions));
   }
   const revealStudioSubmenu=async(label,expected)=>{
-    const position=await evalJS(\`(()=>{
+    const position=await evalJS(`(()=>{
       const menus=[...document.querySelectorAll('.lm-Menu,.p-Menu')]
         .filter(menu=>getComputedStyle(menu).display!=='none');
+      const wanted=${JSON.stringify(label)};
       const candidates=menus.flatMap(menu=>[...menu.querySelectorAll('*')])
-        .map(node=>({node,text:(node.textContent||"").replace(/\\s+/g," ").trim(),
+        .map(node=>({text:(node.textContent||'').replace(/\\s+/g,' ').trim(),
           rect:node.getBoundingClientRect()}))
         .filter(item=>item.rect.width>0&&item.rect.height>0&&
-          (item.text===\${JSON.stringify(label)}||
-           item.text.startsWith(\${JSON.stringify(label)}+" ")));
+          (item.text===wanted||item.text.startsWith(wanted+' ')));
       candidates.sort((a,b)=>
         a.rect.width*a.rect.height-b.rect.width*b.rect.height);
-      if(!candidates.length)return {
-        missing:true,
-        menus:menus.map(menu=>({
-          className:menu.className,text:(menu.innerText||menu.textContent||"").slice(0,500),
-          html:menu.outerHTML.slice(0,1600)
-        }))
-      };
+      if(!candidates.length)return {missing:true,menus:menus.map(menu=>({
+        className:menu.className,text:(menu.innerText||menu.textContent||'').slice(0,500)
+      }))};
       const r=candidates[0].rect;
       return {x:r.left+r.width/2,y:r.top+r.height/2,text:candidates[0].text};
-    })()\`);
+    })()`);
     if(!position||position.missing)
-      throw Error('Native Studio submenu item is not visible: '+label+
-        ' · '+JSON.stringify(position?.menus??null));
-    await command("Input.dispatchMouseEvent",{type:"mouseMoved",x:position.x,y:position.y});
+      throw Error('Native Studio submenu item is not visible: '+label+' · '+
+        JSON.stringify(position?.menus??null));
+    await command('Input.dispatchMouseEvent',{type:'mouseMoved',x:position.x,y:position.y});
     await sleep(350);
-    const visibleMenus=await evalJS(\`[...document.querySelectorAll('.lm-Menu,.p-Menu')]
+    const visibleMenus=await evalJS(`[...document.querySelectorAll('.lm-Menu,.p-Menu')]
       .filter(node=>getComputedStyle(node).display!=='none')
-      .map(node=>node.innerText||node.textContent).join('\\n')`);
+      .map(node=>node.innerText||node.textContent).join(' | ')`);
     for(const expectedLabel of expected)
       if(!visibleMenus.includes(expectedLabel))
         throw Error('Native Studio '+label+' submenu is missing '+expectedLabel+': '+visibleMenus);
