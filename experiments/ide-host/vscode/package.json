@@ -471,7 +471,7 @@
           ],
           "default": "all",
           "scope": "application",
-          "markdownDescription": "Default Compiler v1.0.0 target selection. The current integration builds the selected Skill Package explicitly."
+          "markdownDescription": "Default Compiler v2.0.2 target selection. The current integration builds the selected Skill Package explicitly."
         },
         "connectionAgent.skillStudio.ai.gatewayUrl": {
           "type": "string",
