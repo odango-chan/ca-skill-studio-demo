@@ -81,7 +81,7 @@ jobs:
           test "$checked" -gt 0
           echo "Checked $checked active tracked JavaScript files"
       - name: Build Theia Web extension for default online workbench
-        if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/spike/ide-extension-theia-host'
+        if: github.event_name == 'pull_request' || github.ref == 'refs/heads/main' || github.ref == 'refs/heads/spike/ide-extension-theia-host'
         working-directory: ide-source
         run: |
           npm ci --no-audit --no-fund
@@ -91,7 +91,7 @@ jobs:
           npm ci --prefix experiments/ide-host/lsp-browser/server --no-audit --no-fund
           node experiments/ide-host/scripts/build-ide-spike.mjs
       - name: Checkout pinned CA Skill Compiler v2.0.0 source
-        if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/spike/ide-extension-theia-host'
+        if: github.event_name == 'pull_request' || github.ref == 'refs/heads/main' || github.ref == 'refs/heads/spike/ide-extension-theia-host'
         uses: actions/checkout@v4
         with:
           repository: odango-chan/ca-skill-compiler
@@ -100,12 +100,12 @@ jobs:
           token: ${{ secrets.CA_SKILL_COMPILER_READ_TOKEN }}
           persist-credentials: false
       - name: Go 1.26.6 for the pinned Compiler WASM build
-        if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/spike/ide-extension-theia-host'
+        if: github.event_name == 'pull_request' || github.ref == 'refs/heads/main' || github.ref == 'refs/heads/spike/ide-extension-theia-host'
         uses: actions/setup-go@v5
         with:
           go-version: "1.26.6"
       - name: Build pinned Compiler v2.0.0 Go/WASM Core
-        if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/spike/ide-extension-theia-host'
+        if: github.event_name == 'pull_request' || github.ref == 'refs/heads/main' || github.ref == 'refs/heads/spike/ide-extension-theia-host'
         working-directory: compiler-source
         run: |
           mkdir -p dist
@@ -115,13 +115,13 @@ jobs:
           cp dist/wasm_exec.js ../ide-source/experiments/ide-host/vscode/dist/wasm_exec.js
           sha256sum dist/skillc.wasm
       - name: Stage prepared Compiler Worker and WASM assets
-        if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/spike/ide-extension-theia-host'
+        if: github.event_name == 'pull_request' || github.ref == 'refs/heads/main' || github.ref == 'refs/heads/spike/ide-extension-theia-host'
         working-directory: ide-source
         run: |
           node experiments/ide-host/scripts/prepare-theia-online.mjs
           node --test experiments/ide-host/tests/pages-compose.test.mjs
       - name: Build Theia browser-only static workbench
-        if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/spike/ide-extension-theia-host'
+        if: github.event_name == 'pull_request' || github.ref == 'refs/heads/main' || github.ref == 'refs/heads/spike/ide-extension-theia-host'
         working-directory: ide-source
         run: |
           npm install --prefix experiments/ide-host/theia-online --no-audit --no-fund --ignore-scripts
@@ -135,7 +135,7 @@ jobs:
           node experiments/ide-host/scripts/prepare-theia-static-preview.mjs
           node experiments/ide-host/scripts/prepare-theia-brand.mjs experiments/ide-host/theia-online/lib/frontend
       - name: Real Chromium acceptance at the default Pages root
-        if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/spike/ide-extension-theia-host'
+        if: github.event_name == 'pull_request' || github.ref == 'refs/heads/main' || github.ref == 'refs/heads/spike/ide-extension-theia-host'
         working-directory: ide-source
         env:
           THEIA_BASE_PATH: "/ca-skill-studio-demo"
@@ -145,7 +145,7 @@ jobs:
         run: node experiments/ide-host/scripts/theia-browser-smoke.mjs
       # Theia is the only supported online host. Publish no Classic fallback.
       - name: Compose Theia-only Pages release
-        if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/spike/ide-extension-theia-host'
+        if: github.event_name == 'pull_request' || github.ref == 'refs/heads/main' || github.ref == 'refs/heads/spike/ide-extension-theia-host'
         working-directory: main-source
         run: |
           node ../ide-source/experiments/ide-host/scripts/compose-pages-release.mjs --theia ../ide-source/experiments/ide-host/theia-online/lib/frontend --output dist --site-root .
@@ -167,7 +167,7 @@ jobs:
           test ! -e dist/ide-preview
           test ! -e dist/classic-icons.css
       - name: Record and verify exact deployed source identity
-        if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/spike/ide-extension-theia-host'
+        if: github.event_name == 'pull_request' || github.ref == 'refs/heads/main' || github.ref == 'refs/heads/spike/ide-extension-theia-host'
         working-directory: main-source
         env:
           EXPECTED_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
