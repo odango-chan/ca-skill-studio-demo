@@ -777,6 +777,7 @@ export function registerAiAuthoringEditor(vscode, context, { getActiveDocument, 
       return;
     }
     const pending = activeSession.pending;
+    activeSession.previewRequestId = message.requestId;
     if (!isLiveDocumentRevision(pending.document, pending)) {
       activeSession.pending = null;
       post({ type: "error", message: "Procedure 已变化，候选预览失效；请重新生成提案。" });
@@ -788,16 +789,65 @@ export function registerAiAuthoringEditor(vscode, context, { getActiveDocument, 
         plan: pending.patchPlan,
         acceptedGroupIds: message.groupIds,
       });
-      if (!isCurrent() || activeSession.pending !== pending) return;
+      if (!isCurrent() || activeSession.pending !== pending ||
+        activeSession.previewRequestId !== message.requestId) return;
       if (!isLiveDocumentRevision(pending.document, pending)) {
         activeSession.pending = null;
         post({ type: "error", message: "Procedure 在候选预览生成期间发生变化，旧预览已失效。请刷新上下文并重新生成。" });
         return;
       }
+      let compilerCheck = null;
+      let compilerCheckError = null;
+      try {
+        compilerCheck = await createAuthoringCompilerCheck({
+          compilerIntegration,
+          state: pending.state,
+          document: pending.document,
+          changeSet: pending.changeSet,
+          candidateSource: preview.source,
+          candidateDigest: preview.digest,
+        });
+      } catch (error) {
+        compilerCheckError = String(error?.message ?? error);
+      }
+      if (!isCurrent() || activeSession.pending !== pending ||
+        activeSession.previewRequestId !== message.requestId) return;
+      if (!isLiveDocumentRevision(pending.document, pending)) {
+        activeSession.pending = null;
+        post({ type: "error", message: "Compiler Check 完成前 Procedure 已变化；旧候选已失效。" });
+        return;
+      }
+      const waitGate = containsWaitMutation(pending.changeSet.operations);
+      const canApply = message.groupIds.length > 0 && isAuthoringApplyAllowed({
+        patchPlan: pending.patchPlan,
+        changeSet: pending.changeSet,
+        candidateDigest: preview.digest,
+        blockers: pending.proposalResult.proposal.blockers,
+        waitMutation: waitGate,
+        compilerCheck,
+      });
+      pending.candidateSource = preview.source;
+      pending.candidateDigest = preview.digest;
+      pending.compilerCheck = compilerCheck;
+      pending.canApply = canApply;
       post({
         type: "preview",
         requestId: message.requestId,
         candidateSource: preview.source,
+        compilerVersion: compilerCheck?.compilerVersion ?? COMPILER_VERSION,
+        compilerState: compilerCheck?.state ?? "UNAVAILABLE",
+        canApply,
+        patchState: canApply ? "READY · Compiler v2.0.2 PASS" :
+          waitGate ? "PREVIEW ONLY · trusted IngressCatalog binding required" :
+          compilerCheck?.state === "FAIL" ? "BLOCKED · Compiler Check failed" :
+          "PREVIEW ONLY · Compiler Check unavailable",
+        patchError: compilerCheckError ??
+          (waitGate
+            ? "Wait edits additionally require a trusted IngressCatalog v1alpha1 Owner binding. Static Check alone does not establish that trust."
+            : compilerCheck?.state === "FAIL"
+              ? compilerCheck.diagnostics.slice(0, 6).map(item =>
+                (item.code ? item.code + ": " : "") + item.message).join("\\n")
+              : canApply ? "" : "Compiler v2.0.2 Check did not return a complete PASS for this exact candidate."),
       });
     } catch (error) {
       if (!isCurrent() || activeSession.pending !== pending) return;
