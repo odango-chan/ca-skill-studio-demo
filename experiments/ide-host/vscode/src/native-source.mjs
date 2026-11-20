@@ -8,7 +8,7 @@ async function retryTransientFileSystemEio(operation,label,attempts=4){
     catch(error){
       lastError=error;
       const message=String(error?.message??error);
-      if(!/\\bEIO\\b|I\\/O error/i.test(message)||attempt===attempts-1)throw error;
+      if(!(message.includes("EIO")||message.includes("I/O error"))||attempt===attempts-1)throw error;
       console.warn("SKILL_STUDIO_TRANSIENT_FS_RETRY",JSON.stringify({
         operation:label,attempt:attempt+1,attempts,message
       }));
