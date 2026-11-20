@@ -469,33 +469,35 @@ try{
         throw Error(path+' is missing '+label+': '+JSON.stringify(nativeStudioMenuWidget.fileActions));
   }
   const revealStudioSubmenu=async(label,expected)=>{
-    const position=await evalJS(`(()=>{
-      const item=[...document.querySelectorAll('.lm-Menu-item,.lm-MenuBar-item,.lm-Menu-itemLabel,.lm-MenuBar-itemLabel')]
-        .find(node=>{
-          const text=(node.innerText||node.textContent||"").replace(/\\s+/g," ").trim();
-          const r=node.getBoundingClientRect();
-          return r.width>0&&r.height>0&&
-            (text===${JSON.stringify(label)}||text.startsWith(${JSON.stringify(label)}+" "));
-        });
-      if(!item)return {
+    const position=await evalJS(\`(()=>{
+      const menus=[...document.querySelectorAll('.lm-Menu,.p-Menu')]
+        .filter(menu=>getComputedStyle(menu).display!=='none');
+      const candidates=menus.flatMap(menu=>[...menu.querySelectorAll('*')])
+        .map(node=>({node,text:(node.textContent||"").replace(/\\s+/g," ").trim(),
+          rect:node.getBoundingClientRect()}))
+        .filter(item=>item.rect.width>0&&item.rect.height>0&&
+          (item.text===\${JSON.stringify(label)}||
+           item.text.startsWith(\${JSON.stringify(label)}+" ")));
+      candidates.sort((a,b)=>
+        a.rect.width*a.rect.height-b.rect.width*b.rect.height);
+      if(!candidates.length)return {
         missing:true,
-        candidates:[...document.querySelectorAll('.lm-Menu-item,.lm-MenuBar-item,.lm-Menu-itemLabel,.lm-MenuBar-itemLabel')].map(node=>({
-          text:(node.innerText||node.textContent||"").trim(),
-          rect:node.getBoundingClientRect().toJSON(),
-          display:getComputedStyle(node).display
-        })).filter(item=>item.rect.width>0&&item.rect.height>0).slice(0,30)
+        menus:menus.map(menu=>({
+          className:menu.className,text:(menu.innerText||menu.textContent||"").slice(0,500),
+          html:menu.outerHTML.slice(0,1600)
+        }))
       };
-      const r=item.getBoundingClientRect();
-      return {x:r.left+r.width/2,y:r.top+r.height/2};
-    })()`);
+      const r=candidates[0].rect;
+      return {x:r.left+r.width/2,y:r.top+r.height/2,text:candidates[0].text};
+    })()\`);
     if(!position||position.missing)
       throw Error('Native Studio submenu item is not visible: '+label+
-        ' · '+JSON.stringify(position?.candidates??null));
+        ' · '+JSON.stringify(position?.menus??null));
     await command("Input.dispatchMouseEvent",{type:"mouseMoved",x:position.x,y:position.y});
     await sleep(350);
-    const visibleMenus=await evalJS(`[...document.querySelectorAll('.lm-Menu')]
+    const visibleMenus=await evalJS(\`[...document.querySelectorAll('.lm-Menu,.p-Menu')]
       .filter(node=>getComputedStyle(node).display!=='none')
-      .map(node=>node.innerText).join('\\n')`);
+      .map(node=>node.innerText||node.textContent).join('\\\\n')\`);
     for(const expectedLabel of expected)
       if(!visibleMenus.includes(expectedLabel))
         throw Error('Native Studio '+label+' submenu is missing '+expectedLabel+': '+visibleMenus);
