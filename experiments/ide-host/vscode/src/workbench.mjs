@@ -53,6 +53,7 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
     registered:false,tokenTypeCount:0,requests:0,lastUri:null,lastTokenCount:0,lastError:null,
     registrationError:null,
     renderer:null,renderedTokenCount:0,renderedTypeCount:0,renderError:null,
+    rendererDiagnostics:null,
     server:null,transport:null,packageAttachAttempts:0,lastPackageRoot:null,
     lastPackageAttachReason:null
   };
@@ -114,6 +115,7 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
           vscode,SKILL_SEMANTIC_TOKEN_TYPES,studioLightTheme.semanticTokenColors??{}
         );
         semanticTokenDiagnostics.renderer="theia-text-editor-decoration";
+        semanticTokenDiagnostics.rendererInstance=renderer;
         context.subscriptions.push({dispose:()=>renderer?.dispose()});
       }catch(error){
         semanticTokenDiagnostics.renderError=String(error?.message??error);
@@ -230,6 +232,8 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
   context.subscriptions.push(vscode.commands.registerCommand(
     "skillStudio.internal.semanticTokenDiagnostics",()=>({
       ...semanticTokenDiagnostics,
+      rendererDiagnostics:semanticTokenDiagnostics.renderer==="theia-text-editor-decoration"
+        ?semanticTokenDiagnostics.rendererInstance?.diagnostics?.()??null:null,
       activeDocumentUri:document?.uri?.toString?.()??null,
       activePackageRootUri:document
         ?packageRootForProcedure(vscode,document)?.uri?.toString?.()??null:null,
