@@ -1183,7 +1183,7 @@ try{
   // Simulate a browser profile upgraded from the retired Example. The
   // fixture changes only the dedicated built-in Example root, never a user
   // workspace. The native Project menu must remain the recovery path.
-  const seededLegacy=await evalJS("(()=>{const c=window.theia.container;const k=[...c._bindingDictionary._map.keys()].find(x=>typeof x==='function'&&x.prototype?.executeCommand&&x.prototype?.registerCommand&&x.prototype?.getCommand);return c.get(k).executeCommand('skillStudio.internal.seedLegacyExampleAcceptance')})()");
+  const seededLegacy=await evalJS("(()=>{const c=window.theia.container;const k=[...c._bindingDictionary._map.keys()].find(x=>typeof x==='function'&&x.prototype?.executeCommand&&x.prototype?.registerCommand&&x.prototype?.getCommand);return c.get(k).executeCommand('skillStudio.internal.workspaceIdentityAcceptance',{seedLegacyExample:true})})()");
   if(seededLegacy?.seededApiVersion!=="connectionagent.io/v1alpha1")
     throw Error("Could not seed the previous Example profile: "+JSON.stringify(seededLegacy));
   await command("Page.reload",{ignoreCache:false});
