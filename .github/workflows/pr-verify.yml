@@ -2,6 +2,7 @@ name: Verify Skill Studio pull requests
 on:
   pull_request:
     paths:
+      - 'authoring/**'
       - 'site/**'
       - 'docs/**'
       - 'README.md'
