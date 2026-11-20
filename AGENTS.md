@@ -35,6 +35,7 @@ Theia browser-only 是唯一在线工作台。独立 Classic 浏览器工作台�
 - LSP、Semantic Tokens、Completion、Hover、Definition、References 与 Diagnostics 消费权威语言契约及项目依赖快照；禁止在 Studio 另维护一套 DSL / Schema 定义。
 - 修改现有行为必须新增 positive 和 negative test；Source revision 冲突、结构保真、Route origin、Root/Child 导航都需回归。
 - 用户项目与工作区数据优先保护；示例导入不得覆盖用户修改，删除旧代码不得删除用户文件或持久化工作区数据。
+- AI Authoring 只支持 CA-SL v1alpha5；改动必须遵循 `docs/design/ai-procedure-authoring.md` 与 Issue #200。模型输出始终是不可信提案，必须经过 Host Change Set / v1alpha5 Patch Engine；Compiler 是唯一权威 Check。使用独立 Go `ai-gateway`；Provider Key 只保存在 Gateway 主机，不得进入浏览器、Webview、VSIX 或工作区。无用户账户 / OAuth / per-user Model Key；非 loopback 只允许一个部署级 `X-Gateway-Token`，它不是用户身份。浏览器 CORS 只允许精确 Origin，不使用 Cookie。
 
 ## Local validation / delivery
 

@@ -1,5 +1,19 @@
 # Skill Studio 当前工作状态
 
+## 2026-11-18 · AI Procedure Authoring P1（Go Gateway 集成）
+
+[Issue #200](https://github.com/odango-chan/ca-skill-studio-demo/issues/200) · [Canonical design](design/ai-procedure-authoring.md) · [Go AI Gateway](https://github.com/odango-chan/ai-gateway) · [Gateway browser CORS issue #4](https://github.com/odango-chan/ai-gateway/issues/4)
+
+- **产品边界：** 独立 AI Authoring Editor Tab；模型只输出不可信语义提案；Host 负责 Context Pack、ModelProposal 校验、Change Set、v1alpha5 Patch 和原生 TextDocument Buffer。用户自行保存；不执行 Runtime / Tool。
+- **语言基线：** CA-SL v1alpha5 已 FROZEN / RELEASED（`ca-skills@0abfd0e1ab99f481a4ae01f3f47efc54783dd5e5`）；IngressCatalog v1alpha1 已发布（`ca-skills@9412be9894ef36acf846c757a5870dc0c48b33ac`）。v1alpha4 不作为编辑或兼容路径。
+- **Gateway：** 使用独立 Go 仓 `odango-chan/ai-gateway`，透明转发 OpenAI-compatible HTTP，不做 Prompt 处理、Model 选择、协议转换或用户管理。Gateway 部署在本机 loopback 或可信内网服务器；Provider API Key 只保存在 Gateway 主机。
+- **请求契约：** Studio 的 `gatewayUrl` 是带 upstream label 和上游 path prefix 的路由前缀，例如 `http://127.0.0.1:8787/opencode-go/openai`；Client 追加 `/v1/chat/completions`。Model ID 由 Studio 应用设置提供（初始默认 `deepseek-v4.1-flash`），并放入请求体；Host 生成稳定 `X-Opencode-Session`。
+- **访问边界：** loopback 不需要 Gateway token；非 loopback 使用部署级共享 `X-Gateway-Token`，不是用户认证或用户身份。Host SecretStorage 保存该共享 token；Provider Key 不进入浏览器、Webview、VSIX、工作区或 Context Pack。请求不携带 Cookie。
+- **浏览器跨域：** Gateway 当前默认不启用 CORS；GitHub Pages / Theia Browser-Only 调用本地或内网 Gateway 需要精确 Origin allowlist 和 Private Network preflight 支持，跟踪于 [ai-gateway #4](https://github.com/odango-chan/ai-gateway/issues/4)。CORS 不是认证。
+- **实现 PR 顺序：** [#201 Design](https://github.com/odango-chan/ca-skill-studio-demo/pull/201) → [#203 Authoring Core](https://github.com/odango-chan/ca-skill-studio-demo/pull/203) → [#204 Change Set](https://github.com/odango-chan/ca-skill-studio-demo/pull/204) → [#207 v1alpha5 Patch Engine](https://github.com/odango-chan/ca-skill-studio-demo/pull/207) → [#208 Editor Tab](https://github.com/odango-chan/ca-skill-studio-demo/pull/208)。旧 [#206 Worker prototype](https://github.com/odango-chan/ca-skill-studio-demo/pull/206) 已废弃，不得合并。
+- **当前状态：** Core、Change Set、Patch Engine、Editor Tab 均有实现；Go Gateway 独立仓已存在。Studio → Gateway 真实浏览器 / 模型请求尚未验收；CORS issue #4 未完成。所有 Apply 继续关闭，直到集成的已发布 v1alpha5 Compiler 对同一候选返回完整权威 PASS；Compiler PR #38 仍为 `CANDIDATE_PARTIAL`。
+- **验收纪律：** 本轮刷新会产生新的 PR head，旧 exact-head CI 不能代替新 head 验收；每个 PR 必须重新运行对应单测、IDE Host、Theia Browser Host / Browser-Only Chromium 检查。
+
 ## 2026-11-18 · CA-SL v1alpha5-only authoring（PR #199）
 
 **语言规范：** CA-SL v1alpha5 已由 [ca-skills PR #66](https://github.com/odango-chan/ca-skills/pull/66) 正式冻结发布，权威 Release Commit 为 `0abfd0e1ab99f481a4ae01f3f47efc54783dd5e5`，目标为 `connectionagent.io/v1alpha5`。v1alpha4 只保留为不可变的规范继承基线和历史记录，不是产品编辑模式；不提供 v1alpha4 兼容入口或旧项目自动迁移。
