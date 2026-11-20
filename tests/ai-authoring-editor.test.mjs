@@ -3,6 +3,8 @@ import assert from "node:assert/strict";
 import { configureAiGatewayToken } from "../experiments/ide-host/vscode/src/ai-authoring-editor.mjs";
 import {
   buildAuthoringResourceInventory,
+  createAuthoringCompilerRequest,
+  createAuthoringCompilerCheck,
   containsWaitMutation,
   createPackageRevisionTracker,
   renderAiAuthoringHtml,
@@ -22,6 +24,7 @@ function packageSnapshot(overrides = {}) {
     completeness: "complete",
     generation: 1,
     documents: [
+      { relativePath: "assurance/procedure.yaml", version: 1, text: "start: check\\nnodes: {}\\n" },
       { relativePath: "assurance/contract.yaml", version: 1, text: "goal: session.established\n" },
       { relativePath: "assurance/predicates.yaml", version: 1, text: "predicates: {}\n" },
       { relativePath: "schemas/request.schema.yaml", version: 1, text: "type: object\n" },
@@ -147,6 +150,73 @@ test("stale Editor Tab sessions cannot publish asynchronous results into a repla
   assert.equal(isCurrentAuthoringSession(null, first), false);
 });
 
+test("Compiler request replaces only the exact candidate Procedure and includes locked dependency bytes", () => {
+  const state = {
+    snapshot: packageSnapshot(),
+    dependencies: dependencyResolution(),
+    generation: 4,
+  };
+  const request = createAuthoringCompilerRequest(state, "start: candidate\\nnodes: {}\\n");
+  assert.equal(request.languageTarget, "connectionagent.io/v1alpha5");
+  const procedure = request.files.find((item) =>
+    item.path === "skills/example/assurance/procedure.yaml");
+  assert.ok(procedure);
+  assert.equal(Buffer.from(procedure.bytes, "base64").toString("utf8"),
+    "start: candidate\\nnodes: {}\\n");
+  assert.ok(request.files.some((item) =>
+    item.path === "skills/example/assurance/contract.yaml"));
+  assert.equal(request.resolvedDependencies[0].dependencyId, "provider-5gc");
+  assert.equal(request.resolvedDependencies[0].digest, digest);
+});
+
+test("Compiler Check result is bound to exact document, Package generation and candidate digest", async () => {
+  const state = {
+    snapshot: packageSnapshot(),
+    dependencies: dependencyResolution(),
+    generation: 9,
+  };
+  const document = {
+    uri: { toString: () => "file:///workspace/skills/example/assurance/procedure.yaml" },
+    version: 7,
+  };
+  const changeSet = { base: {
+    documentUri: document.uri.toString(),
+    documentVersion: 7,
+    packageGeneration: 9,
+    sourceDigest: "sha256:" + "a".repeat(64),
+  } };
+  const candidateDigest = "sha256:" + "b".repeat(64);
+  let request;
+  const compilerIntegration = {
+    compilerVersion: "v2.0.2",
+    async checkRequest(value) { request = value; return []; },
+  };
+  const result = await createAuthoringCompilerCheck({
+    compilerIntegration,state,document,changeSet,
+    candidateSource: "start: candidate\\nnodes: {}\\n",candidateDigest,
+  });
+  assert.equal(request.languageTarget, "connectionagent.io/v1alpha5");
+  assert.equal(result.compilerVersion, "v2.0.2");
+  assert.equal(result.state, "PASS");
+  assert.equal(result.complete, true);
+  assert.equal(result.documentUri, changeSet.base.documentUri);
+  assert.equal(result.documentVersion, 7);
+  assert.equal(result.packageGeneration, 9);
+  assert.equal(result.sourceDigest, changeSet.base.sourceDigest);
+  assert.equal(result.candidateDigest, candidateDigest);
+  assert.equal(result.trustedIngressBinding, false);
+  const failed = await createAuthoringCompilerCheck({
+    compilerIntegration: {
+      compilerVersion: "v2.0.2",
+      async checkRequest() { return [{code:"E_TEST",severity:"error",message:"invalid"}]; },
+    },
+    state,document,changeSet,
+    candidateSource: "start: candidate\\nnodes: {}\\n",candidateDigest,
+  });
+  assert.equal(failed.state, "FAIL");
+  assert.equal(failed.errorCount, 1);
+});
+
 test("AI proposals require a complete pinned v1alpha5 Compiler PASS for the exact candidate identity", () => {
   const changeSet = { base: {
     documentUri: "file:///workspace/skills/example/assurance/procedure.yaml",
@@ -157,6 +227,7 @@ test("AI proposals require a complete pinned v1alpha5 Compiler PASS for the exac
   } };
   const patchPlan = { candidateDigest: "sha256:" + "b".repeat(64) };
   const compilerCheck = {
+    compilerVersion: "v2.0.2",
     languageTarget: "connectionagent.io/v1alpha5",
     state: "PASS",
     complete: true,
