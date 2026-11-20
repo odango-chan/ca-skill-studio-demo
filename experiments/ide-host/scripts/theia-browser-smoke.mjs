@@ -1365,16 +1365,14 @@ try{
   }));
   let aiAuthoringEvidence=null;
   if(requireEditor&&externalUrl){
-    const nativeCommand=async(id,...args)=>evalJS(
+    await evalJS(
       "(async()=>{const c=window.theia.container;"+
       "const key=[...c._bindingDictionary._map.keys()].find(k=>"+
       "typeof k==='function'&&k.prototype?.executeCommand&&"+
       "k.prototype?.registerCommand&&k.prototype?.getCommand);"+
       "if(!key)throw Error('Native Theia command registry missing for AI Authoring');"+
-      "return c.get(key).executeCommand("+JSON.stringify("skillStudio.openProcedure")+
-      ",..."+JSON.stringify([identity.defaultProcedure])+
-      ");})()");
-    await nativeCommand("skillStudio.openProcedure",identity.defaultProcedure);
+      "return c.get(key).executeCommand('skillStudio.openProcedure',"+
+      JSON.stringify(identity.defaultProcedure)+");})()");
     const opened=await evalJS(
       "(async()=>{const c=window.theia.container;"+
       "const key=[...c._bindingDictionary._map.keys()].find(k=>"+

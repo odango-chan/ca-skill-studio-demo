@@ -27,6 +27,7 @@ const boot = (async () => {
   }
   throw new Error("Pinned Go/WASM Compiler did not expose its v1alpha5 callbacks.");
 })();
+void boot.catch(() => undefined);
 
 parentPort.on("message", async message => {
   const { id, command, request } = message ?? {};

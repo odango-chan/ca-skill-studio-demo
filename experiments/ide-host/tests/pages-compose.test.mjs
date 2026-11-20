@@ -100,6 +100,25 @@ test("Pages builds and smoke-tests the exact Compiler v2.0.2 Go/WASM release",as
   assert.match(workflow,/THEIA_REQUIRE_COMPILER_WORKER: "1"/);
 });
 
+test("all Compiler host workflows pin the same released v2.0.2 source commit",async()=>{
+  const compilerCommit="e98a7b26acabfa2a5e1587974ab9be5742e70bf7";
+  const workflows=[
+    "pages.yml",
+    "theia-browser-host-spike.yml",
+    "theia-online-spike.yml",
+    "ide-host-spike.yml",
+    "pr-verify.yml"
+  ];
+  for(const name of workflows){
+    const workflow=await readFile(new URL("../../../.github/workflows/"+name,import.meta.url),"utf8");
+    assert.match(workflow,/repository: odango-chan\/ca-skill-compiler[\s\S]*?ref: e98a7b26acabfa2a5e1587974ab9be5742e70bf7/,
+      name+" must check out the exact v2.0.2 commit");
+    assert.match(workflow,/Verify pinned CA Skill Compiler v2\.0\.2 source identity[\s\S]*?git rev-parse HEAD/,
+      name+" must verify the staged Compiler source identity");
+    assert.ok(workflow.includes(compilerCommit),name+" must retain the exact immutable source SHA");
+  }
+});
+
 test("Pages workflow cannot reintroduce the Classic application",async()=>{
   const workflow=await readFile(new URL("../../../.github/workflows/pages.yml",import.meta.url),"utf8");
   assert.doesNotMatch(workflow,/--classic|preserve Classic/i);
