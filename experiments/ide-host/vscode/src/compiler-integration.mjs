@@ -598,12 +598,14 @@ export function registerCompilerIntegration(vscode,context,{
       target=>safe("inspect",target))
   );
 
-  // Real Chromium acceptance: exercise the actual pinned Go/WASM callbacks in
-  // the browser-only Theia Plugin Worker with a deliberately incomplete Skill.
-  // It proves transport and failure atomicity only, not a qualified Owner build.
-  if(typeof globalThis.Worker==="function"&&
-     typeof globalThis.location!=="undefined"&&
-     /^(localhost|127(?:\.\d{1,3}){3})$/.test(globalThis.location.hostname)){
+  // Internal acceptance command: exercise the actual pinned Go/WASM callbacks
+  // in either the browser Worker or Node worker_threads host. It proves
+  // transport and failure atomicity only, not a qualified Owner build.
+  const nodeExtensionHost=typeof process!=="undefined"&&Boolean(process.versions?.node);
+  const localBrowserHost=typeof globalThis.Worker==="function"&&
+    typeof globalThis.location!=="undefined"&&
+    /^(localhost|127(?:\.\d{1,3}){3})$/.test(globalThis.location.hostname);
+  if(nodeExtensionHost||localBrowserHost){
     context.subscriptions.push(vscode.commands.registerCommand(
       "skillStudio.internal.compilerWorkerAcceptance",async()=>{
         const request={

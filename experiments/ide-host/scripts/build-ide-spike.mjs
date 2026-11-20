@@ -36,6 +36,7 @@ for(const language of syntaxManifest.contributes?.languages??[]){
 // Keep the Go/WASM Compiler adapter as a separate classic Worker entry; the
 // pinned wasm_exec.js and skillc.wasm are staged by the CI Go build step.
 await cp(join(root,"src/compiler-worker.js"),join(root,"dist/compiler-worker.js"));
+await cp(join(root,"src/compiler-node-worker.mjs"),join(root,"dist/compiler-node-worker.mjs"));
 // The pinned Markdown extension owns native Source language services; the shared Studio Preview Host owns rendering.
 await cp("extensions/skill-studio-theme/styles/markdown-preview.css",
   join(root,"media/studio-markdown-preview.css"));
