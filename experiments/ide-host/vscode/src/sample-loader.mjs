@@ -28,7 +28,7 @@ async function clearDirectoryContents(vscode,fs,root){
   }
   for(const [name] of entries){
     if(typeof name!=="string"||!name||name==="."||name===".."||
-       name.includes("/")||name.includes("\\\\"))
+       name.includes("/")||name.includes("\\"))
       fail("Host file system returned an unsafe Example child name");
     const child=vscode.Uri.joinPath(root,name);
     await fs.delete(child,{recursive:true,useTrash:false});
