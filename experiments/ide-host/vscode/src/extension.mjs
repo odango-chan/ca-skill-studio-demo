@@ -471,11 +471,23 @@ export function activate(context){
         "skills","establish-pdu-session","assurance","procedure.yaml"):null;
       const masProcedure=root?vscode.Uri.joinPath(root,
         "skills","establish-pdu-session-mas","assurance","procedure.yaml"):null;
+      const contract=root?vscode.Uri.joinPath(root,
+        "skills","establish-pdu-session","assurance","contract.yaml"):null;
+      const lib=root?vscode.Uri.joinPath(root,"lib"):null;
+      const output=root?vscode.Uri.joinPath(root,"output"):null;
       const exists=async uri=>{
         if(!uri)return false;
         try{await vscode.workspace.fs.stat(uri);return true;}
         catch{return false;}
       };
+      let contractApiVersion=null;
+      if(contract){
+        try{
+          const source=new TextDecoder("utf-8",{fatal:true})
+            .decode(await vscode.workspace.fs.readFile(contract));
+          contractApiVersion=/^\\s*apiVersion\\s*:\\s*["']?([^"'\\s]+)/m.exec(source)?.[1]??null;
+        }catch{}
+      }
       return {
         workspaceName:vscode.workspace.name??null,
         workspaceFile:vscode.workspace.workspaceFile?.toString?.()??null,
@@ -484,10 +496,34 @@ export function activate(context){
         defaultProcedure:defaultProcedure?.toString?.()??null,
         defaultProcedureExists:await exists(defaultProcedure),
         masProcedure:masProcedure?.toString?.()??null,
-        masProcedureExists:await exists(masProcedure)
+        masProcedureExists:await exists(masProcedure),
+        contractApiVersion,
+        libExists:await exists(lib),
+        outputExists:await exists(output)
       };
     }
   ));
+  // Localhost-only acceptance fixture: simulate an existing, pre-v1alpha5
+  // Example profile without exposing a destructive command in the public Pages
+  // build. The real loadExample command must still ask before replacing it.
+  if(typeof globalThis.location!=="undefined"&&
+     /^(localhost|127(?:\\.\\d{1,3}){3})$/.test(globalThis.location.hostname)){
+    context.subscriptions.push(vscode.commands.registerCommand(
+      "skillStudio.internal.seedLegacyExampleAcceptance",async()=>{
+        const root=vscode.Uri.joinPath(context.globalStorageUri,EXAMPLE_PROJECT_NAME);
+        const contract=vscode.Uri.joinPath(root,"skills","establish-pdu-session",
+          "assurance","contract.yaml");
+        await vscode.workspace.fs.createDirectory(vscode.Uri.joinPath(root,"lib"));
+        await vscode.workspace.fs.createDirectory(vscode.Uri.joinPath(root,"output"));
+        await vscode.workspace.fs.writeFile(contract,new TextEncoder().encode(
+          "apiVersion: connectionagent.io/v1alpha1\\n"+
+          "kind: Contract\\nmetadata:\\n  name: legacy-example\\n"
+        ));
+        return {root:root.toString(),contract:contract.toString(),
+          seededApiVersion:"connectionagent.io/v1alpha1"};
+      })
+    ));
+  }
   let exampleLoadPromise=null;
   let projectWelcome=null;
   const progressZh=String(vscode.env?.language??"en").toLowerCase().startsWith("zh");
