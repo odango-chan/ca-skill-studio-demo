@@ -1065,6 +1065,34 @@ export function registerAiAuthoringEditor(vscode, context, { getActiveDocument, 
       void vscode.window.showErrorMessage("配置共享 AI Gateway 访问令牌失败：" + String(error?.message ?? error));
     }
   });
+  const gatewayAcceptanceCommand =
+    typeof process !== "undefined" && process.env?.THEIA_ACCEPTANCE_FIXTURES === "1"
+      ? vscode.commands.registerCommand("skillStudio.internal.configureAiGatewayAcceptance",
+        async ({ gatewayUrl = "", modelId = "deepseek-v4.1-flash" } = {}) => {
+          if (typeof gatewayUrl !== "string" || typeof modelId !== "string" ||
+              !/^[A-Za-z0-9][A-Za-z0-9._:/-]{0,255}$/.test(modelId)) {
+            throw new TypeError("Invalid AI Gateway acceptance configuration.");
+          }
+          if (gatewayUrl) {
+            const parsed = new URL(gatewayUrl);
+            if (parsed.protocol !== "http:" ||
+                !["127.0.0.1", "localhost", "[::1]"].includes(parsed.hostname) ||
+                parsed.username || parsed.password || parsed.search || parsed.hash ||
+                parsed.pathname === "/" || !parsed.pathname) {
+              throw new TypeError("AI Gateway acceptance may target only an HTTP loopback route.");
+            }
+          }
+          const settings = vscode.workspace.getConfiguration("connectionAgent.skillStudio.ai");
+          const target = vscode.ConfigurationTarget?.Global;
+          if (target === undefined || typeof settings?.update !== "function") {
+            throw new Error("Application-scoped AI Gateway settings cannot be updated by the acceptance host.");
+          }
+          await settings.update("gatewayUrl", gatewayUrl, target);
+          await settings.update("model", modelId, target);
+          return true;
+        })
+      : null;
   context.subscriptions.push(command, gatewayTokenCommand);
+  if (gatewayAcceptanceCommand) context.subscriptions.push(gatewayAcceptanceCommand);
   return Object.freeze({ open, configureAiGatewayToken: () => configureAiGatewayToken(vscode, context.secrets) });
 }
