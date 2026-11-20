@@ -131,8 +131,8 @@ test("Example imports only the pinned CA-SL v1alpha5 Skills into skills/",async(
 });
 
 test("Existing Example stays untouched unless replacement is explicitly requested",async()=>{
-  const seedFiles=[],seedFolders=[root,skillRoot,root+"/archive/legacy-v0.2",
-    root+"/examples/v1alpha4-candidate"];
+  const seedFiles=[],seedFolders=[root,skillRoot,root+"/archive",
+    root+"/archive/legacy-v0.2",root+"/examples",root+"/examples/v1alpha4-candidate"];
   const legacyNames=["establish-pdu-session","establish-pdu-session-mas"];
   for(const name of legacyNames){
     const packageRoot=skillRoot+"/"+name;
