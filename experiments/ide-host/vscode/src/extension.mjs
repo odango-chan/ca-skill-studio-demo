@@ -480,14 +480,16 @@ export function activate(context){
         try{await vscode.workspace.fs.stat(uri);return true;}
         catch{return false;}
       };
-      let contractApiVersion=null;
-      if(contract){
+      const readApiVersion=async uri=>{
+        if(!uri)return null;
         try{
           const source=new TextDecoder("utf-8",{fatal:true})
-            .decode(await vscode.workspace.fs.readFile(contract));
-          contractApiVersion=/^\s*apiVersion\s*:\s*["']?([^"'\s]+)/m.exec(source)?.[1]??null;
-        }catch{}
-      }
+            .decode(await vscode.workspace.fs.readFile(uri));
+          return /^\s*apiVersion\s*:\s*["']?([^"'\s]+)/m.exec(source)?.[1]??null;
+        }catch{return null;}
+      };
+      const contractApiVersion=await readApiVersion(contract);
+      const procedureApiVersion=await readApiVersion(defaultProcedure);
       return {
         workspaceName:vscode.workspace.name??null,
         workspaceFile:vscode.workspace.workspaceFile?.toString?.()??null,
@@ -497,7 +499,7 @@ export function activate(context){
         defaultProcedureExists:await exists(defaultProcedure),
         masProcedure:masProcedure?.toString?.()??null,
         masProcedureExists:await exists(masProcedure),
-        contractApiVersion,
+        contractApiVersion,procedureApiVersion,
         libExists:await exists(lib),
         outputExists:await exists(output)
       };
@@ -513,14 +515,20 @@ export function activate(context){
         const root=vscode.Uri.joinPath(context.globalStorageUri,EXAMPLE_PROJECT_NAME);
         const contract=vscode.Uri.joinPath(root,"skills","establish-pdu-session",
           "assurance","contract.yaml");
+        const procedure=vscode.Uri.joinPath(root,"skills","establish-pdu-session",
+          "assurance","procedure.yaml");
         await vscode.workspace.fs.createDirectory(vscode.Uri.joinPath(root,"lib"));
         await vscode.workspace.fs.createDirectory(vscode.Uri.joinPath(root,"output"));
         await vscode.workspace.fs.writeFile(contract,new TextEncoder().encode(
           "apiVersion: connectionagent.io/v1alpha1\n"+
           "kind: Contract\nmetadata:\n  name: legacy-example\n"
         ));
+        await vscode.workspace.fs.writeFile(procedure,new TextEncoder().encode(
+          "apiVersion: connectionagent.io/v1alpha1\n"+
+          "kind: Procedure\nstart: legacy\nnodes: {}\n"
+        ));
         return {root:root.toString(),contract:contract.toString(),
-          seededApiVersion:"connectionagent.io/v1alpha1"};
+          procedure:procedure.toString(),seededApiVersion:"connectionagent.io/v1alpha1"};
       })
     ));
   }
