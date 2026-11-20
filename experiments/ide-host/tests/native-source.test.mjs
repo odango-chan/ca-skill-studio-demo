@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {openNativeSource} from '../vscode/src/native-source.mjs';
+import {openNativeSource,openTextDocumentWithRetry} from '../vscode/src/native-source.mjs';
 test('VS Code explicit Source uses its public default editor ID',async()=>{
   const calls=[];const api={env:{uriScheme:'vscode'},commands:{executeCommand:async(...args)=>calls.push(args)}};
   const uri={path:'/workspace/assurance/procedure.yaml'};
@@ -22,4 +22,27 @@ test('Source open reports real host failure and does not retry unrelated errors'
     window:{showErrorMessage:async value=>{shown=value;}}};
   await assert.rejects(openNativeSource(api,{},{}),/Read permission denied/);
   assert.equal(calls,1);assert.match(shown,/Read permission denied/);
+});
+
+test('Source open retries only transient Theia OPFS EIO failures',async()=>{
+  let openCalls=0;
+  const api={env:{uriScheme:'theia'},commands:{executeCommand:async()=>{
+    openCalls++;
+    if(openCalls<3)throw Error('Unknown (FileSystemError): EIO: I/O error');
+    return 'opened';
+  }}};
+  assert.equal(await openNativeSource(api,{},{}),'opened');
+  assert.equal(openCalls,3);
+});
+
+test('TextDocument open retries transient Theia OPFS EIO failures',async()=>{
+  let readCalls=0;
+  const document={lineCount:10};
+  const api={workspace:{openTextDocument:async()=>{
+    readCalls++;
+    if(readCalls<2)throw Error('Unknown (FileSystemError): EIO: I/O error');
+    return document;
+  }}};
+  assert.equal(await openTextDocumentWithRetry(api,{}),document);
+  assert.equal(readCalls,2);
 });
