@@ -22,6 +22,35 @@ const SENSITIVE_SEGMENT = /(?:^|[._-])(?:secrets?|credentials?|passwords?|api[-_
 const GATEWAY_TOKEN_SECRET_KEY = "connectionAgent.skillStudio.ai.gatewayToken";
 const encoder = new TextEncoder();
 
+export async function configureAiGatewayToken(vscode, secrets) {
+  if (!secrets || typeof secrets.store !== "function" || typeof secrets.delete !== "function") {
+    throw new Error("Host SecretStorage is unavailable.");
+  }
+  if (typeof vscode?.window?.showInputBox !== "function") {
+    throw new Error("Host input UI is unavailable.");
+  }
+  const value = await vscode.window.showInputBox({
+    prompt: "配置共享 AI Gateway 访问令牌；留空可清除已有令牌",
+    password: true,
+    ignoreFocusOut: true,
+    placeHolder: "Gateway access token",
+  });
+  if (value === undefined) return false;
+  if (typeof value !== "string") throw new TypeError("Gateway token must be text.");
+  const token = value.trim();
+  if (token && /[\\u0000-\\u001f\\u007f]/.test(token)) {
+    throw new TypeError("Gateway token must contain printable characters only.");
+  }
+  if (token) {
+    await secrets.store(GATEWAY_TOKEN_SECRET_KEY, token);
+    await vscode.window.showInformationMessage("已保存共享 AI Gateway 访问令牌。");
+  } else {
+    await secrets.delete(GATEWAY_TOKEN_SECRET_KEY);
+    await vscode.window.showInformationMessage("已清除共享 AI Gateway 访问令牌。");
+  }
+  return true;
+}
+
 async function sha256Hex(value) {
   if (!globalThis.crypto?.subtle) throw new Error("Web Crypto is unavailable");
   const digest = await globalThis.crypto.subtle.digest("SHA-256", encoder.encode(value));
