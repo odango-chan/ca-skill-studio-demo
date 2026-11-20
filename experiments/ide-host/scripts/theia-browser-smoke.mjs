@@ -469,22 +469,44 @@ try{
         throw Error(path+' is missing '+label+': '+JSON.stringify(nativeStudioMenuWidget.fileActions));
   }
   const revealStudioSubmenu=async(label,expected)=>{
+    const active=await evalJS(`(()=>{
+      const c=window.theia.container;
+      const keys=[...c._bindingDictionary._map.keys()];
+      const key=keys.find(k=>typeof k==='function'&&
+        k.prototype?.activateWidget&&k.prototype?.addWidget);
+      const bar=key?c.get(key).topPanel.widgets.find(w=>w.id==='theia:menubar'):null;
+      return {active:bar?.activeMenu?.title?.label??null};
+    })()`);
+    if(active?.active!=='SKILL Studio'){
+      const top=await evalJS(`(()=>{
+        const item=[...document.querySelectorAll('.lm-MenuBar-itemLabel')]
+          .find(node=>(node.textContent||'').trim()==='SKILL Studio');
+        const r=item?.getBoundingClientRect();
+        return r&&r.width>0&&r.height>0?{x:r.left+r.width/2,y:r.top+r.height/2}:null;
+      })()`);
+      if(!top)throw Error('Native SKILL Studio top-level menu is not visible');
+      await command('Input.dispatchMouseEvent',{type:'mouseMoved',x:top.x,y:top.y});
+      await command('Input.dispatchMouseEvent',{type:'mousePressed',x:top.x,y:top.y,button:'left',clickCount:1});
+      await command('Input.dispatchMouseEvent',{type:'mouseReleased',x:top.x,y:top.y,button:'left',clickCount:1});
+      await sleep(250);
+    }
     const position=await evalJS(`(()=>{
-      const menus=[...document.querySelectorAll('.lm-Menu,.p-Menu')]
+      const label=${JSON.stringify(label)};
+      const popups=[...document.querySelectorAll('.lm-Menu,.p-Menu')]
         .filter(menu=>getComputedStyle(menu).display!=='none');
-      const wanted=${JSON.stringify(label)};
-      const candidates=menus.flatMap(menu=>[...menu.querySelectorAll('*')])
-        .map(node=>({text:(node.textContent||'').replace(/\\s+/g,' ').trim(),
-          rect:node.getBoundingClientRect()}))
-        .filter(item=>item.rect.width>0&&item.rect.height>0&&
-          (item.text===wanted||item.text.startsWith(wanted+' ')));
-      candidates.sort((a,b)=>
-        a.rect.width*a.rect.height-b.rect.width*b.rect.height);
-      if(!candidates.length)return {missing:true,menus:menus.map(menu=>({
-        className:menu.className,text:(menu.innerText||menu.textContent||'').slice(0,500)
+      const items=popups.flatMap(menu=>[...menu.querySelectorAll('.lm-Menu-item,.p-Menu-item')])
+        .filter(item=>{
+          const text=(item.querySelector('.lm-Menu-itemLabel,.p-Menu-itemLabel')?.textContent||
+            item.textContent||'').replace(/\\s+/g,' ').trim();
+          const r=item.getBoundingClientRect();
+          return text===label&&r.width>0&&r.height>0;
+        });
+      if(!items.length)return {missing:true,menus:popups.map(menu=>({
+        text:(menu.innerText||menu.textContent||'').slice(0,700),
+        html:menu.outerHTML.slice(0,2200)
       }))};
-      const r=candidates[0].rect;
-      return {x:r.left+r.width/2,y:r.top+r.height/2,text:candidates[0].text};
+      const r=items[0].getBoundingClientRect();
+      return {x:r.left+r.width/2,y:r.top+r.height/2};
     })()`);
     if(!position||position.missing)
       throw Error('Native Studio submenu item is not visible: '+label+' · '+
