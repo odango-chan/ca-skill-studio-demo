@@ -207,7 +207,8 @@ jobs:
           trap 'rm -f "$info_file"' EXIT
           published=false
           for attempt in $(seq 1 30); do
-            if curl --fail --silent --show-error "${PAGE_URL%/}/build-info.json" -o "$info_file"; then
+            if curl --fail --silent --show-error "${PAGE_URL%/}/build-info.json" -o "$info_file" &&
+               grep -q "$EXPECTED_SOURCE_SHA" "$info_file"; then
               published=true
               break
             fi
