@@ -1231,6 +1231,39 @@ try{
      !legacyIdentity.libExists||!legacyIdentity.outputExists)
     throw Error("The previous Example profile was not restored as a legacy fixture: "+
       JSON.stringify(legacyIdentity));
+  // A stale built-in Example must not look like a healthy Package with an
+  // empty Problems view just because its old Procedure cannot be projected.
+  // Assert the real LSP diagnostics reach both the native editor markers and
+  // the Problems tree before offering the explicit replacement action.
+  let legacyDiagnostics=null,legacyPackageStatus=null,legacySourceProblem=null,
+    legacyEditorMarker=null;
+  for(let attempt=0;attempt<90;attempt++){
+    try{
+      legacyDiagnostics=await evalJS("(async()=>{const c=window.theia?.container;if(!c)return null;const k=[...(c._bindingDictionary?._map?.keys?.()??[])].find(x=>typeof x==='function'&&x.prototype?.executeCommand&&x.prototype?.registerCommand&&x.prototype?.getCommand);return k?await c.get(k).executeCommand('skillStudio.internal.semanticTokenDiagnostics'):null})()");
+      legacyPackageStatus=(legacyDiagnostics?.packageStatuses??[]).find(item=>
+        String(item.rootUri??"").endsWith("/skill-studio-demo/skills/establish-pdu-session"));
+      legacySourceProblem=(legacyDiagnostics?.packageAudit?.problems??[]).find(item=>
+        item.code==="UNKNOWN_FIELD"&&item.path==="assurance/contract.yaml");
+      legacyEditorMarker=(legacyDiagnostics?.packageAudit?.editorMarkers??[]).find(item=>
+        item.code==="UNKNOWN_FIELD");
+      if(legacyPackageStatus?.state==="PARTIAL"&&legacySourceProblem&&legacyEditorMarker)break;
+    }catch{legacyDiagnostics=null;}
+    await sleep(200);
+  }
+  if(legacyPackageStatus?.state!=="PARTIAL"||
+     legacyPackageStatus?.procedureState!=="UNAVAILABLE"||
+     !legacySourceProblem||!legacyEditorMarker)
+    throw Error("The stale v1alpha1 Example was not surfaced as a source-backed Problem: "+
+      JSON.stringify({packageStatus:legacyPackageStatus,problem:legacySourceProblem,
+        editorMarker:legacyEditorMarker,diagnostics:legacyDiagnostics?.packageAudit}).slice(0,3200));
+  console.log("STUDIO_LEGACY_EXAMPLE_PROBLEMS_CHROMIUM_PASS",JSON.stringify({
+    packageState:legacyPackageStatus.state,
+    procedureState:legacyPackageStatus.procedureState,
+    publishedDiagnosticCount:legacyPackageStatus.publishedDiagnosticCount,
+    problem:{code:legacySourceProblem.code,path:legacySourceProblem.path,
+      line:legacySourceProblem.line},
+    editorMarker:{code:legacyEditorMarker.code,line:legacyEditorMarker.line}
+  }));
   const recoveryMenu=await evalJS("(()=>{const item=[...document.querySelectorAll('.lm-MenuBar-item')].find(x=>x.innerText.trim()==='SKILL Studio');if(!item)return null;const r=item.getBoundingClientRect();return {visible:r.width>0&&r.height>0,label:item.innerText.trim()}})()");
   if(!recoveryMenu?.visible)
     throw Error("SKILL Studio recovery entry disappeared on a pre-existing Example profile");
