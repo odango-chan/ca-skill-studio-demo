@@ -94,7 +94,7 @@ export function buildSkillStudioBrandScript(){
     ...groups.flatMap(group=>group.actions.map(([,id])=>id)),
     ...fileActions.map(action=>action.id)
   ];
-  const menuAnchorIds=["skillStudio.showWelcome","skillStudio.showActivationDiagnostics"];
+  const fallbackAnchorIds=["skillStudio.showWelcome","skillStudio.showActivationDiagnostics"];
   let attempts=0;
   function install(){
     const container=window.theia?.container;
@@ -114,7 +114,11 @@ export function buildSkillStudioBrandScript(){
     // Core navigation is sufficient to create the product entry. Optional
     // Compiler, dependency, authoring and LSP actions are added independently;
     // one failed feature must never hide Welcome or Open Example.
-    if(!menuAnchorIds.some(hasCommand))return false;
+    // Prefer the complete Project recovery path. If Example loading itself
+    // failed to register, still expose Welcome/Activation Diagnostics after a
+    // short grace period rather than leaving the user with no product entry.
+    if(!hasCommand("skillStudio.loadExample")&&
+       !(attempts>=20&&fallbackAnchorIds.some(hasCommand)))return false;
     const availableGroups=groups.map(group=>({
       ...group,actions:group.actions.filter(([,id])=>hasCommand(id))
     })).filter(group=>group.actions.length);
