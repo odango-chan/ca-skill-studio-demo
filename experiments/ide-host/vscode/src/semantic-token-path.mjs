@@ -1,6 +1,6 @@
 function normalizePath(value){
   return typeof value==="string"
-    ?value.replace(/\\/g,"/").replace(/^\\/+/, "")
+    ?value.replace(/\\/g,"/").replace(/^\/+/,"")
     :"";
 }
 
@@ -14,7 +14,7 @@ function normalizePath(value){
 export function resolveSemanticTokenSourcePath(uriPath,workspaceRelativePath=""){
   const uri=normalizePath(uriPath);
   const workspace=normalizePath(workspaceRelativePath);
-  const packageMatch=uri.match(/(?:^|\\/)(assurance\\/(?:procedure|contract|predicates)\\.ya?ml)$/i);
+  const packageMatch=uri.match(/(?:^|\/)(assurance\/(?:procedure|contract|predicates)\.ya?ml)$/i);
   if(packageMatch)return packageMatch[1];
 
   const libraryMatch=uri.startsWith("lib/")
