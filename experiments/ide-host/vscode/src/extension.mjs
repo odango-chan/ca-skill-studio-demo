@@ -504,7 +504,7 @@ export function activate(context){
         outputExists:await exists(output)
       };
     }
-    );
+  ));
   // Localhost-only acceptance fixture: simulate an existing, pre-v1alpha5
   // Example profile without exposing a destructive command in the public Pages
   // build. The real loadExample command must still ask before replacing it.
@@ -522,7 +522,7 @@ export function activate(context){
         await vscode.workspace.fs.writeFile(contract,new TextEncoder().encode(
           "apiVersion: connectionagent.io/v1alpha1\n"+
           "kind: Contract\nmetadata:\n  name: legacy-example\n"
-        ));
+    );
         await vscode.workspace.fs.writeFile(procedure,new TextEncoder().encode(
           "apiVersion: connectionagent.io/v1alpha1\n"+
           "kind: Procedure\nstart: legacy\nnodes: {}\n"
