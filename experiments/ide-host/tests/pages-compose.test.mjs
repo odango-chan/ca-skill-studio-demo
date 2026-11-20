@@ -115,7 +115,7 @@ test("Pages preview builds the exact PR head without deploying it",async()=>{
   assert.match(workflow,/THEIA_REQUIRE_BROWSER_LSP: "1"/);
   assert.match(workflow,/THEIA_REQUIRE_COMPILER_WORKER: "1"/);
   assert.match(workflow,/Verify deployed Pages build identity/);
-  assert.match(workflow,/curl --fail --silent --show-error[\\s\\S]*build-info\\.json/);
+  assert.match(workflow,/curl --fail --silent --show-error[\s\S]*build-info\.json/);
   assert.doesNotMatch(workflow,/CA_SKILL_COMPILER_READ_TOKEN/,
     "the Compiler repository is public; Pages preview must not depend on a private secret");
 });
