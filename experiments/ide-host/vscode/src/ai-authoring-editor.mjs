@@ -910,16 +910,42 @@ export function registerAiAuthoringEditor(vscode, context, { getActiveDocument, 
         }
         return;
       }
+      const compilerCheck = await createAuthoringCompilerCheck({
+        compilerIntegration,
+        state: finalState,
+        document,
+        changeSet: pending.changeSet,
+        candidateSource: materialized.source,
+        candidateDigest: materialized.digest,
+      });
+      if (!isCurrent() || activeSession.pending !== pending) return;
+      const afterCheckState = await collectAuthoringState(document);
+      if (!isCurrent() || activeSession.pending !== pending) return;
+      if (!isLiveDocumentRevision(document, pending) ||
+        afterCheckState.generation !== pending.packageGeneration) {
+        activeSession.pending = null;
+        await refreshContext();
+        if (isCurrent()) {
+          post({ type: "error", message: "Compiler Check 期间 Procedure 或 Package 发生变化，已拒绝应用旧候选。" });
+        }
+        return;
+      }
+      pending.compilerCheck = compilerCheck;
       const selectedCandidateAllowed = isAuthoringApplyAllowed({
         patchPlan: pending.patchPlan,
         changeSet: pending.changeSet,
         candidateDigest: materialized.digest,
         blockers: pending.proposalResult.proposal.blockers,
         waitMutation: containsWaitMutation(pending.changeSet.operations),
-        compilerCheck: pending.compilerCheck,
+        compilerCheck,
       });
       if (!selectedCandidateAllowed) {
-        post({ type: "error", message: "所选修改组对应的候选摘要没有完整、权威且精确匹配的 v1alpha5 Compiler PASS；仍保持 PREVIEW ONLY。" });
+        pending.canApply = false;
+        post({ type: "error", message: compilerCheck.state === "FAIL"
+          ? "Compiler v2.0.2 对所选候选返回 FAIL： " +
+            compilerCheck.diagnostics.slice(0, 6).map(item =>
+              (item.code ? item.code + ": " : "") + item.message).join("; ")
+          : "所选候选没有获得完整、精确匹配的 v2.0.2 Compiler PASS；仍保持 PREVIEW ONLY。" });
         return;
       }
       assertStudioMutation(document.uri, vscode.workspace.workspaceFolders ?? [], "edit");
