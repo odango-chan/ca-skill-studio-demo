@@ -14,6 +14,7 @@ import {resolveLockedDependencies} from "./dependency-service.mjs";
 import {readProjectConfiguration} from "./project-configuration.mjs";
 import {decodeBase64} from "./dependency-snapshot.mjs";
 import {collectPackageSnapshot,packageRootForProcedure} from "./package-snapshot.mjs";
+import {resolveSemanticTokenSourcePath} from "./semantic-token-path.mjs";
 import {
   collectSkillSemanticTokenSpans,
   SKILL_SEMANTIC_TOKEN_TYPES,
@@ -51,7 +52,8 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
     languageStatusItem=null,languageTransportFailure=null,languagePackageFailure=null;
   let semanticTokenRenderer=null;
   const semanticTokenDiagnostics={
-    registered:false,tokenTypeCount:0,requests:0,lastUri:null,lastTokenCount:0,lastError:null,
+    registered:false,tokenTypeCount:0,requests:0,lastUri:null,lastRelativePath:null,
+    lastSourceLength:0,lastLanguageId:null,lastTokenCount:0,lastError:null,
     registrationError:null,
     renderer:null,renderedTokenCount:0,renderedTypeCount:0,renderError:null,
     server:null,transport:null,packageAttachAttempts:0,lastPackageRoot:null,
@@ -125,11 +127,17 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
       provideDocumentSemanticTokens(document,cancellationToken){
         if(cancellationToken?.isCancellationRequested)
           return new vscode.SemanticTokens(new Uint32Array());
-        const uriPath=document.uri.path.split("/").filter(Boolean).join("/");
-        const relativePath=vscode.workspace.asRelativePath?.(document.uri,false)||uriPath;
-        const spans=collectSkillSemanticTokenSpans(document.getText(),relativePath);
+        const sourceText=document.getText();
+        const workspaceRelativePath=vscode.workspace.asRelativePath?.(document.uri,false)??"";
+        const relativePath=resolveSemanticTokenSourcePath(
+          document.uri.path,workspaceRelativePath
+        );
+        const spans=collectSkillSemanticTokenSpans(sourceText,relativePath);
         semanticTokenDiagnostics.requests++;
         semanticTokenDiagnostics.lastUri=document.uri.toString();
+        semanticTokenDiagnostics.lastRelativePath=relativePath;
+        semanticTokenDiagnostics.lastSourceLength=sourceText.length;
+        semanticTokenDiagnostics.lastLanguageId=document.languageId??null;
         semanticTokenDiagnostics.transport="extension-host";
         const result=encodeNativeSemanticTokens(document,spans);
         semanticTokenDiagnostics.lastTokenCount=result.data.length/5;
