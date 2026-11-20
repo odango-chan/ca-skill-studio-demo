@@ -1371,17 +1371,8 @@ try{
       "typeof k==='function'&&k.prototype?.executeCommand&&"+
       "k.prototype?.registerCommand&&k.prototype?.getCommand);"+
       "if(!key)throw Error('Native Theia command registry missing for AI Authoring');"+
-      "return c.get(key).executeCommand("+JSON.stringify("skillStudio.openAiAuthoring")+
-      ",..."+JSON.stringify([])+");})()");
-    const runCommand=async(id,...args)=>evalJS(
-      "(async()=>{const c=window.theia.container;"+
-      "const key=[...c._bindingDictionary._map.keys()].find(k=>"+
-      "typeof k==='function'&&k.prototype?.executeCommand&&"+
-      "k.prototype?.registerCommand&&k.prototype?.getCommand);"+
-      "if(!key)throw Error('Native Theia command registry missing for AI Authoring');"+
-      "return c.get(key).executeCommand("+JSON.stringify("skillStudio.openProcedure")+
-      ",..."+JSON.stringify([identity.defaultProcedure])+
-      ");})()");
+      "return c.get(key).executeCommand("+JSON.stringify(id)+
+      ",..."+JSON.stringify(args)+");})()");
     // A local OpenAI-compatible mock proves the complete Host-owned request /
     // Proposal / Patch / Compiler path without storing a provider credential in CI.
     const mockProposal={
@@ -1489,11 +1480,11 @@ try{
       return null;
     };
     try{
-      const configured=await runCommand("skillStudio.internal.configureAiGatewayAcceptance",{
+      const configured=await nativeCommand("skillStudio.internal.configureAiGatewayAcceptance",{
         gatewayUrl,modelId:"deepseek-v4.1-flash"
       });
       if(configured!==true)throw Error("AI Gateway mock route could not be configured in the acceptance host");
-      await runCommand("skillStudio.openProcedure",identity.defaultProcedure);
+      await nativeCommand("skillStudio.openProcedure",identity.defaultProcedure);
       const opened=await nativeCommand("skillStudio.openAiAuthoring");
       if(opened!==true)
         throw Error("AI Procedure Authoring command did not open its standalone Editor Tab");
@@ -1595,7 +1586,7 @@ try{
       console.log("STUDIO_AI_AUTHORING_MOCK_GATEWAY_E2E_CHROMIUM",JSON.stringify(aiAuthoringEvidence));
     }finally{
       try{
-        await runCommand("skillStudio.internal.configureAiGatewayAcceptance",{
+        await nativeCommand("skillStudio.internal.configureAiGatewayAcceptance",{
           gatewayUrl:"",modelId:"deepseek-v4.1-flash"
         });
       }catch{/* The acceptance profile is ephemeral; never hide the primary failure. */}
