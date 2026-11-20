@@ -470,7 +470,7 @@ try{
   }
   const revealStudioSubmenu=async(label,expected)=>{
     const position=await evalJS(`(()=>{
-      const item=[...document.querySelectorAll('.lm-Menu-item')]
+      const item=[...document.querySelectorAll('.lm-Menu-item,.lm-MenuBar-item,.lm-Menu-itemLabel,.lm-MenuBar-itemLabel')]
         .find(node=>{
           const text=(node.innerText||node.textContent||"").replace(/\\s+/g," ").trim();
           const r=node.getBoundingClientRect();
@@ -479,7 +479,7 @@ try{
         });
       if(!item)return {
         missing:true,
-        candidates:[...document.querySelectorAll('.lm-Menu-item')].map(node=>({
+        candidates:[...document.querySelectorAll('.lm-Menu-item,.lm-MenuBar-item,.lm-Menu-itemLabel,.lm-MenuBar-itemLabel')].map(node=>({
           text:(node.innerText||node.textContent||"").trim(),
           rect:node.getBoundingClientRect().toJSON(),
           display:getComputedStyle(node).display
