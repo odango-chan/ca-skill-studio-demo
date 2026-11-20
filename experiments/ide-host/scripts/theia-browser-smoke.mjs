@@ -1274,8 +1274,8 @@ try{
   for(let attempt=0;attempt<120;attempt++){
     try{
       upgradedIdentity=await evalJS("(()=>{const c=window.theia?.container;if(!c)return null;const k=[...(c._bindingDictionary?._map?.keys?.()??[])].find(x=>typeof x==='function'&&x.prototype?.executeCommand&&x.prototype?.registerCommand&&x.prototype?.getCommand);return k?c.get(k).executeCommand('skillStudio.internal.workspaceIdentityAcceptance'):null})()");
-      if(upgradedIdentity?.contractApiVersion==="connectionagent.io/v1alpha5"&&
-         upgradedIdentity?.procedureApiVersion==="connectionagent.io/v1alpha5"){
+      if(upgradedIdentity?.contractCurrentShape===true&&
+         upgradedIdentity?.procedureCurrentShape===true){
         upgradedEvidence=await evalJS("(()=>{const c=window.theia.container;const k=[...c._bindingDictionary._map.keys()].find(x=>typeof x==='function'&&x.prototype?.executeCommand&&x.prototype?.registerCommand&&x.prototype?.getCommand);return c.get(k).executeCommand('skillStudio.showActivationDiagnostics')})()");
         if(upgradedEvidence?.packageInventory?.state==="ready"&&
            upgradedEvidence.packageInventory.packages?.length===2)break;
@@ -1283,8 +1283,8 @@ try{
     }catch{upgradedIdentity=null;}
     await sleep(250);
   }
-  if(upgradedIdentity?.contractApiVersion!=="connectionagent.io/v1alpha5"||
-     upgradedIdentity?.procedureApiVersion!=="connectionagent.io/v1alpha5"||
+  if(upgradedIdentity?.contractCurrentShape!==true||
+     upgradedIdentity?.procedureCurrentShape!==true||
      upgradedIdentity?.libExists||upgradedIdentity?.outputExists||
      upgradedIdentity?.workspaceFolders?.length!==1||
      upgradedEvidence?.packageInventory?.packages?.length!==2||
@@ -1294,7 +1294,7 @@ try{
   console.log("STUDIO_LEGACY_EXAMPLE_REPLACEMENT_CHROMIUM_PASS",JSON.stringify({
     menu:recoveryMenu,legacyVersion:legacyIdentity.contractApiVersion,
     cancelPreserved:afterCancel.contractApiVersion,
-    upgradedVersion:upgradedIdentity.contractApiVersion,
+    upgradedGrammar:"CA-SL v1alpha5 (top-level Contract + start/nodes)",
     libRemoved:!upgradedIdentity.libExists,outputRemoved:!upgradedIdentity.outputExists,
     packages:upgradedEvidence.packageInventory.packages.length
   }));
