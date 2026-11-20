@@ -25,7 +25,7 @@ export function buildSkillStudioBrandScript(){
   return String.raw`// Theia 1.76 native MenuModelRegistry adapter.
 (() => {
   const TOP=["menubar","5z_skill_studio"];
-  const zh=/^zh\\b/i.test(document.documentElement.lang||navigator.language||"");
+  const zh=/^zh\b/i.test(document.documentElement.lang||navigator.language||"");
   const labels=zh?{
     project:"项目",skill:"Skill",dependencies:"依赖",authoring:"编写",tools:"工具",help:"帮助",
     welcome:"欢迎页面",diagnostics:"激活诊断",newProject:"新建项目",openProject:"打开项目",
