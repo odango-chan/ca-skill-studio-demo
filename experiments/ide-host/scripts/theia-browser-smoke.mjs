@@ -862,19 +862,26 @@ try{
   // of CA-SL semantic token/LSP analysis. Use the extension's exact Example
   // Source opener: Quick Open can inherit focus from Compiler Output.
   if(requireEditor){
-    const opened=await evalJS(`(async()=>{
-      const c=window.theia.container;
-      const key=[...c._bindingDictionary._map.keys()].find(k=>
-        typeof k==='function'&&k.prototype?.executeCommand&&
-        k.prototype?.registerCommand&&k.prototype?.getCommand);
-      if(!key)throw Error('Native command registry missing for Python syntax');
-      return c.get(key).executeCommand(
-        'skillStudio.internal.openPythonSyntaxAcceptance');
-    })()`);
+    let opened=null,pythonOpenError=null,pythonOpenAttempts=0;
+    for(;pythonOpenAttempts<4;pythonOpenAttempts++){
+      try{
+        opened=await evalJS(`(async()=>{
+          const c=window.theia.container;
+          const key=[...c._bindingDictionary._map.keys()].find(k=>
+            typeof k==='function'&&k.prototype?.executeCommand&&
+            k.prototype?.registerCommand&&k.prototype?.getCommand);
+          if(!key)throw Error('Native command registry missing for Python syntax');
+          return c.get(key).executeCommand(
+            'skillStudio.internal.openPythonSyntaxAcceptance');
+        })()`);
+        if(opened?.uri)break;
+      }catch(error){pythonOpenError=String(error?.message??error);}
+      await sleep(250);
+    }
     if(!opened?.uri?.endsWith("/scripts/validate-subscription-request.py")||
        opened.languageId!=="python"||opened.viewColumn!==1)
-      throw Error("Exact native Python Source did not open in the primary group: "+
-        JSON.stringify(opened));
+      throw Error("Exact native Python Source did not open in the primary group after "+
+        pythonOpenAttempts+" attempts: "+JSON.stringify({opened,pythonOpenError}));
     let pythonTextMate=null;
     for(let attempt=0;attempt<35;attempt++){
       pythonTextMate=await evalJS(`(()=>{
