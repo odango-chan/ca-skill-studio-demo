@@ -873,6 +873,7 @@ export function registerAiAuthoringEditor(vscode, context, { getActiveDocument, 
       return;
     }
     const pending = activeSession.pending;
+    let appliedCompilerState = "NOT_RUN";
     if (pending.canApply !== true) {
       post({ type: "error", message: "该提案目前仅可预览。必须先由完整、权威的 CA-SL v1alpha5 Compiler 对同一候选 Package 返回 PASS，才能启用 Apply。" });
       return;
@@ -918,6 +919,7 @@ export function registerAiAuthoringEditor(vscode, context, { getActiveDocument, 
         candidateSource: materialized.source,
         candidateDigest: materialized.digest,
       });
+      appliedCompilerState = compilerCheck.state;
       if (!isCurrent() || activeSession.pending !== pending) return;
       const afterCheckState = await collectAuthoringState(document);
       if (!isCurrent() || activeSession.pending !== pending) return;
@@ -964,7 +966,7 @@ export function registerAiAuthoringEditor(vscode, context, { getActiveDocument, 
         acceptedGroupIds: materialized.acceptedGroupIds,
         documentVersion: document.version,
         saved: false,
-        compilerCheck: "NOT_RUN",
+        compilerCheck: appliedCompilerState,
       });
       await refreshContext();
     } catch (error) {
@@ -973,7 +975,7 @@ export function registerAiAuthoringEditor(vscode, context, { getActiveDocument, 
     } finally {
       if (isCurrent()) {
         activeSession.applying = false;
-        post({ type: "status", message: "应用操作结束。Compiler Check: NOT_RUN。", busy: false });
+        post({ type: "status", message: "应用操作结束。Compiler Check: " + appliedCompilerState + "。", busy: false });
       }
     }
   }
