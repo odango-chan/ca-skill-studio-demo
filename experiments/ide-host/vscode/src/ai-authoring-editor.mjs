@@ -14,8 +14,9 @@ import { resolveLockedDependencies } from "./dependency-service.mjs";
 import { decodeBase64 } from "./dependency-snapshot.mjs";
 import { isProcedurePath } from "./bridge.mjs";
 import { assertStudioMutation } from "./project-policy.mjs";
+import { createCompilerBuildRequest, COMPILER_LANGUAGE_TARGET, COMPILER_VERSION } from "./compiler-request.mjs";
 
-const LANGUAGE_TARGET = "connectionagent.io/v1alpha5";
+const LANGUAGE_TARGET = COMPILER_LANGUAGE_TARGET;
 const MAX_CONTEXT_ITEMS = 512;
 const TEXT_DEPENDENCY_FILE = /\.(?:json|ya?ml|md)$/i;
 const SENSITIVE_SEGMENT = /(?:^|[._-])(?:secrets?|credentials?|passwords?|api[-_]?keys?|private[-_]?keys?|access[-_]?tokens?|tokens?|auth)(?:[._-]|$)/i;
@@ -174,6 +175,74 @@ export function containsWaitMutation(operations) {
   );
 }
 
+export function createAuthoringCompilerRequest(state, candidateSource) {
+  if (!state?.snapshot || state.snapshot.completeness !== "complete" ||
+    !state?.dependencies || state.dependencies.status !== "READY" ||
+    typeof candidateSource !== "string") {
+    throw new Error("A complete current Package and candidate Procedure are required for Compiler Check.");
+  }
+  const documents = (state.snapshot.documents ?? []).map((item) =>
+    item.relativePath === "assurance/procedure.yaml"
+      ? { ...item, text: candidateSource }
+      : item
+  );
+  if (!documents.some((item) => item.relativePath === "assurance/procedure.yaml" &&
+    item.text === candidateSource)) {
+    throw new Error("The exact candidate Procedure is missing from the Compiler snapshot.");
+  }
+  const resolvedDependencies = (state.dependencies.snapshots ?? []).map((item) => ({
+    dependencyId: item.id,
+    digest: item.snapshotDigest,
+    files: item.files ?? [],
+  }));
+  return createCompilerBuildRequest({
+    packageName: state.snapshot.packageName,
+    documents,
+    resolvedDependencies,
+  });
+}
+
+export async function createAuthoringCompilerCheck({
+  compilerIntegration,
+  state,
+  document,
+  changeSet,
+  candidateSource,
+  candidateDigest,
+} = {}) {
+  if (typeof compilerIntegration?.checkRequest !== "function") {
+    throw new Error("The pinned CA-SL v1alpha5 Compiler Worker is unavailable.");
+  }
+  if (!document?.uri || !Number.isSafeInteger(document.version) ||
+    !changeSet?.base || typeof candidateDigest !== "string") {
+    throw new Error("The exact live document and Change Set identity are required for Compiler Check.");
+  }
+  const request = createAuthoringCompilerRequest(state, candidateSource);
+  const diagnostics = await compilerIntegration.checkRequest(request);
+  if (!Array.isArray(diagnostics)) {
+    throw new Error("Compiler Check did not return a complete Diagnostic array.");
+  }
+  const errorCount = diagnostics.filter((item) => item?.severity === "error").length;
+  const warningCount = diagnostics.filter((item) => item?.severity === "warning").length;
+  return Object.freeze({
+    compilerVersion: compilerIntegration.compilerVersion ?? COMPILER_VERSION,
+    languageTarget: COMPILER_LANGUAGE_TARGET,
+    state: errorCount === 0 ? "PASS" : "FAIL",
+    complete: true,
+    documentUri: document.uri.toString(),
+    documentVersion: document.version,
+    packageGeneration: state.generation,
+    sourceDigest: changeSet.base.sourceDigest,
+    candidateDigest,
+    // Studio does not yet attach a trusted IngressCatalog binding to this request.
+    // Wait-bearing candidates therefore remain preview-only even after static Check.
+    trustedIngressBinding: false,
+    diagnostics,
+    errorCount,
+    warningCount,
+  });
+}
+
 export function isAuthoringApplyAllowed({
   patchPlan,
   changeSet,
@@ -200,6 +269,7 @@ export function isAuthoringApplyAllowed({
     exactCandidate &&
     Array.isArray(blockers) &&
     blockers.length === 0 &&
+    compilerCheck?.compilerVersion === COMPILER_VERSION &&
     compilerCheck?.languageTarget === LANGUAGE_TARGET &&
     compilerCheck?.state === "PASS" &&
     compilerCheck?.complete === true &&
@@ -305,7 +375,7 @@ export function renderAiAuthoringHtml(nonce) {
   ].join("\n");
 }
 
-export function registerAiAuthoringEditor(vscode, context, { getActiveDocument } = {}) {
+export function registerAiAuthoringEditor(vscode, context, { getActiveDocument, compilerIntegration } = {}) {
   const revisionFor = createPackageRevisionTracker();
   let panel = null;
   let session = null;
