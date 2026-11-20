@@ -4,7 +4,7 @@ import {runInNewContext} from "node:vm";
 import {buildSkillStudioBrandScript}
   from "../experiments/ide-host/scripts/prepare-theia-brand.mjs";
 
-function installWithCommands(commandIds,language="zh-CN"){
+function installWithCommands(commandIds,language="zh-CN",ticks=1){
   const root={id:"menubar",children:[]};
   const ensure=path=>{
     let node=root;
@@ -60,7 +60,7 @@ function installWithCommands(commandIds,language="zh-CN"){
     clearInterval(id){assert.equal(id,7);cleared=true;},
     console:{warn(){},error(){}}
   });
-  install();
+  for(let tick=0;tick<ticks&&!cleared;tick++)install();
   return {root,document,cleared:()=>cleared};
 }
 const menu=root=>root.children.find(node=>node.id==="5z_skill_studio");
@@ -100,7 +100,7 @@ test("core SKILL Studio Project menu remains visible when optional Compiler/Work
 });
 
 test("Activation Diagnostics alone can retain a visible recovery entry when Welcome registration fails",()=>{
-  const result=installWithCommands(new Set(["skillStudio.showActivationDiagnostics"]));
+  const result=installWithCommands(new Set(["skillStudio.showActivationDiagnostics"]),"en",21);
   const studio=menu(result.root);
   assert.ok(studio);
   assert.equal(studio.label,"SKILL Studio");
@@ -111,7 +111,8 @@ test("Activation Diagnostics alone can retain a visible recovery entry when Welc
 
 test("Chinese labels are preserved in the generated native menu",()=>{
   const available=new Set([
-    "skillStudio.showWelcome","skillStudio.showActivationDiagnostics"
+    "skillStudio.showWelcome","skillStudio.showActivationDiagnostics",
+    "skillStudio.loadExample"
   ]);
   const result=installWithCommands(available,"zh-CN");
   assert.equal(child(menu(result.root),"01_project").label,"项目");
