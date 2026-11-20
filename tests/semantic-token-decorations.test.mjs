@@ -30,6 +30,7 @@ function fakeDocument(uri, version = 1) {
 
 function fakeHost(initialEditors = []) {
   const visibleListeners = new Set();
+  const activeListeners = new Set();
   const changeListeners = new Set();
   const closeListeners = new Set();
   const decorations = [];
@@ -49,7 +50,12 @@ function fakeHost(initialEditors = []) {
       onDidChangeVisibleTextEditors(listener) {
         visibleListeners.add(listener);
         return {dispose:()=>visibleListeners.delete(listener)};
-      }
+      },
+      onDidChangeActiveTextEditor(listener) {
+        activeListeners.add(listener);
+        return {dispose:()=>activeListeners.delete(listener)};
+      },
+      activeTextEditor:null
     },
     workspace: {
       onDidChangeTextDocument(listener) {
@@ -68,6 +74,10 @@ function fakeHost(initialEditors = []) {
     showEditors(editors) {
       vscode.window.visibleTextEditors=editors;
       for (const listener of visibleListeners) listener(editors);
+    },
+    activateEditor(editor) {
+      vscode.window.activeTextEditor=editor;
+      for (const listener of activeListeners) listener(editor);
     },
     change(document) {
       for (const listener of changeListeners) listener({document});
@@ -175,4 +185,29 @@ test("Theia decoration adapter preserves delta positions and clears stale ranges
 
   renderer.dispose();
   assert.ok(host.decorations.every(decoration=>decoration.disposed));
+});
+
+test("Theia decoration adapter applies cached semantic ranges to the active editor even without a visible-editor event",()=>{
+  const uri="file:///workspace/skills/establish-pdu-session/assurance/procedure.yaml";
+  const document=fakeDocument(uri);
+  const editor=fakeEditor(document);
+  const host=fakeHost();
+  const renderer=createSemanticTokenDecorationRenderer(
+    host.vscode,["skillPredicate","skillOutcome"],theme.semanticTokenColors
+  );
+  const line=document.lineAt(1).text;
+  const result=renderer.render(document,semanticData(line));
+  assert.deepEqual(result,{tokenCount:2,tokenTypeCount:2});
+  assert.equal(editor.calls.length,0);
+  host.activateEditor(editor);
+  assert.equal(editor.calls.length,2);
+  const state=renderer.diagnostics();
+  assert.equal(state.lastMatchingEditorCount,1);
+  assert.equal(state.lastVersionMatchedEditorCount,1);
+  assert.equal(state.lastAppliedEditorCount,1);
+  assert.equal(state.lastAppliedRangeCount,2);
+  assert.equal(state.lastAppliedDecorationCount,2);
+  assert.equal(state.decorationStyles.skillPredicate.color,"#317DC0");
+  assert.equal(state.decorationStyles.skillOutcome.color,"#AD6517");
+  renderer.dispose();
 });

@@ -49,6 +49,7 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
   let languageClientEpoch=0;
   let languageClient=null,languageClientPromise=null,languageClientFailureShown=false,
     languageStatusItem=null,languageTransportFailure=null,languagePackageFailure=null;
+  let semanticTokenRenderer=null;
   const semanticTokenDiagnostics={
     registered:false,tokenTypeCount:0,requests:0,lastUri:null,lastTokenCount:0,lastError:null,
     registrationError:null,
@@ -114,6 +115,7 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
           vscode,SKILL_SEMANTIC_TOKEN_TYPES,studioLightTheme.semanticTokenColors??{}
         );
         semanticTokenDiagnostics.renderer="theia-text-editor-decoration";
+        semanticTokenRenderer=renderer;
         context.subscriptions.push({dispose:()=>renderer?.dispose()});
       }catch(error){
         semanticTokenDiagnostics.renderError=String(error?.message??error);
@@ -228,8 +230,24 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
       };
     }));
   context.subscriptions.push(vscode.commands.registerCommand(
+    "skillStudio.internal.revealSemanticColorAcceptance",()=>{
+      const editor=vscode.window.activeTextEditor;
+      const doc=editor?.document;
+      if(!doc||! /\/assurance\/procedure\.ya?ml$/i.test(doc.uri.path))
+        throw Error("Semantic color acceptance requires the active native Procedure Source");
+      const lines=doc.getText().split(/\r?\n/);
+      const line=lines.findIndex(value=>value.includes("PASS: subscribe-sm-data"));
+      if(line<0)throw Error("Semantic color acceptance route marker is absent from the current Procedure");
+      editor.revealRange(new vscode.Range(line,0,line,lines[line].length),
+        vscode.TextEditorRevealType.InCenter);
+      return {uri:doc.uri.toString(),line:line+1,text:lines[line]};
+    }
+  ));
+  context.subscriptions.push(vscode.commands.registerCommand(
     "skillStudio.internal.semanticTokenDiagnostics",()=>({
       ...semanticTokenDiagnostics,
+      rendererDiagnostics:semanticTokenDiagnostics.renderer==="theia-text-editor-decoration"
+        ?semanticTokenRenderer?.diagnostics?.()??null:null,
       activeDocumentUri:document?.uri?.toString?.()??null,
       activePackageRootUri:document
         ?packageRootForProcedure(vscode,document)?.uri?.toString?.()??null:null,

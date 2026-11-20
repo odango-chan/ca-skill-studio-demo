@@ -52,9 +52,11 @@ export function createSemanticTokenDecorationRenderer(vscode, tokenTypes, semant
   }
 
   const decorationTypes = new Map();
+  const decorationStyles = new Map();
   for (const tokenType of tokenTypes) {
     const options = decorationOptions(semanticTokenColors[tokenType]);
     if (options) {
+      decorationStyles.set(tokenType, options);
       decorationTypes.set(tokenType, vscode.window.createTextEditorDecorationType(options));
     }
   }
@@ -62,6 +64,13 @@ export function createSemanticTokenDecorationRenderer(vscode, tokenTypes, semant
   const documents = new Map();
   const appliedByEditor = new WeakMap();
   const subscriptions = [];
+  const diagnostics = {
+    lastUri:null,lastDocumentVersion:null,lastTokenCount:0,lastTokenTypeCount:0,
+    lastVisibleEditorCount:0,lastCandidateEditorCount:0,lastMatchingEditorCount:0,
+    lastVersionMatchedEditorCount:0,lastAppliedEditorCount:0,
+    lastAppliedDecorationCount:0,lastAppliedRangeCount:0,
+    lastVersionMismatches:[],totalSetDecorationsCalls:0
+  };
   let disposed = false;
 
   function setEditorRanges(editor, uri, entry) {
@@ -78,21 +87,94 @@ export function createSemanticTokenDecorationRenderer(vscode, tokenTypes, semant
       }
     }
 
+    let calls=0,rangeCount=0;
     for (const tokenType of new Set([...previous, ...current])) {
       const decoration = decorationTypes.get(tokenType);
       if (!decoration) continue;
-      editor.setDecorations(decoration, entry?.ranges.get(tokenType) ?? []);
+      const ranges=entry?.ranges.get(tokenType) ?? [];
+      editor.setDecorations(decoration,ranges);
+      calls++;
+      rangeCount+=ranges.length;
     }
+    diagnostics.totalSetDecorationsCalls+=calls;
     if (current.size) editorDocuments.set(uri, current);
     else editorDocuments.delete(uri);
+    return {decorationCount:current.size,rangeCount,calls};
+  }
+
+  function editorCandidates() {
+    const visible=[...(vscode.window.visibleTextEditors??[])];
+    const candidates=[...visible];
+    const active=vscode.window.activeTextEditor;
+    if(active&&!candidates.includes(active))candidates.push(active);
+    return {visible,candidates};
+  }
+
+  function recordApplication(uri,summary) {
+    diagnostics.lastUri=uri;
+    diagnostics.lastVisibleEditorCount=summary.visibleEditorCount;
+    diagnostics.lastCandidateEditorCount=summary.candidateEditorCount;
+    diagnostics.lastMatchingEditorCount=summary.matchingEditorCount;
+    diagnostics.lastVersionMatchedEditorCount=summary.versionMatchedEditorCount;
+    diagnostics.lastAppliedEditorCount=summary.appliedEditorCount;
+    diagnostics.lastAppliedDecorationCount=summary.appliedDecorationCount;
+    diagnostics.lastAppliedRangeCount=summary.appliedRangeCount;
+    diagnostics.lastVersionMismatches=summary.versionMismatches;
   }
 
   function applyVisible(uri, entry) {
-    for (const editor of vscode.window.visibleTextEditors ?? []) {
+    const {visible,candidates}=editorCandidates();
+    const summary={
+      visibleEditorCount:visible.length,candidateEditorCount:candidates.length,
+      matchingEditorCount:0,versionMatchedEditorCount:0,appliedEditorCount:0,
+      appliedDecorationCount:0,appliedRangeCount:0,versionMismatches:[]
+    };
+    for (const editor of candidates) {
       if (uriKey(editor.document?.uri) !== uri) continue;
-      const current = entry && entry.version === editor.document.version ? entry : null;
-      setEditorRanges(editor, uri, current);
+      summary.matchingEditorCount++;
+      const versionMatches=!entry||entry.version===editor.document.version;
+      if(entry&&!versionMatches){
+        summary.versionMismatches.push({
+          uri,documentVersion:entry.version,editorVersion:editor.document.version
+        });
+      }
+      const current=entry&&versionMatches?entry:null;
+      const applied=setEditorRanges(editor,uri,current);
+      if(versionMatches){
+        summary.versionMatchedEditorCount++;
+        if(current){
+          summary.appliedEditorCount++;
+          summary.appliedDecorationCount+=applied.decorationCount;
+          summary.appliedRangeCount+=applied.rangeCount;
+        }
+      }
     }
+    recordApplication(uri,summary);
+    return summary;
+  }
+
+  function applyActiveEditor(editor) {
+    const uri=uriKey(editor?.document?.uri);
+    if(!uri)return;
+    const entry=documents.get(uri);
+    const summary={
+      visibleEditorCount:(vscode.window.visibleTextEditors??[]).length,
+      candidateEditorCount:1,matchingEditorCount:1,
+      versionMatchedEditorCount:0,appliedEditorCount:0,
+      appliedDecorationCount:0,appliedRangeCount:0,versionMismatches:[]
+    };
+    const versionMatches=!!entry&&entry.version===editor.document.version;
+    if(entry&&!versionMatches)summary.versionMismatches.push({
+      uri,documentVersion:entry.version,editorVersion:editor.document.version
+    });
+    const applied=setEditorRanges(editor,uri,versionMatches?entry:null);
+    if(versionMatches){
+      summary.versionMatchedEditorCount=1;
+      summary.appliedEditorCount=1;
+      summary.appliedDecorationCount=applied.decorationCount;
+      summary.appliedRangeCount=applied.rangeCount;
+    }
+    recordApplication(uri,summary);
   }
 
   function clearDocument(uri) {
@@ -151,10 +233,13 @@ export function createSemanticTokenDecorationRenderer(vscode, tokenTypes, semant
 
     const entry = { version: document.version, ranges };
     documents.set(uri, entry);
-    applyVisible(uri, entry);
 
     let tokenCount = 0;
     for (const tokenRanges of ranges.values()) tokenCount += tokenRanges.length;
+    diagnostics.lastDocumentVersion=document.version;
+    diagnostics.lastTokenCount=tokenCount;
+    diagnostics.lastTokenTypeCount=ranges.size;
+    applyVisible(uri, entry);
     return { tokenCount, tokenTypeCount: ranges.size };
   }
 
@@ -162,13 +247,17 @@ export function createSemanticTokenDecorationRenderer(vscode, tokenTypes, semant
   if (typeof visibleEditorsChanged === "function") {
     subscriptions.push(visibleEditorsChanged(editors => {
       for (const editor of editors ?? vscode.window.visibleTextEditors ?? []) {
-        const uri = uriKey(editor.document?.uri);
-        if (!uri) continue;
-        const entry = documents.get(uri);
-        setEditorRanges(editor, uri,
-          entry && entry.version === editor.document.version ? entry : null);
+        applyActiveEditor(editor);
       }
     }));
+  }
+
+  // Some Theia CodeEditorOpener transitions update activeTextEditor without
+  // publishing a corresponding visible-editors event. Reapply cached ranges
+  // on the active-editor event as well; the renderer remains URI/version scoped.
+  const activeEditorChanged=vscode.window.onDidChangeActiveTextEditor;
+  if(typeof activeEditorChanged==="function"){
+    subscriptions.push(activeEditorChanged(editor=>applyActiveEditor(editor)));
   }
 
   const documentChanged = vscode.workspace?.onDidChangeTextDocument;
@@ -191,6 +280,13 @@ export function createSemanticTokenDecorationRenderer(vscode, tokenTypes, semant
 
   return {
     render,
+    diagnostics() {
+      return {
+        ...diagnostics,
+        decorationTypeCount:decorationTypes.size,
+        decorationStyles:Object.fromEntries(decorationStyles)
+      };
+    },
     dispose() {
       if (disposed) return;
       disposed = true;
