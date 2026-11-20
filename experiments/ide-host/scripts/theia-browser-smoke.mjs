@@ -469,19 +469,53 @@ try{
         throw Error(path+' is missing '+label+': '+JSON.stringify(nativeStudioMenuWidget.fileActions));
   }
   const revealStudioSubmenu=async(label,expected)=>{
+    const active=await evalJS(`(()=>{
+      const c=window.theia.container;
+      const keys=[...c._bindingDictionary._map.keys()];
+      const key=keys.find(k=>typeof k==='function'&&
+        k.prototype?.activateWidget&&k.prototype?.addWidget);
+      const bar=key?c.get(key).topPanel.widgets.find(w=>w.id==='theia:menubar'):null;
+      return {active:bar?.activeMenu?.title?.label??null};
+    })()`);
+    if(active?.active!=='SKILL Studio'){
+      const top=await evalJS(`(()=>{
+        const item=[...document.querySelectorAll('.lm-MenuBar-itemLabel')]
+          .find(node=>(node.textContent||'').trim()==='SKILL Studio');
+        const r=item?.getBoundingClientRect();
+        return r&&r.width>0&&r.height>0?{x:r.left+r.width/2,y:r.top+r.height/2}:null;
+      })()`);
+      if(!top)throw Error('Native SKILL Studio top-level menu is not visible');
+      await command('Input.dispatchMouseEvent',{type:'mouseMoved',x:top.x,y:top.y});
+      await command('Input.dispatchMouseEvent',{type:'mousePressed',x:top.x,y:top.y,button:'left',clickCount:1});
+      await command('Input.dispatchMouseEvent',{type:'mouseReleased',x:top.x,y:top.y,button:'left',clickCount:1});
+      await sleep(250);
+    }
     const position=await evalJS(`(()=>{
-      const item=[...document.querySelectorAll('.lm-Menu-item')]
-        .find(node=>node.innerText.trim()===${JSON.stringify(label)});
-      if(!item)return null;
-      const r=item.getBoundingClientRect();
+      const label=${JSON.stringify(label)};
+      const popups=[...document.querySelectorAll('.lm-Menu,.p-Menu')]
+        .filter(menu=>getComputedStyle(menu).display!=='none');
+      const items=popups.flatMap(menu=>[...menu.querySelectorAll('.lm-Menu-item,.p-Menu-item')])
+        .filter(item=>{
+          const text=(item.querySelector('.lm-Menu-itemLabel,.p-Menu-itemLabel')?.textContent||
+            item.textContent||'').replace(/\\s+/g,' ').trim();
+          const r=item.getBoundingClientRect();
+          return text===label&&r.width>0&&r.height>0;
+        });
+      if(!items.length)return {missing:true,menus:popups.map(menu=>({
+        text:(menu.innerText||menu.textContent||'').slice(0,700),
+        html:menu.outerHTML.slice(0,2200)
+      }))};
+      const r=items[0].getBoundingClientRect();
       return {x:r.left+r.width/2,y:r.top+r.height/2};
     })()`);
-    if(!position)throw Error('Native Studio submenu item is not visible: '+label);
-    await command("Input.dispatchMouseEvent",{type:"mouseMoved",...position});
+    if(!position||position.missing)
+      throw Error('Native Studio submenu item is not visible: '+label+' · '+
+        JSON.stringify(position?.menus??null));
+    await command('Input.dispatchMouseEvent',{type:'mouseMoved',x:position.x,y:position.y});
     await sleep(350);
-    const visibleMenus=await evalJS(`[...document.querySelectorAll('.lm-Menu')]
+    const visibleMenus=await evalJS(`[...document.querySelectorAll('.lm-Menu,.p-Menu')]
       .filter(node=>getComputedStyle(node).display!=='none')
-      .map(node=>node.innerText).join('\\n')`);
+      .map(node=>node.innerText||node.textContent).join(' | ')`);
     for(const expectedLabel of expected)
       if(!visibleMenus.includes(expectedLabel))
         throw Error('Native Studio '+label+' submenu is missing '+expectedLabel+': '+visibleMenus);
@@ -828,19 +862,26 @@ try{
   // of CA-SL semantic token/LSP analysis. Use the extension's exact Example
   // Source opener: Quick Open can inherit focus from Compiler Output.
   if(requireEditor){
-    const opened=await evalJS(`(async()=>{
-      const c=window.theia.container;
-      const key=[...c._bindingDictionary._map.keys()].find(k=>
-        typeof k==='function'&&k.prototype?.executeCommand&&
-        k.prototype?.registerCommand&&k.prototype?.getCommand);
-      if(!key)throw Error('Native command registry missing for Python syntax');
-      return c.get(key).executeCommand(
-        'skillStudio.internal.openPythonSyntaxAcceptance');
-    })()`);
+    let opened=null,pythonOpenError=null,pythonOpenAttempts=0;
+    for(;pythonOpenAttempts<4;pythonOpenAttempts++){
+      try{
+        opened=await evalJS(`(async()=>{
+          const c=window.theia.container;
+          const key=[...c._bindingDictionary._map.keys()].find(k=>
+            typeof k==='function'&&k.prototype?.executeCommand&&
+            k.prototype?.registerCommand&&k.prototype?.getCommand);
+          if(!key)throw Error('Native command registry missing for Python syntax');
+          return c.get(key).executeCommand(
+            'skillStudio.internal.openPythonSyntaxAcceptance');
+        })()`);
+        if(opened?.uri)break;
+      }catch(error){pythonOpenError=String(error?.message??error);}
+      await sleep(250);
+    }
     if(!opened?.uri?.endsWith("/scripts/validate-subscription-request.py")||
        opened.languageId!=="python"||opened.viewColumn!==1)
-      throw Error("Exact native Python Source did not open in the primary group: "+
-        JSON.stringify(opened));
+      throw Error("Exact native Python Source did not open in the primary group after "+
+        pythonOpenAttempts+" attempts: "+JSON.stringify({opened,pythonOpenError}));
     let pythonTextMate=null;
     for(let attempt=0;attempt<35;attempt++){
       pythonTextMate=await evalJS(`(()=>{
@@ -1168,6 +1209,147 @@ try{
      persistedEvidence.semantic?.registered!==true)
     throw Error("The persisted workspace lost Package, Workbench or semantic highlighting after reload: "+
       JSON.stringify(persistedEvidence).slice(0,3500));
+  // Simulate a browser profile upgraded from the retired Example. The
+  // fixture changes only the dedicated built-in Example root, never a user
+  // workspace. The native Project menu must remain the recovery path.
+  const seededLegacy=await evalJS("(()=>{const c=window.theia.container;const k=[...c._bindingDictionary._map.keys()].find(x=>typeof x==='function'&&x.prototype?.executeCommand&&x.prototype?.registerCommand&&x.prototype?.getCommand);return c.get(k).executeCommand('skillStudio.internal.workspaceIdentityAcceptance',{seedLegacyExample:true})})()");
+  if(seededLegacy?.seededApiVersion!=="connectionagent.io/v1alpha1")
+    throw Error("Could not seed the previous Example profile: "+JSON.stringify(seededLegacy));
+  await command("Page.reload",{ignoreCache:false});
+  let legacyIdentity=null;
+  for(let attempt=0;attempt<120;attempt++){
+    try{
+      legacyIdentity=await evalJS("(()=>{const c=window.theia?.container;if(!c)return null;const k=[...(c._bindingDictionary?._map?.keys?.()??[])].find(x=>typeof x==='function'&&x.prototype?.executeCommand&&x.prototype?.registerCommand&&x.prototype?.getCommand);return k?c.get(k).executeCommand('skillStudio.internal.workspaceIdentityAcceptance'):null})()");
+      if(legacyIdentity?.contractApiVersion==="connectionagent.io/v1alpha1"&&
+         legacyIdentity?.procedureApiVersion==="connectionagent.io/v1alpha1")break;
+    }catch{legacyIdentity=null;}
+    await sleep(250);
+  }
+  if(legacyIdentity?.workspaceName!=="skill-studio-demo"||
+     legacyIdentity.contractApiVersion!=="connectionagent.io/v1alpha1"||
+     legacyIdentity.procedureApiVersion!=="connectionagent.io/v1alpha1"||
+     !legacyIdentity.libExists||!legacyIdentity.outputExists)
+    throw Error("The previous Example profile was not restored as a legacy fixture: "+
+      JSON.stringify(legacyIdentity));
+  // A stale built-in Example must not look like a healthy Package with an
+  // empty Problems view just because its old Procedure cannot be projected.
+  // Assert the real LSP diagnostics reach both the native editor markers and
+  // the Problems tree before offering the explicit replacement action.
+  let legacyDiagnostics=null,legacyPackageStatus=null,legacySourceDiagnostic=null,
+    legacyReadyOtherPackage=null;
+  for(let attempt=0;attempt<90;attempt++){
+    try{
+      legacyDiagnostics=await evalJS("(async()=>{const c=window.theia?.container;if(!c)return null;const k=[...(c._bindingDictionary?._map?.keys?.()??[])].find(x=>typeof x==='function'&&x.prototype?.executeCommand&&x.prototype?.registerCommand&&x.prototype?.getCommand);return k?await c.get(k).executeCommand('skillStudio.internal.semanticTokenDiagnostics'):null})()");
+      legacyPackageStatus=(legacyDiagnostics?.packageStatuses??[]).find(item=>
+        String(item.rootUri??"").endsWith("/skill-studio-demo/skills/establish-pdu-session"));
+      legacyReadyOtherPackage=(legacyDiagnostics?.packageStatuses??[]).find(item=>
+        item.rootUri!==legacyPackageStatus?.rootUri&&item.state==="READY");
+      legacySourceDiagnostic=(legacyPackageStatus?.analysisDiagnostics??[]).find(item=>
+        item.code==="UNKNOWN_FIELD"&&item.relativePath==="assurance/contract.yaml");
+      if(legacyPackageStatus?.state==="PARTIAL"&&
+         legacyPackageStatus?.procedureState==="UNAVAILABLE"&&
+         legacyPackageStatus?.publishedDiagnosticCount>0&&legacySourceDiagnostic&&
+         legacyReadyOtherPackage&&
+         legacyDiagnostics?.languageStatus==="SKILL LSP: PARTIAL")break;
+    }catch{legacyDiagnostics=null;}
+    await sleep(200);
+  }
+  if(legacyPackageStatus?.state!=="PARTIAL"||
+     legacyPackageStatus?.procedureState!=="UNAVAILABLE"||
+     !(legacyPackageStatus?.publishedDiagnosticCount>0)||
+     !legacySourceDiagnostic||!legacyReadyOtherPackage||
+     legacyDiagnostics?.languageStatus!=="SKILL LSP: PARTIAL")
+    throw Error("The stale v1alpha1 Example was not surfaced as a workspace-level analysis failure: "+
+      JSON.stringify({
+        languageStatus:legacyDiagnostics?.languageStatus,
+        packageStatus:legacyPackageStatus,
+        readyOtherPackage:legacyReadyOtherPackage,
+        sourceDiagnostic:legacySourceDiagnostic
+      }).slice(0,3200));
+  console.log("STUDIO_LEGACY_EXAMPLE_ANALYSIS_UNAVAILABLE_CHROMIUM_PASS",JSON.stringify({
+    languageStatus:legacyDiagnostics.languageStatus,
+    packageState:legacyPackageStatus.state,
+    procedureState:legacyPackageStatus.procedureState,
+    publishedDiagnosticCount:legacyPackageStatus.publishedDiagnosticCount,
+    sourceDiagnostic:{code:legacySourceDiagnostic.code,
+      path:legacySourceDiagnostic.relativePath,line:legacySourceDiagnostic.line},
+    otherPackage:{rootUri:legacyReadyOtherPackage.rootUri,state:legacyReadyOtherPackage.state},
+    packageAuditState:legacyPackageStatus.packageAuditState
+  }));
+  const recoveryMenu=await evalJS("(()=>{const item=[...document.querySelectorAll('.lm-MenuBar-item')].find(x=>x.innerText.trim()==='SKILL Studio');if(!item)return null;const r=item.getBoundingClientRect();return {visible:r.width>0&&r.height>0,label:item.innerText.trim()}})()");
+  if(!recoveryMenu?.visible)
+    throw Error("SKILL Studio recovery entry disappeared on a pre-existing Example profile");
+  await revealStudioSubmenu("Project",["Open Example Project"]);
+  const openExamplePosition=await evalJS("(()=>{const item=[...document.querySelectorAll('.lm-Menu-item')].find(x=>x.innerText.trim()==='Open Example Project'||x.innerText.trim()==='打开示例项目');if(!item)return null;const r=item.getBoundingClientRect();return {x:r.left+r.width/2,y:r.top+r.height/2,label:item.innerText.trim()}})()");
+  if(!openExamplePosition)
+    throw Error("Project menu lost its explicit Open Example Project action");
+  await command("Input.dispatchMouseEvent",{type:"mouseMoved",x:openExamplePosition.x,y:openExamplePosition.y});
+  await command("Input.dispatchMouseEvent",{type:"mousePressed",x:openExamplePosition.x,y:openExamplePosition.y,button:"left",clickCount:1});
+  await command("Input.dispatchMouseEvent",{type:"mouseReleased",x:openExamplePosition.x,y:openExamplePosition.y,button:"left",clickCount:1});
+  const waitForDialogButton=async labels=>{
+    for(let attempt=0;attempt<80;attempt++){
+      const position=await evalJS("(()=>{const labels="+JSON.stringify(labels)+";const button=[...document.querySelectorAll('button')].find(item=>{const r=item.getBoundingClientRect();return r.width>0&&r.height>0&&labels.includes(item.innerText.trim())});if(!button)return null;const r=button.getBoundingClientRect();return {x:r.left+r.width/2,y:r.top+r.height/2,label:button.innerText.trim()}})()");
+      if(position)return position;
+      await sleep(100);
+    }
+    throw Error("The existing Example replacement confirmation did not appear: "+
+      (await evalJS("document.body.innerText.slice(-900)")));
+  };
+  const cancelPosition=await waitForDialogButton(["Cancel","取消"]);
+  await command("Input.dispatchMouseEvent",{type:"mouseMoved",x:cancelPosition.x,y:cancelPosition.y});
+  await command("Input.dispatchMouseEvent",{type:"mousePressed",x:cancelPosition.x,y:cancelPosition.y,button:"left",clickCount:1});
+  await command("Input.dispatchMouseEvent",{type:"mouseReleased",x:cancelPosition.x,y:cancelPosition.y,button:"left",clickCount:1});
+  let afterCancel=null;
+  for(let attempt=0;attempt<30;attempt++){
+    afterCancel=await evalJS("(()=>{const c=window.theia.container;const k=[...c._bindingDictionary._map.keys()].find(x=>typeof x==='function'&&x.prototype?.executeCommand&&x.prototype?.registerCommand&&x.prototype?.getCommand);return c.get(k).executeCommand('skillStudio.internal.workspaceIdentityAcceptance')})()");
+    if(afterCancel?.contractApiVersion==="connectionagent.io/v1alpha1")break;
+    await sleep(100);
+  }
+  if(afterCancel?.contractApiVersion!=="connectionagent.io/v1alpha1"||
+     afterCancel?.procedureApiVersion!=="connectionagent.io/v1alpha1"||
+     !afterCancel.libExists||!afterCancel.outputExists)
+    throw Error("Cancel changed the old Example profile; replacement must be explicit: "+
+      JSON.stringify(afterCancel));
+  // Re-open through the same native menu and explicitly accept full Example
+  // replacement. This must remove retired folders and restore only v1alpha5.
+  await revealStudioSubmenu("Project",["Open Example Project"]);
+  const retryPosition=await evalJS("(()=>{const item=[...document.querySelectorAll('.lm-Menu-item')].find(x=>x.innerText.trim()==='Open Example Project'||x.innerText.trim()==='打开示例项目');if(!item)return null;const r=item.getBoundingClientRect();return {x:r.left+r.width/2,y:r.top+r.height/2}})()");
+  if(!retryPosition)throw Error("Open Example Project disappeared after cancelling replacement");
+  await command("Input.dispatchMouseEvent",{type:"mouseMoved",...retryPosition});
+  await command("Input.dispatchMouseEvent",{type:"mousePressed",...retryPosition,button:"left",clickCount:1});
+  await command("Input.dispatchMouseEvent",{type:"mouseReleased",...retryPosition,button:"left",clickCount:1});
+  const replacePosition=await waitForDialogButton(["Replace Example","替换 Example"]);
+  await command("Input.dispatchMouseEvent",{type:"mouseMoved",x:replacePosition.x,y:replacePosition.y});
+  await command("Input.dispatchMouseEvent",{type:"mousePressed",x:replacePosition.x,y:replacePosition.y,button:"left",clickCount:1});
+  await command("Input.dispatchMouseEvent",{type:"mouseReleased",x:replacePosition.x,y:replacePosition.y,button:"left",clickCount:1});
+  let upgradedIdentity=null,upgradedEvidence=null;
+  for(let attempt=0;attempt<120;attempt++){
+    try{
+      upgradedIdentity=await evalJS("(()=>{const c=window.theia?.container;if(!c)return null;const k=[...(c._bindingDictionary?._map?.keys?.()??[])].find(x=>typeof x==='function'&&x.prototype?.executeCommand&&x.prototype?.registerCommand&&x.prototype?.getCommand);return k?c.get(k).executeCommand('skillStudio.internal.workspaceIdentityAcceptance'):null})()");
+      if(upgradedIdentity?.contractCurrentShape===true&&
+         upgradedIdentity?.procedureCurrentShape===true){
+        upgradedEvidence=await evalJS("(()=>{const c=window.theia.container;const k=[...c._bindingDictionary._map.keys()].find(x=>typeof x==='function'&&x.prototype?.executeCommand&&x.prototype?.registerCommand&&x.prototype?.getCommand);return c.get(k).executeCommand('skillStudio.showActivationDiagnostics')})()");
+        if(upgradedEvidence?.packageInventory?.state==="ready"&&
+           upgradedEvidence.packageInventory.packages?.length===2)break;
+      }
+    }catch{upgradedIdentity=null;}
+    await sleep(250);
+  }
+  if(upgradedIdentity?.contractCurrentShape!==true||
+     upgradedIdentity?.procedureCurrentShape!==true||
+     upgradedIdentity?.libExists||upgradedIdentity?.outputExists||
+     upgradedIdentity?.workspaceFolders?.length!==1||
+     upgradedEvidence?.packageInventory?.packages?.length!==2||
+     upgradedEvidence?.failures?.length)
+    throw Error("Explicit Example replacement did not restore a clean current v1alpha5 project: "+
+      JSON.stringify({identity:upgradedIdentity,activation:upgradedEvidence}).slice(0,3200));
+  console.log("STUDIO_LEGACY_EXAMPLE_REPLACEMENT_CHROMIUM_PASS",JSON.stringify({
+    menu:recoveryMenu,legacyVersion:legacyIdentity.contractApiVersion,
+    cancelPreserved:afterCancel.contractApiVersion,
+    upgradedGrammar:"CA-SL v1alpha5 (top-level Contract + start/nodes)",
+    libRemoved:!upgradedIdentity.libExists,outputRemoved:!upgradedIdentity.outputExists,
+    packages:upgradedEvidence.packageInventory.packages.length
+  }));
   console.log("STUDIO_PERSISTED_WORKSPACE_RELOAD_PASS",JSON.stringify({
     workspace:persistedIdentity.workspaceName,
     packages:persistedEvidence.inventory.packages.map(item=>item.name),

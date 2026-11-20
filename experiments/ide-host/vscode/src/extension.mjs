@@ -1,4 +1,4 @@
-import {openNativeSource} from "./native-source.mjs";
+import {openNativeSource,openTextDocumentWithRetry} from "./native-source.mjs";
 import {registerPreviewHost} from "./preview-host.mjs";
 import {mountMarkdownPreview} from "./markdown-preview.mjs";
 
@@ -464,18 +464,69 @@ export function activate(context){
   // This command is internal (not contributed to the Command Palette) and
   // returns the authoritative workspace and the two current Skill URIs.
   context.subscriptions.push(vscode.commands.registerCommand(
-    "skillStudio.internal.workspaceIdentityAcceptance",async()=>{
+    "skillStudio.internal.workspaceIdentityAcceptance",async(options={})=>{
       const folders=vscode.workspace.workspaceFolders??[];
+      const exampleRoot=vscode.Uri.joinPath(context.globalStorageUri,EXAMPLE_PROJECT_NAME);
+      let seededApiVersion=null;
+      if(options?.seedLegacyExample===true){
+        if(folders.length!==1||folders[0].uri.toString()!==exampleRoot.toString())
+          throw Error("Refusing to seed a legacy fixture outside the built-in Example workspace");
+        const contract=vscode.Uri.joinPath(exampleRoot,"skills","establish-pdu-session",
+          "assurance","contract.yaml");
+        const procedure=vscode.Uri.joinPath(exampleRoot,"skills","establish-pdu-session",
+          "assurance","procedure.yaml");
+        await vscode.workspace.fs.createDirectory(vscode.Uri.joinPath(exampleRoot,"lib"));
+        await vscode.workspace.fs.createDirectory(vscode.Uri.joinPath(exampleRoot,"output"));
+        await vscode.workspace.fs.writeFile(contract,new TextEncoder().encode(
+          "apiVersion: connectionagent.io/v1alpha1\n"+
+          "kind: Contract\nmetadata:\n  name: legacy-example\n"
+        ));
+        await vscode.workspace.fs.writeFile(procedure,new TextEncoder().encode(
+          "apiVersion: connectionagent.io/v1alpha1\n"+
+          "kind: Procedure\nstart: legacy\nnodes: {}\n"
+        ));
+        seededApiVersion="connectionagent.io/v1alpha1";
+      }
       const root=folders.length===1?folders[0].uri:null;
       const defaultProcedure=root?vscode.Uri.joinPath(root,
         "skills","establish-pdu-session","assurance","procedure.yaml"):null;
       const masProcedure=root?vscode.Uri.joinPath(root,
         "skills","establish-pdu-session-mas","assurance","procedure.yaml"):null;
+      const contract=root?vscode.Uri.joinPath(root,
+        "skills","establish-pdu-session","assurance","contract.yaml"):null;
+      const lib=root?vscode.Uri.joinPath(root,"lib"):null;
+      const output=root?vscode.Uri.joinPath(root,"output"):null;
       const exists=async uri=>{
         if(!uri)return false;
         try{await vscode.workspace.fs.stat(uri);return true;}
         catch{return false;}
       };
+      const readSource=async uri=>{
+        if(!uri)return {text:null,error:'URI unavailable'};
+        try{
+          const text=new TextDecoder('utf-8',{fatal:true})
+            .decode(await vscode.workspace.fs.readFile(uri));
+          return {text,error:null};
+        }catch(error){return {text:null,error:String(error?.message??error)};}
+      };
+      const contractRead=await readSource(contract);
+      const procedureRead=await readSource(defaultProcedure);
+      const apiVersion=source=>/^\s*apiVersion\s*:\s*[\"']?([^\"'\s]+)/m.exec(source??'')?.[1]??null;
+      const contractApiVersion=apiVersion(contractRead.text);
+      const procedureApiVersion=apiVersion(procedureRead.text);
+      // CA-SL v1alpha5 intentionally has no apiVersion field in each source file.
+      // Its frozen authoring shape is a top-level Contract and a start/nodes DAG.
+      const contractCurrentShape=Boolean(contractRead.text&&
+        /^\s*goal\s*:/m.test(contractRead.text)&&
+        /^\s*precondition\s*:/m.test(contractRead.text)&&
+        /^\s*requestSchema\s*:/m.test(contractRead.text)&&
+        /^\s*contextSchema\s*:/m.test(contractRead.text)&&
+        /^\s*dependencies\s*:/m.test(contractRead.text)&&
+        /^\s*capabilities\s*:/m.test(contractRead.text));
+      const procedureCurrentShape=Boolean(procedureRead.text&&
+        /^\s*start\s*:/m.test(procedureRead.text)&&
+        /^\s*nodes\s*:/m.test(procedureRead.text)&&
+        !/^\s*procedures\s*:/m.test(procedureRead.text));
       return {
         workspaceName:vscode.workspace.name??null,
         workspaceFile:vscode.workspace.workspaceFile?.toString?.()??null,
@@ -484,7 +535,13 @@ export function activate(context){
         defaultProcedure:defaultProcedure?.toString?.()??null,
         defaultProcedureExists:await exists(defaultProcedure),
         masProcedure:masProcedure?.toString?.()??null,
-        masProcedureExists:await exists(masProcedure)
+        masProcedureExists:await exists(masProcedure),
+        contractApiVersion,procedureApiVersion,
+        contractCurrentShape,procedureCurrentShape,
+        contractReadError:contractRead.error,procedureReadError:procedureRead.error,
+        libExists:await exists(lib),
+        outputExists:await exists(output),
+        ...(seededApiVersion?{seededApiVersion}:{})
       };
     }
   ));
@@ -538,6 +595,11 @@ export function activate(context){
               exampleText.replacePrompt,{modal:true},
               exampleText.replaceAction,exampleText.cancelAction
             );
+            console.log("STUDIO_EXAMPLE_REPLACEMENT_DECISION",JSON.stringify({
+              existingExample,choice:choice??null,
+              replaceAction:exampleText.replaceAction,
+              replaceExisting:choice===exampleText.replaceAction
+            }));
             if(choice!==exampleText.replaceAction)return null;
             replaceExisting=true;
           }
@@ -561,6 +623,16 @@ export function activate(context){
                     else if(phase==="project-ready")report(exampleText.workspace);
                   }
                 });
+              console.log("STUDIO_EXAMPLE_IMPORT_RESULT",JSON.stringify({
+                root:result.root.toString(),replaceRequested:replaceExisting,
+                replacedExisting:result.replacedExisting,
+                candidateFiles:result.candidateFiles,created:result.created,
+                skipped:result.skipped,readmeUpdated:result.readmeUpdated
+              }));
+              if(replaceExisting&&(!result.replacedExisting||
+                 result.created!==result.candidateFiles||result.skipped!==0||
+                 !result.readmeUpdated))
+                throw Error("Explicit Example replacement did not replace the complete existing root");
               // A Theia browser-only session may currently be backed by an
               // Untitled multi-root workspace file. Opening the project folder
               // natively replaces that workspace and gives the workbench its
@@ -711,7 +783,7 @@ export function activate(context){
       if(folders.length!==1)throw Error("Python syntax probe needs one Example workspace");
       const uri=vscode.Uri.joinPath(folders[0].uri,"skills",
         "establish-pdu-session","scripts","validate-subscription-request.py");
-      const doc=await vscode.workspace.openTextDocument(uri);
+      const doc=await openTextDocumentWithRetry(vscode,uri);
       const editor=await vscode.window.showTextDocument(doc,{
         viewColumn:vscode.ViewColumn.One,preserveFocus:false,preview:false
       });
@@ -758,7 +830,7 @@ export function activate(context){
       const pythonFiles=await vscode.workspace.findFiles(
         "**/scripts/validate-subscription-request.py","**/node_modules/**",5);
       if(!pythonFiles.length)throw Error("CA-SL v1alpha5 Python acceptance fixture is missing");
-      const python=await vscode.workspace.openTextDocument(pythonFiles[0]);
+      const python=await openTextDocumentWithRetry(vscode,pythonFiles[0]);
       await vscode.window.showTextDocument(python,{
         viewColumn:vscode.ViewColumn.One,preserveFocus:false,preview:false
       });
@@ -781,7 +853,7 @@ export function activate(context){
       const yamlUri=projectRoot.with({path:projectRoot.path+"/.studio-editor-group-acceptance.yaml"});
       await vscode.workspace.fs.writeFile(yamlUri,
         new TextEncoder().encode("kind: editor-group-acceptance\\n"));
-      const yamlDocument=await vscode.workspace.openTextDocument(yamlUri);
+      const yamlDocument=await openTextDocumentWithRetry(vscode,yamlUri);
       if(yamlDocument.isDirty&&!await yamlDocument.save())
         throw Error("Temporary YAML fixture could not be saved");
       if(yamlDocument.isDirty)

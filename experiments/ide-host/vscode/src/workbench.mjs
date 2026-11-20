@@ -166,6 +166,23 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
     // another scheduled ANALYZING refresh. Native Source editing is separate.
     if(languageTransportFailure && state!=="UNAVAILABLE" && state!=="IDLE")return;
     if(!browserLanguageWorkerAvailable&&!useInProcessLanguageService)return;
+    // The status bar describes the whole workspace, not whichever Package
+    // happened to publish last. A READY result from one Skill must never hide
+    // another active Skill whose current-source analysis is PARTIAL/UNAVAILABLE.
+    const incompletePackages=[...languagePackageStatuses.values()].filter(status=>
+      status.state==="PARTIAL"||status.state==="UNAVAILABLE");
+    if(incompletePackages.length&&!["UNAVAILABLE","ERROR","IDLE"].includes(state)){
+      state="PARTIAL";
+      detail=incompletePackages.map(status=>{
+        const packageName=String(status.rootUri??"").split("/").filter(Boolean).at(-1)||
+          "unknown Package";
+        const procedureState=status.procedureState??"UNAVAILABLE";
+        const diagnosticCount=status.procedureDiagnosticCount??"?";
+        const auditReason=status.packageAuditReason??status.reason??"";
+        return packageName+": Procedure "+procedureState+" ("+diagnosticCount+
+          " diagnostics)"+(auditReason?" · "+auditReason:"");
+      }).join("; ");
+    }
     if(!languageStatusItem){
       languageStatusItem=vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left,20);
       languageStatusItem.name="SKILL Studio Language Service";

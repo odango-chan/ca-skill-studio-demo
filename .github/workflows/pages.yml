@@ -13,13 +13,24 @@ on:
       - "package.json"
       - "package-lock.json"
       - ".github/workflows/pages.yml"
+  pull_request:
+    paths:
+      - "site/**"
+      - "experiments/ide-host/**"
+      - "extensions/skill-studio-theme/**"
+      - "extensions/skill-studio-languages/**"
+      - "tests/**"
+      - "scripts/**"
+      - "package.json"
+      - "package-lock.json"
+      - ".github/workflows/pages.yml"
   workflow_dispatch:
 
 permissions:
   contents: read
 
 concurrency:
-  group: skill-studio-pages
+  group: skill-studio-pages-${{ github.head_ref || github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -32,13 +43,13 @@ jobs:
       - name: Checkout current published site from main
         uses: actions/checkout@v4
         with:
-          ref: main
+          ref: ${{ github.event.pull_request.head.sha || 'main' }}
           path: main-source
       - name: Checkout isolated Theia experiment
-        if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/spike/ide-extension-theia-host'
+        if: github.event_name == 'pull_request' || github.ref == 'refs/heads/main' || github.ref == 'refs/heads/spike/ide-extension-theia-host'
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.ref_name }}
+          ref: ${{ github.event.pull_request.head.sha || github.ref_name }}
           path: ide-source
       - name: Install Node.js
         uses: actions/setup-node@v4
@@ -70,7 +81,7 @@ jobs:
           test "$checked" -gt 0
           echo "Checked $checked active tracked JavaScript files"
       - name: Build Theia Web extension for default online workbench
-        if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/spike/ide-extension-theia-host'
+        if: github.event_name == 'pull_request' || github.ref == 'refs/heads/main' || github.ref == 'refs/heads/spike/ide-extension-theia-host'
         working-directory: ide-source
         run: |
           npm ci --no-audit --no-fund
@@ -80,21 +91,20 @@ jobs:
           npm ci --prefix experiments/ide-host/lsp-browser/server --no-audit --no-fund
           node experiments/ide-host/scripts/build-ide-spike.mjs
       - name: Checkout pinned CA Skill Compiler v2.0.0 source
-        if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/spike/ide-extension-theia-host'
+        if: github.event_name == 'pull_request' || github.ref == 'refs/heads/main' || github.ref == 'refs/heads/spike/ide-extension-theia-host'
         uses: actions/checkout@v4
         with:
           repository: odango-chan/ca-skill-compiler
           ref: v2.0.0
           path: compiler-source
-          token: ${{ secrets.CA_SKILL_COMPILER_READ_TOKEN }}
           persist-credentials: false
       - name: Go 1.26.6 for the pinned Compiler WASM build
-        if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/spike/ide-extension-theia-host'
+        if: github.event_name == 'pull_request' || github.ref == 'refs/heads/main' || github.ref == 'refs/heads/spike/ide-extension-theia-host'
         uses: actions/setup-go@v5
         with:
           go-version: "1.26.6"
       - name: Build pinned Compiler v2.0.0 Go/WASM Core
-        if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/spike/ide-extension-theia-host'
+        if: github.event_name == 'pull_request' || github.ref == 'refs/heads/main' || github.ref == 'refs/heads/spike/ide-extension-theia-host'
         working-directory: compiler-source
         run: |
           mkdir -p dist
@@ -104,13 +114,13 @@ jobs:
           cp dist/wasm_exec.js ../ide-source/experiments/ide-host/vscode/dist/wasm_exec.js
           sha256sum dist/skillc.wasm
       - name: Stage prepared Compiler Worker and WASM assets
-        if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/spike/ide-extension-theia-host'
+        if: github.event_name == 'pull_request' || github.ref == 'refs/heads/main' || github.ref == 'refs/heads/spike/ide-extension-theia-host'
         working-directory: ide-source
         run: |
           node experiments/ide-host/scripts/prepare-theia-online.mjs
           node --test experiments/ide-host/tests/pages-compose.test.mjs
       - name: Build Theia browser-only static workbench
-        if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/spike/ide-extension-theia-host'
+        if: github.event_name == 'pull_request' || github.ref == 'refs/heads/main' || github.ref == 'refs/heads/spike/ide-extension-theia-host'
         working-directory: ide-source
         run: |
           npm install --prefix experiments/ide-host/theia-online --no-audit --no-fund --ignore-scripts
@@ -124,17 +134,18 @@ jobs:
           node experiments/ide-host/scripts/prepare-theia-static-preview.mjs
           node experiments/ide-host/scripts/prepare-theia-brand.mjs experiments/ide-host/theia-online/lib/frontend
       - name: Real Chromium acceptance at the default Pages root
-        if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/spike/ide-extension-theia-host'
+        if: github.event_name == 'pull_request' || github.ref == 'refs/heads/main' || github.ref == 'refs/heads/spike/ide-extension-theia-host'
         working-directory: ide-source
         env:
           THEIA_BASE_PATH: "/ca-skill-studio-demo"
+          THEIA_ACCEPTANCE_FIXTURES: "1"
           THEIA_REQUIRE_WEBVIEW: "1"
           THEIA_REQUIRE_BROWSER_LSP: "1"
           THEIA_REQUIRE_COMPILER_WORKER: "1"
         run: node experiments/ide-host/scripts/theia-browser-smoke.mjs
       # Theia is the only supported online host. Publish no Classic fallback.
       - name: Compose Theia-only Pages release
-        if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/spike/ide-extension-theia-host'
+        if: github.event_name == 'pull_request' || github.ref == 'refs/heads/main' || github.ref == 'refs/heads/spike/ide-extension-theia-host'
         working-directory: main-source
         run: |
           node ../ide-source/experiments/ide-host/scripts/compose-pages-release.mjs --theia ../ide-source/experiments/ide-host/theia-online/lib/frontend --output dist --site-root .
@@ -156,8 +167,10 @@ jobs:
           test ! -e dist/ide-preview
           test ! -e dist/classic-icons.css
       - name: Record and verify exact deployed source identity
-        if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/spike/ide-extension-theia-host'
+        if: github.event_name == 'pull_request' || github.ref == 'refs/heads/main' || github.ref == 'refs/heads/spike/ide-extension-theia-host'
         working-directory: main-source
+        env:
+          EXPECTED_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
         run: node ../ide-source/experiments/ide-host/scripts/write-pages-build-info.mjs --source ../ide-source --output dist/build-info.json
       - name: Configure Pages
         uses: actions/configure-pages@v5
@@ -171,7 +184,7 @@ jobs:
     runs-on: ubuntu-latest
     # Pages is published from main only. Experiment and theme branches
     # retain CI/build artifacts but cannot overwrite the public site.
-    if: github.ref == 'refs/heads/main'
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
     permissions:
       contents: read
       pages: write
@@ -184,3 +197,29 @@ jobs:
       - name: Deploy artifact to Pages
         id: deployment
         uses: actions/deploy-pages@v4
+      - name: Verify deployed Pages build identity
+        env:
+          PAGE_URL: ${{ steps.deployment.outputs.page_url }}
+          EXPECTED_SOURCE_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          info_file="$(mktemp)"
+          trap 'rm -f "$info_file"' EXIT
+          published=false
+          for attempt in $(seq 1 30); do
+            if curl --fail --silent --show-error "${PAGE_URL%/}/build-info.json" -o "$info_file" &&
+               grep -q "$EXPECTED_SOURCE_SHA" "$info_file"; then
+              published=true
+              break
+            fi
+            sleep 10
+          done
+          test "$published" = true
+          node --input-type=module - "$info_file" "$EXPECTED_SOURCE_SHA" <<'NODE'
+          import {readFileSync} from "node:fs";
+          const info=JSON.parse(readFileSync(process.argv[2],"utf8"));
+          const expected=process.argv[3];
+          if(info.schemaVersion!==2||info.sourceSha!==expected||info.workflowSha!==expected)
+            throw new Error("Live Pages build identity mismatch: "+JSON.stringify({expected,info}));
+          console.log("STUDIO_PAGES_LIVE_DEPLOYMENT_PASS",JSON.stringify(info));
+          NODE

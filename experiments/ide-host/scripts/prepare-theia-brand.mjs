@@ -22,7 +22,156 @@ export function buildSkillStudioBrandCss(){
 `;
 }
 export function buildSkillStudioBrandScript(){
-  return "// Theia 1.76 native MenuModelRegistry adapter.\n  // This is not a DOM menu or an event interception: the registry owns every\n  // action and Lumino owns the rendered menu and keyboard navigation.\n(() => {\n  const TOP=[\"menubar\",\"5z_skill_studio\"];\n  const zh=/^zh\\b/i.test(document.documentElement.lang||navigator.language||\"\");\n  const labels=zh?{\n    project:\"项目\",skill:\"Skill\",dependencies:\"依赖\",authoring:\"编写\",tools:\"工具\",help:\"帮助\",\n    welcome:\"欢迎页面\",newProject:\"新建项目\",openProject:\"打开项目\",\n    example:\"打开示例项目\",selectRoot:\"选择项目根目录\",refresh:\"刷新 Package\",\n    check:\"检查 Skill\",build:\"构建 Skill\",inspect:\"检查依赖\",\n    audit:\"审计当前 Package\",export:\"导出 Package ZIP\",\n    addDependency:\"添加依赖\",refreshDependencies:\"刷新依赖\",\n    procedure:\"打开 Procedure 设计器\",contract:\"打开 Contract 设计器\",\n    predicates:\"打开 Predicate 设计器\",schema:\"打开 Schema 设计器\",\n    refreshInspection:\"刷新检查结果\",restartLsp:\"重启语言服务\",\n    spec:\"Skill 语言规范\",guide:\"编写指南\"\n  }:{\n    project:\"Project\",skill:\"Skill\",dependencies:\"Dependencies\",authoring:\"Authoring\",tools:\"Tools\",help:\"Help\",\n    welcome:\"Welcome\",newProject:\"New Project\",openProject:\"Open Project\",\n    example:\"Open Example Project\",selectRoot:\"Select Project Root\",refresh:\"Refresh Packages\",\n    check:\"Check Skill\",build:\"Build Skill\",inspect:\"Inspect Dependencies\",\n    audit:\"Audit Current Package\",export:\"Export Package ZIP\",\n    addDependency:\"Add Dependency\",refreshDependencies:\"Refresh Dependencies\",\n    procedure:\"Open Procedure Designer\",contract:\"Open Contract Designer\",\n    predicates:\"Open Predicate Designer\",schema:\"Open Schema Designer\",\n    refreshInspection:\"Refresh Inspection\",restartLsp:\"Restart Language Service\",\n    spec:\"Skill Language Specification\",guide:\"Authoring Guide\"\n  };\n  const groups=[\n    {id:\"01_project\",label:labels.project,actions:[\n      [\"0\",\"skillStudio.showWelcome\",labels.welcome],\n      [\"1\",\"skillStudio.newProject\",labels.newProject],\n      [\"2\",\"skillStudio.openProject\",labels.openProject],\n      [\"3\",\"skillStudio.loadExample\",labels.example],\n      [\"4\",\"skillStudio.selectProjectRoot\",labels.selectRoot],\n      [\"5\",\"skillStudio.refreshPackages\",labels.refresh]\n    ]},\n    {id:\"02_skill\",label:labels.skill,actions:[\n      [\"0\",\"skillStudio.checkSkill\",labels.check],\n      [\"1\",\"skillStudio.buildSkill\",labels.build],\n      [\"2\",\"skillStudio.inspectCompilerDependencies\",labels.inspect],\n      [\"3\",\"skillStudio.auditPackage\",labels.audit],\n      [\"4\",\"skillStudio.exportPackageZip\",labels.export]\n    ]},\n    {id:\"03_dependencies\",label:labels.dependencies,actions:[\n      [\"0\",\"skillStudio.addDependency\",labels.addDependency],\n      [\"1\",\"skillStudio.refreshDependencies\",labels.refreshDependencies],\n    ]},\n    {id:\"04_authoring\",label:labels.authoring,actions:[\n      [\"0\",\"skillStudio.openProcedure\",labels.procedure],\n      [\"1\",\"skillStudio.openContract\",labels.contract],\n      [\"2\",\"skillStudio.openPredicates\",labels.predicates],\n      [\"3\",\"skillStudio.openSchema\",labels.schema]\n    ]},\n    {id:\"05_tools\",label:labels.tools,actions:[\n      [\"0\",\"skillStudio.refreshInspection\",labels.refreshInspection],\n      [\"1\",\"skillStudio.restartLanguageService\",labels.restartLsp]\n    ]},\n    {id:\"06_help\",label:labels.help,actions:[\n      [\"0\",\"skillStudio.openLanguageSpec\",labels.spec],\n      [\"1\",\"skillStudio.openAuthoringGuide\",labels.guide]\n    ]}\n  ];\n  const fileActions=[\n    {path:[\"menubar\",\"1_file\",\"1_new\"],order:\"80\",id:\"skillStudio.newProject\",label:labels.newProject},\n    {path:[\"menubar\",\"1_file\",\"2_open\"],order:\"80\",id:\"skillStudio.openProject\",label:labels.openProject},\n    {path:[\"menubar\",\"1_file\",\"2_open\"],order:\"81\",id:\"skillStudio.loadExample\",label:labels.example}\n  ];\n  const actionIds=[\n    ...groups.flatMap(group=>group.actions.map(([,id])=>id)),\n    ...fileActions.map(action=>action.id)\n  ];\n  let attempts=0;\n  function install(){\n    const container=window.theia?.container;\n    const bar=document.querySelector('[id=\"theia:menubar\"].lm-MenuBar');\n    const keys=container?._bindingDictionary?._map?.keys?.();\n    if(!bar||!keys)return false;\n    const all=[...keys];\n    const menuKey=all.find(key=>typeof key===\"function\"&&\n      key.prototype?.registerSubmenu&&key.prototype?.registerMenuAction&&\n      key.prototype?.getMenuNode);\n    const commandsKey=all.find(key=>typeof key===\"function\"&&\n      key.prototype?.executeCommand&&key.prototype?.registerCommand&&\n      key.prototype?.getCommand);\n    if(!menuKey||!commandsKey)return false;\n    const commands=container.get(commandsKey);\n    // Wait for actual extension handlers, but do not gate registration on\n    // contextual visibility: selected-item commands are hidden by their own\n    // native visibility predicates when no matching tree item is selected.\n    if(!actionIds.every(id=>commands.getCommand(id)))return false;\n    const menus=container.get(menuKey);\n    const root=menus.getMenuNode([\"menubar\"]);\n    const existing=root?.children?.find(node=>node.id===TOP[1]);\n    if(existing){\n      if(existing.label!==\"SKILL Studio\")throw Error(\"Conflicting Studio top-level menu\");\n      const existingGroups=new Set((existing.children??[]).map(node=>node.id));\n      const missing=groups.map(group=>group.id).filter(id=>!existingGroups.has(id));\n      if(missing.length)throw Error(\"Incomplete existing Studio menu: \"+missing.join(\", \"));\n    }else{\n      // Create real nested Theia submenus; the command registry remains the\n      // sole owner of enablement, visibility and execution.\n      for(const group of groups){\n        const groupPath=[...TOP,group.id];\n        menus.registerSubmenu(groupPath,group.label,{sortString:group.id});\n        for(const [order,id,label] of group.actions)\n          menus.registerMenuAction(groupPath,{commandId:id,label,order});\n      }\n      menus.registerSubmenu(TOP,\"SKILL Studio\",{sortString:\"5z_skill_studio\"});\n      // Project creation/opening also lives where IDE users expect it: File.\n      for(const action of fileActions)\n        menus.registerMenuAction(action.path,{\n          commandId:action.id,label:action.label,order:action.order\n        });\n    }\n    document.documentElement.dataset.skillStudioBrand=\"ready\";\n    document.documentElement.dataset.skillStudioNativeMenu=\"ready\";\n    return true;\n  }\n  const handle=setInterval(()=>{\n    try{\n      if(install()){clearInterval(handle);return;}\n      if(++attempts>200){\n        clearInterval(handle);\n        document.documentElement.dataset.skillStudioNativeMenu=\"unavailable\";\n        console.error(\"SKILL Studio native menu: registry or commands unavailable\");\n      }\n    }catch(error){\n      clearInterval(handle);\n      document.documentElement.dataset.skillStudioNativeMenu=\"error\";\n      console.error(\"SKILL Studio native menu registration failed\",error);\n    }\n  },200);\n})();\n";
+  return String.raw`// Theia 1.76 native MenuModelRegistry adapter.
+(() => {
+  const TOP=["menubar","5z_skill_studio"];
+  const zh=/^zh\b/i.test(document.documentElement.lang||navigator.language||"");
+  const labels=zh?{
+    project:"项目",skill:"Skill",dependencies:"依赖",authoring:"编写",tools:"工具",help:"帮助",
+    welcome:"欢迎页面",diagnostics:"激活诊断",newProject:"新建项目",openProject:"打开项目",
+    example:"打开示例项目",selectRoot:"选择项目根目录",refresh:"刷新 Package",
+    check:"检查 Skill",build:"构建 Skill",inspect:"检查依赖",
+    audit:"审计当前 Package",export:"导出 Package ZIP",
+    addDependency:"添加依赖",refreshDependencies:"刷新依赖",
+    procedure:"打开 Procedure 设计器",contract:"打开 Contract 设计器",
+    predicates:"打开 Predicate 设计器",schema:"打开 Schema 设计器",
+    refreshInspection:"刷新检查结果",restartLsp:"重启语言服务",
+    spec:"Skill 语言规范",guide:"编写指南"
+  }:{
+    project:"Project",skill:"Skill",dependencies:"Dependencies",authoring:"Authoring",tools:"Tools",help:"Help",
+    welcome:"Welcome",diagnostics:"Activation Diagnostics",newProject:"New Project",openProject:"Open Project",
+    example:"Open Example Project",selectRoot:"Select Project Root",refresh:"Refresh Packages",
+    check:"Check Skill",build:"Build Skill",inspect:"Inspect Dependencies",
+    audit:"Audit Current Package",export:"Export Package ZIP",
+    addDependency:"Add Dependency",refreshDependencies:"Refresh Dependencies",
+    procedure:"Open Procedure Designer",contract:"Open Contract Designer",
+    predicates:"Open Predicate Designer",schema:"Open Schema Designer",
+    refreshInspection:"Refresh Inspection",restartLsp:"Restart Language Service",
+    spec:"Skill Language Specification",guide:"Authoring Guide"
+  };
+  const groups=[
+    {id:"01_project",label:labels.project,actions:[
+      ["0","skillStudio.showWelcome",labels.welcome],
+      ["1","skillStudio.newProject",labels.newProject],
+      ["2","skillStudio.openProject",labels.openProject],
+      ["3","skillStudio.loadExample",labels.example],
+      ["4","skillStudio.selectProjectRoot",labels.selectRoot],
+      ["5","skillStudio.refreshPackages",labels.refresh]
+    ]},
+    {id:"02_skill",label:labels.skill,actions:[
+      ["0","skillStudio.checkSkill",labels.check],
+      ["1","skillStudio.buildSkill",labels.build],
+      ["2","skillStudio.inspectCompilerDependencies",labels.inspect],
+      ["3","skillStudio.auditPackage",labels.audit],
+      ["4","skillStudio.exportPackageZip",labels.export]
+    ]},
+    {id:"03_dependencies",label:labels.dependencies,actions:[
+      ["0","skillStudio.addDependency",labels.addDependency],
+      ["1","skillStudio.refreshDependencies",labels.refreshDependencies]
+    ]},
+    {id:"04_authoring",label:labels.authoring,actions:[
+      ["0","skillStudio.openProcedure",labels.procedure],
+      ["1","skillStudio.openContract",labels.contract],
+      ["2","skillStudio.openPredicates",labels.predicates],
+      ["3","skillStudio.openSchema",labels.schema]
+    ]},
+    {id:"05_tools",label:labels.tools,actions:[
+      ["0","skillStudio.refreshInspection",labels.refreshInspection],
+      ["1","skillStudio.restartLanguageService",labels.restartLsp],
+      ["2","skillStudio.showActivationDiagnostics",labels.diagnostics]
+    ]},
+    {id:"06_help",label:labels.help,actions:[
+      ["0","skillStudio.openLanguageSpec",labels.spec],
+      ["1","skillStudio.openAuthoringGuide",labels.guide]
+    ]}
+  ];
+  const fileActions=[
+    {path:["menubar","1_file","1_new"],order:"80",id:"skillStudio.newProject",label:labels.newProject},
+    {path:["menubar","1_file","2_open"],order:"80",id:"skillStudio.openProject",label:labels.openProject},
+    {path:["menubar","1_file","2_open"],order:"81",id:"skillStudio.loadExample",label:labels.example}
+  ];
+  const actionIds=[
+    ...groups.flatMap(group=>group.actions.map(([,id])=>id)),
+    ...fileActions.map(action=>action.id)
+  ];
+  const fallbackAnchorIds=["skillStudio.showWelcome","skillStudio.showActivationDiagnostics"];
+  let attempts=0;
+  function install(){
+    const container=window.theia?.container;
+    const bar=document.querySelector('[id="theia:menubar"].lm-MenuBar');
+    const keys=container?._bindingDictionary?._map?.keys?.();
+    if(!bar||!keys)return false;
+    const all=[...keys];
+    const menuKey=all.find(key=>typeof key==="function"&&
+      key.prototype?.registerSubmenu&&key.prototype?.registerMenuAction&&
+      key.prototype?.getMenuNode);
+    const commandsKey=all.find(key=>typeof key==="function"&&
+      key.prototype?.executeCommand&&key.prototype?.registerCommand&&
+      key.prototype?.getCommand);
+    if(!menuKey||!commandsKey)return false;
+    const commands=container.get(commandsKey);
+    const hasCommand=id=>Boolean(commands.getCommand(id));
+    // Core navigation is sufficient to create the product entry. Optional
+    // Compiler, dependency, authoring and LSP actions are added independently;
+    // one failed feature must never hide Welcome or Open Example.
+    // Prefer the complete Project recovery path. If Example loading itself
+    // failed to register, still expose Welcome/Activation Diagnostics after a
+    // short grace period rather than leaving the user with no product entry.
+    if(!hasCommand("skillStudio.loadExample")&&
+       !(attempts>=20&&fallbackAnchorIds.some(hasCommand)))return false;
+    const availableGroups=groups.map(group=>({
+      ...group,actions:group.actions.filter(([,id])=>hasCommand(id))
+    })).filter(group=>group.actions.length);
+    const availableFileActions=fileActions.filter(action=>hasCommand(action.id));
+    const missing=actionIds.filter(id=>!hasCommand(id));
+    const menus=container.get(menuKey);
+    const root=menus.getMenuNode(["menubar"]);
+    if(!root)return false;
+    const existing=root.children?.find(node=>node.id===TOP[1]);
+    if(existing&&existing.label!=="SKILL Studio")
+      throw Error("Conflicting Studio top-level menu");
+    if(existing){
+      const existingGroups=new Set((existing.children??[]).map(node=>node.id));
+      const missingGroups=availableGroups.map(group=>group.id)
+        .filter(id=>!existingGroups.has(id));
+      if(missingGroups.length)
+        throw Error("Incomplete existing Studio menu: "+missingGroups.join(", "));
+    }else{
+      for(const group of availableGroups){
+        const groupPath=[...TOP,group.id];
+        menus.registerSubmenu(groupPath,group.label,{sortString:group.id});
+        for(const [order,id,label] of group.actions)
+          menus.registerMenuAction(groupPath,{commandId:id,label,order});
+      }
+      menus.registerSubmenu(TOP,"SKILL Studio",{sortString:"5z_skill_studio"});
+    }
+    for(const action of availableFileActions)
+      menus.registerMenuAction(action.path,{
+        commandId:action.id,label:action.label,order:action.order
+      });
+    document.documentElement.dataset.skillStudioBrand="ready";
+    document.documentElement.dataset.skillStudioNativeMenu="ready";
+    document.documentElement.dataset.skillStudioNativeMenuMissingCommands=missing.join(",");
+    if(missing.length)
+      console.warn("SKILL Studio menu installed with unavailable optional commands:",missing);
+    return true;
+  }
+  const handle=setInterval(()=>{
+    try{
+      if(install()){clearInterval(handle);return;}
+      if(++attempts>200){
+        clearInterval(handle);
+        document.documentElement.dataset.skillStudioNativeMenu="unavailable";
+        console.error("SKILL Studio native menu: core commands or Theia registry unavailable");
+      }
+    }catch(error){
+      clearInterval(handle);
+      document.documentElement.dataset.skillStudioNativeMenu="error";
+      console.error("SKILL Studio native menu registration failed",error);
+    }
+  },200);
+})();
+`;
 }
 
 function ensureHeadLink(html,id,href){
