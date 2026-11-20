@@ -34,7 +34,28 @@ function host(candidateOverride=null,{files:seedFiles=[],folders:seedFolders=[]}
         return {type:1};
       throw Object.assign(Error("missing"),{code:"FileNotFound"});
     },
+    async readDirectory(target){
+      if(!folders.has(target.path))
+        throw Object.assign(Error("missing directory"),{code:"FileNotFound"});
+      const prefix=target.path.endsWith("/")?target.path:target.path+"/";
+      const entries=new Map();
+      for(const path of folders){
+        if(path.startsWith(prefix)){
+          const name=path.slice(prefix.length);
+          if(name&&!name.includes("/"))entries.set(name,2);
+        }
+      }
+      for(const path of files.keys()){
+        if(path.startsWith(prefix)){
+          const name=path.slice(prefix.length);
+          if(name&&!name.includes("/"))entries.set(name,1);
+        }
+      }
+      return [...entries.entries()];
+    },
     async delete(target){
+      if(target.path==="/global-storage/skill-studio-demo")
+        throw Object.assign(Error("active workspace root must remain stable"),{code:"NoPermissions"});
       const prefix=target.path+"/";
       let found=false;
       for(const path of [...files.keys()]){
@@ -144,6 +165,12 @@ test("Existing Example stays untouched unless replacement is explicitly requeste
   assert.equal(replaced.skipped,0);
   assert.equal(replaced.readmeUpdated,true);
   assert.equal(h.files.size,total+1);
+  assert.deepEqual((await h.vscode.workspace.fs.readDirectory(uri(root)))
+    .map(([name])=>name).sort(),["README.md","skills"],
+    "replacement keeps the active root but removes every retired root entry");
+  assert.deepEqual((await h.vscode.workspace.fs.readDirectory(uri(skillRoot)))
+    .map(([name])=>name).sort(),["establish-pdu-session","establish-pdu-session-mas"],
+    "replacement restores only the two current Skills");
   assert.match(decode(h.files.get(procedurePath)),/^# Illustrative CA-SL v1alpha5/m);
   assert.match(decode(h.files.get(masProcedurePath)),/start: validate-sm-subscription/);
   assert.match(decode(h.files.get(root+"/README.md")),/CA-SL v1alpha5 PDU Session examples/);
