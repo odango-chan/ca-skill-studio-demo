@@ -1459,7 +1459,7 @@ try{
             expression:"(()=>({title:document.title,"+
               "bodyText:document.body?.innerText??'',"+
               "csp:document.querySelector('meta[http-equiv=\"Content-Security-Policy\" i]')?.content??'',"+
-              "gatewayConfigured:window.gatewayConfigured===true,"+
+              "gatewayConfigured:document.body?.innerText.includes('已配置')===true,"+
               "proposalSummary:document.getElementById('proposalSummary')?.textContent??'',"+
               "candidateSource:document.getElementById('candidateSource')?.textContent??'',"+
               "compilerStatus:document.getElementById('compilerStatus')?.textContent??'',"+
