@@ -508,8 +508,12 @@ export function activate(context){
   // Localhost-only acceptance fixture: simulate an existing, pre-v1alpha5
   // Example profile without exposing a destructive command in the public Pages
   // build. The real loadExample command must still ask before replacing it.
-  if(typeof globalThis.location!=="undefined"&&
-     /^(localhost|127(?:\.\d{1,3}){3})$/.test(globalThis.location.hostname)){
+  const localAcceptanceHost=(
+    typeof globalThis.location!=="undefined"&&
+    /^(localhost|127(?:\.\d{1,3}){3})$/.test(globalThis.location.hostname)
+  )||(typeof process!=="undefined"&&
+    process.env?.THEIA_ACCEPTANCE_FIXTURES==="1");
+  if(localAcceptanceHost){
     context.subscriptions.push(vscode.commands.registerCommand(
       "skillStudio.internal.seedLegacyExampleAcceptance",async()=>{
         const root=vscode.Uri.joinPath(context.globalStorageUri,EXAMPLE_PROJECT_NAME);
