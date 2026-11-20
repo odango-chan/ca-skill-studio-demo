@@ -138,6 +138,7 @@ jobs:
         working-directory: ide-source
         env:
           THEIA_BASE_PATH: "/ca-skill-studio-demo"
+          THEIA_ACCEPTANCE_FIXTURES: "1"
           THEIA_REQUIRE_WEBVIEW: "1"
           THEIA_REQUIRE_BROWSER_LSP: "1"
           THEIA_REQUIRE_COMPILER_WORKER: "1"
