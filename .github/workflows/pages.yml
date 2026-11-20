@@ -13,13 +13,24 @@ on:
       - "package.json"
       - "package-lock.json"
       - ".github/workflows/pages.yml"
+  pull_request:
+    paths:
+      - "site/**"
+      - "experiments/ide-host/**"
+      - "extensions/skill-studio-theme/**"
+      - "extensions/skill-studio-languages/**"
+      - "tests/**"
+      - "scripts/**"
+      - "package.json"
+      - "package-lock.json"
+      - ".github/workflows/pages.yml"
   workflow_dispatch:
 
 permissions:
   contents: read
 
 concurrency:
-  group: skill-studio-pages
+  group: skill-studio-pages-${{ github.head_ref || github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -32,13 +43,13 @@ jobs:
       - name: Checkout current published site from main
         uses: actions/checkout@v4
         with:
-          ref: main
+          ref: ${{ github.event.pull_request.head.sha || 'main' }}
           path: main-source
       - name: Checkout isolated Theia experiment
-        if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/spike/ide-extension-theia-host'
+        if: github.event_name == 'pull_request' || github.ref == 'refs/heads/main' || github.ref == 'refs/heads/spike/ide-extension-theia-host'
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.ref_name }}
+          ref: ${{ github.event.pull_request.head.sha || github.ref_name }}
           path: ide-source
       - name: Install Node.js
         uses: actions/setup-node@v4
@@ -158,6 +169,8 @@ jobs:
       - name: Record and verify exact deployed source identity
         if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/spike/ide-extension-theia-host'
         working-directory: main-source
+        env:
+          EXPECTED_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
         run: node ../ide-source/experiments/ide-host/scripts/write-pages-build-info.mjs --source ../ide-source --output dist/build-info.json
       - name: Configure Pages
         uses: actions/configure-pages@v5
@@ -171,7 +184,7 @@ jobs:
     runs-on: ubuntu-latest
     # Pages is published from main only. Experiment and theme branches
     # retain CI/build artifacts but cannot overwrite the public site.
-    if: github.ref == 'refs/heads/main'
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
     permissions:
       contents: read
       pages: write
@@ -184,3 +197,28 @@ jobs:
       - name: Deploy artifact to Pages
         id: deployment
         uses: actions/deploy-pages@v4
+      - name: Verify deployed Pages build identity
+        env:
+          PAGE_URL: ${{ steps.deployment.outputs.page_url }}
+          EXPECTED_SOURCE_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          info_file="$(mktemp)"
+          trap 'rm -f "$info_file"' EXIT
+          published=false
+          for attempt in $(seq 1 30); do
+            if curl --fail --silent --show-error "${PAGE_URL%/}/build-info.json" -o "$info_file"; then
+              published=true
+              break
+            fi
+            sleep 10
+          done
+          test "$published" = true
+          node --input-type=module - "$info_file" "$EXPECTED_SOURCE_SHA" <<'NODE'
+          import {readFileSync} from "node:fs";
+          const info=JSON.parse(readFileSync(process.argv[2],"utf8"));
+          const expected=process.argv[3];
+          if(info.schemaVersion!==2||info.sourceSha!==expected||info.workflowSha!==expected)
+            throw new Error("Live Pages build identity mismatch: "+JSON.stringify({expected,info}));
+          console.log("STUDIO_PAGES_LIVE_DEPLOYMENT_PASS",JSON.stringify(info));
+          NODE
