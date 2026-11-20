@@ -1235,17 +1235,21 @@ try{
   // empty Problems view just because its old Procedure cannot be projected.
   // Assert the real LSP diagnostics reach both the native editor markers and
   // the Problems tree before offering the explicit replacement action.
-  let legacyDiagnostics=null,legacyPackageStatus=null,legacySourceDiagnostic=null;
+  let legacyDiagnostics=null,legacyPackageStatus=null,legacySourceDiagnostic=null,
+    legacyReadyOtherPackage=null;
   for(let attempt=0;attempt<90;attempt++){
     try{
       legacyDiagnostics=await evalJS("(async()=>{const c=window.theia?.container;if(!c)return null;const k=[...(c._bindingDictionary?._map?.keys?.()??[])].find(x=>typeof x==='function'&&x.prototype?.executeCommand&&x.prototype?.registerCommand&&x.prototype?.getCommand);return k?await c.get(k).executeCommand('skillStudio.internal.semanticTokenDiagnostics'):null})()");
       legacyPackageStatus=(legacyDiagnostics?.packageStatuses??[]).find(item=>
         String(item.rootUri??"").endsWith("/skill-studio-demo/skills/establish-pdu-session"));
+      legacyReadyOtherPackage=(legacyDiagnostics?.packageStatuses??[]).find(item=>
+        item.rootUri!==legacyPackageStatus?.rootUri&&item.state==="READY");
       legacySourceDiagnostic=(legacyPackageStatus?.analysisDiagnostics??[]).find(item=>
         item.code==="UNKNOWN_FIELD"&&item.relativePath==="assurance/contract.yaml");
       if(legacyPackageStatus?.state==="PARTIAL"&&
          legacyPackageStatus?.procedureState==="UNAVAILABLE"&&
          legacyPackageStatus?.publishedDiagnosticCount>0&&legacySourceDiagnostic&&
+         legacyReadyOtherPackage&&
          legacyDiagnostics?.languageStatus==="SKILL LSP: PARTIAL")break;
     }catch{legacyDiagnostics=null;}
     await sleep(200);
@@ -1253,12 +1257,13 @@ try{
   if(legacyPackageStatus?.state!=="PARTIAL"||
      legacyPackageStatus?.procedureState!=="UNAVAILABLE"||
      !(legacyPackageStatus?.publishedDiagnosticCount>0)||
-     !legacySourceDiagnostic||
+     !legacySourceDiagnostic||!legacyReadyOtherPackage||
      legacyDiagnostics?.languageStatus!=="SKILL LSP: PARTIAL")
-    throw Error("The stale v1alpha1 Example was not surfaced as an explicit current-grammar analysis failure: "+
+    throw Error("The stale v1alpha1 Example was not surfaced as a workspace-level analysis failure: "+
       JSON.stringify({
         languageStatus:legacyDiagnostics?.languageStatus,
         packageStatus:legacyPackageStatus,
+        readyOtherPackage:legacyReadyOtherPackage,
         sourceDiagnostic:legacySourceDiagnostic
       }).slice(0,3200));
   console.log("STUDIO_LEGACY_EXAMPLE_ANALYSIS_UNAVAILABLE_CHROMIUM_PASS",JSON.stringify({
@@ -1268,6 +1273,7 @@ try{
     publishedDiagnosticCount:legacyPackageStatus.publishedDiagnosticCount,
     sourceDiagnostic:{code:legacySourceDiagnostic.code,
       path:legacySourceDiagnostic.relativePath,line:legacySourceDiagnostic.line},
+    otherPackage:{rootUri:legacyReadyOtherPackage.rootUri,state:legacyReadyOtherPackage.state},
     packageAuditState:legacyPackageStatus.packageAuditState
   }));
   const recoveryMenu=await evalJS("(()=>{const item=[...document.querySelectorAll('.lm-MenuBar-item')].find(x=>x.innerText.trim()==='SKILL Studio');if(!item)return null;const r=item.getBoundingClientRect();return {visible:r.width>0&&r.height>0,label:item.innerText.trim()}})()");
