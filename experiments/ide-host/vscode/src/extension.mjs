@@ -478,12 +478,12 @@ export function activate(context){
         await vscode.workspace.fs.createDirectory(vscode.Uri.joinPath(exampleRoot,"lib"));
         await vscode.workspace.fs.createDirectory(vscode.Uri.joinPath(exampleRoot,"output"));
         await vscode.workspace.fs.writeFile(contract,new TextEncoder().encode(
-          "apiVersion: connectionagent.io/v1alpha1\\n"+
-          "kind: Contract\\nmetadata:\\n  name: legacy-example\\n"
+          "apiVersion: connectionagent.io/v1alpha1\n"+
+          "kind: Contract\nmetadata:\n  name: legacy-example\n"
         ));
         await vscode.workspace.fs.writeFile(procedure,new TextEncoder().encode(
-          "apiVersion: connectionagent.io/v1alpha1\\n"+
-          "kind: Procedure\\nstart: legacy\\nnodes: {}\\n"
+          "apiVersion: connectionagent.io/v1alpha1\n"+
+          "kind: Procedure\nstart: legacy\nnodes: {}\n"
         ));
         seededApiVersion="connectionagent.io/v1alpha1";
       }
