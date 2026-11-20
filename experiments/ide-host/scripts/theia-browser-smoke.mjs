@@ -1363,6 +1363,89 @@ try{
     phaseEvidence:workbenchEvidence?.phaseEvidence??null,
     languageServiceStatus:workbenchEvidence?.languageServiceStatus??null
   }));
+  let aiAuthoringEvidence=null;
+  if(requireEditor&&externalUrl){
+    const nativeCommand=async(id,...args)=>evalJS(
+      "(async()=>{const c=window.theia.container;"+
+      "const key=[...c._bindingDictionary._map.keys()].find(k=>"+
+      "typeof k==='function'&&k.prototype?.executeCommand&&"+
+      "k.prototype?.registerCommand&&k.prototype?.getCommand);"+
+      "if(!key)throw Error('Native Theia command registry missing for AI Authoring');"+
+      "return c.get(key).executeCommand("+JSON.stringify("skillStudio.openProcedure")+
+      ",..."+JSON.stringify([identity.defaultProcedure])+
+      ");})()");
+    await nativeCommand("skillStudio.openProcedure",identity.defaultProcedure);
+    const opened=await evalJS(
+      "(async()=>{const c=window.theia.container;"+
+      "const key=[...c._bindingDictionary._map.keys()].find(k=>"+
+      "typeof k==='function'&&k.prototype?.executeCommand&&"+
+      "k.prototype?.registerCommand&&k.prototype?.getCommand);"+
+      "if(!key)throw Error('Native Theia command registry missing for AI Authoring');"+
+      "return c.get(key).executeCommand('skillStudio.openAiAuthoring');})()");
+    if(opened!==true)
+      throw Error("AI Procedure Authoring command did not open its standalone Editor Tab");
+    let latest=[];
+    for(let attempt=0;attempt<120&&!aiAuthoringEvidence;attempt++){
+      const tree=await command("Page.getFrameTree");
+      const frames=[];
+      const walk=node=>{
+        if(!node)return;
+        frames.push(node.frame);
+        for(const child of node.childFrames??[])walk(child);
+      };
+      walk(tree.frameTree);
+      latest=[];
+      for(const frame of frames.filter(item=>/webview/i.test(item.url??""))){
+        try{
+          const world=await command("Page.createIsolatedWorld",{
+            frameId:frame.id,
+            worldName:"skill-studio-ai-authoring-acceptance",
+            grantUniveralAccess:true
+          });
+          const evaluated=await command("Runtime.evaluate",{
+            contextId:world.executionContextId,
+            returnByValue:true,
+            expression:"(()=>({title:document.title,"+
+              "bodyText:document.body?.innerText??'',"+
+              "csp:document.querySelector('meta[http-equiv=\"Content-Security-Policy\" i]')?.content??''"+
+              "}))()"
+          });
+          const view=evaluated.result?.value;
+          if(!view)continue;
+          latest.push({url:frame.url,title:view.title,bodyText:view.bodyText.slice(0,700)});
+          const contextReady=view.bodyText.includes("上下文来源")&&
+            view.bodyText.includes("assurance/contract.yaml")&&
+            view.bodyText.includes("assurance/predicates.yaml")&&
+            view.bodyText.includes("schemas/establishment-request.schema.yaml");
+          if(view.title==="AI Procedure Authoring"&&contextReady){
+            if(!view.csp.includes("default-src 'none'")||
+               !view.csp.includes("connect-src 'none'")||
+               !view.csp.includes("script-src 'nonce-"))
+              throw Error("AI Authoring Webview CSP did not retain nonce-only scripts and a disabled direct network path: "+view.csp);
+            aiAuthoringEvidence={
+              title:view.title,
+              packageContext:["assurance/contract.yaml","assurance/predicates.yaml",
+                "schemas/establishment-request.schema.yaml"],
+              cspDefaultNone:true,
+              cspConnectNone:true,
+              nonceScriptPolicy:true,
+              gatewayNoticeVisible:view.bodyText.includes("AI Gateway")
+            };
+            break;
+          }
+        }catch(error){
+          if(String(error?.message??error).includes("CSP"))
+            throw error;
+          // Webview frames can be replaced while the new Editor Tab activates.
+        }
+      }
+      if(!aiAuthoringEvidence)await sleep(100);
+    }
+    if(!aiAuthoringEvidence)
+      throw Error("AI Procedure Authoring Editor Tab did not load the live Package context in backend Chromium: "+
+        JSON.stringify(latest));
+    console.log("STUDIO_AI_AUTHORING_EDITOR_TAB_CHROMIUM",JSON.stringify(aiAuthoringEvidence));
+  }
   if(requireEditor)
     console.log("THEIA_BROWSER_HOST_V1ALPHA5_ACCEPTANCE_PASS");
   else
