@@ -471,13 +471,27 @@ try{
   const revealStudioSubmenu=async(label,expected)=>{
     const position=await evalJS(`(()=>{
       const item=[...document.querySelectorAll('.lm-Menu-item')]
-        .find(node=>node.innerText.trim()===${JSON.stringify(label)});
-      if(!item)return null;
+        .find(node=>{
+          const text=(node.innerText||node.textContent||"").replace(/\\s+/g," ").trim();
+          const r=node.getBoundingClientRect();
+          return r.width>0&&r.height>0&&
+            (text===${JSON.stringify(label)}||text.startsWith(${JSON.stringify(label)}+" "));
+        });
+      if(!item)return {
+        missing:true,
+        candidates:[...document.querySelectorAll('.lm-Menu-item')].map(node=>({
+          text:(node.innerText||node.textContent||"").trim(),
+          rect:node.getBoundingClientRect().toJSON(),
+          display:getComputedStyle(node).display
+        })).filter(item=>item.rect.width>0&&item.rect.height>0).slice(0,30)
+      };
       const r=item.getBoundingClientRect();
       return {x:r.left+r.width/2,y:r.top+r.height/2};
     })()`);
-    if(!position)throw Error('Native Studio submenu item is not visible: '+label);
-    await command("Input.dispatchMouseEvent",{type:"mouseMoved",...position});
+    if(!position||position.missing)
+      throw Error('Native Studio submenu item is not visible: '+label+
+        ' · '+JSON.stringify(position?.candidates??null));
+    await command("Input.dispatchMouseEvent",{type:"mouseMoved",x:position.x,y:position.y});
     await sleep(350);
     const visibleMenus=await evalJS(`[...document.querySelectorAll('.lm-Menu')]
       .filter(node=>getComputedStyle(node).display!=='none')
