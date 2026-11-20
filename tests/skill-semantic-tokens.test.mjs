@@ -11,6 +11,7 @@ import {
   semanticTokenDecorationClass,
   semanticTokenDecorationCss
 } from "../site/semantic-token-theme.mjs";
+import {resolveSemanticTokenSourcePath} from "../experiments/ide-host/vscode/src/semantic-token-path.mjs";
 
 const contractText=readFileSync(new URL(
   "../language/contracts/semantic-tokens.v1.json",import.meta.url
@@ -267,6 +268,26 @@ test("invalid YAML, unrelated paths and traversal paths produce no speculative t
   assert.deepEqual(observed(source,"unrelated/values.yaml"),[]);
   assert.deepEqual(observed(source,"skills/../demo/assurance/procedure.yaml"),[]);
   assert.deepEqual(observed(source,"skills/demo/assurance\\procedure.yaml"),[]);
+});
+
+test("Theia resolves Package-relative semantic paths when workspace-relative paths collapse to a basename",()=>{
+  const source=sample("establish-pdu-session","assurance/procedure.yaml");
+  const procedurePath=resolveSemanticTokenSourcePath(
+    "/.theia/globalStorage/skill-studio-demo/skills/establish-pdu-session/assurance/procedure.yaml",
+    "procedure.yaml"
+  );
+  assert.equal(procedurePath,"assurance/procedure.yaml");
+  assert.ok(observed(source,procedurePath).length>100);
+
+  const libraryPath=resolveSemanticTokenSourcePath(
+    "/.theia/globalStorage/skill-studio-demo/lib/tool-catalog.yaml",
+    "tool-catalog.yaml"
+  );
+  assert.equal(libraryPath,"lib/tool-catalog.yaml");
+
+  assert.equal(resolveSemanticTokenSourcePath(
+    "/workspace/docs/example.yaml","docs/example.yaml"
+  ),"docs/example.yaml");
 });
 
 test("Monaco provider encodes the canonical legend and registers only the YAML profile",()=>{
