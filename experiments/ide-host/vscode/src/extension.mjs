@@ -511,22 +511,22 @@ export function activate(context){
       };
       const contractRead=await readSource(contract);
       const procedureRead=await readSource(defaultProcedure);
-      const apiVersion=source=>/^\\s*apiVersion\\s*:\\s*[\"']?([^\"'\\s]+)/m.exec(source??'')?.[1]??null;
+      const apiVersion=source=>/^\s*apiVersion\s*:\s*[\"']?([^\"'\s]+)/m.exec(source??'')?.[1]??null;
       const contractApiVersion=apiVersion(contractRead.text);
       const procedureApiVersion=apiVersion(procedureRead.text);
       // CA-SL v1alpha5 intentionally has no apiVersion field in each source file.
       // Its frozen authoring shape is a top-level Contract and a start/nodes DAG.
       const contractCurrentShape=Boolean(contractRead.text&&
-        /^\\s*goal\\s*:/m.test(contractRead.text)&&
-        /^\\s*precondition\\s*:/m.test(contractRead.text)&&
-        /^\\s*requestSchema\\s*:/m.test(contractRead.text)&&
-        /^\\s*contextSchema\\s*:/m.test(contractRead.text)&&
-        /^\\s*dependencies\\s*:/m.test(contractRead.text)&&
-        /^\\s*capabilities\\s*:/m.test(contractRead.text));
+        /^\s*goal\s*:/m.test(contractRead.text)&&
+        /^\s*precondition\s*:/m.test(contractRead.text)&&
+        /^\s*requestSchema\s*:/m.test(contractRead.text)&&
+        /^\s*contextSchema\s*:/m.test(contractRead.text)&&
+        /^\s*dependencies\s*:/m.test(contractRead.text)&&
+        /^\s*capabilities\s*:/m.test(contractRead.text));
       const procedureCurrentShape=Boolean(procedureRead.text&&
-        /^\\s*start\\s*:/m.test(procedureRead.text)&&
-        /^\\s*nodes\\s*:/m.test(procedureRead.text)&&
-        !/^\\s*procedures\\s*:/m.test(procedureRead.text));
+        /^\s*start\s*:/m.test(procedureRead.text)&&
+        /^\s*nodes\s*:/m.test(procedureRead.text)&&
+        !/^\s*procedures\s*:/m.test(procedureRead.text));
       return {
         workspaceName:vscode.workspace.name??null,
         workspaceFile:vscode.workspace.workspaceFile?.toString?.()??null,
