@@ -522,7 +522,7 @@ export function activate(context){
         await vscode.workspace.fs.writeFile(contract,new TextEncoder().encode(
           "apiVersion: connectionagent.io/v1alpha1\n"+
           "kind: Contract\nmetadata:\n  name: legacy-example\n"
-    );
+        ));
         await vscode.workspace.fs.writeFile(procedure,new TextEncoder().encode(
           "apiVersion: connectionagent.io/v1alpha1\n"+
           "kind: Procedure\nstart: legacy\nnodes: {}\n"
@@ -530,7 +530,7 @@ export function activate(context){
         return {root:root.toString(),contract:contract.toString(),
           procedure:procedure.toString(),seededApiVersion:"connectionagent.io/v1alpha1"};
       })
-    ));
+    );
   }
   let exampleLoadPromise=null;
   let projectWelcome=null;
