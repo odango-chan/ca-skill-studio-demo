@@ -1,4 +1,4 @@
-// Theia / VS Code host adapter for released CA Skill Compiler v2.0.0.
+// Theia / VS Code host adapter for released CA Skill Compiler v2.0.2.
 // The Compiler is the sole authority for Check, Build, linking and Artifact output.
 // This adapter owns workspace snapshots, diagnostics and read-only presentation.
 import {collectPackageSnapshot,packageRootForProcedure} from "./package-snapshot.mjs";
@@ -391,7 +391,7 @@ export function registerCompilerIntegration(vscode,context,{
         label:vscode.workspace.asRelativePath(file),
         description:file.path,
         uri:file
-      })),{placeHolder:"Select a Skill Package for Compiler v2.0.0"});
+      })),{placeHolder:"Select a Skill Package for Compiler v2.0.2"});
       if(!choice) return null;
       selected=choice.uri;
     }
@@ -598,12 +598,14 @@ export function registerCompilerIntegration(vscode,context,{
       target=>safe("inspect",target))
   );
 
-  // Real Chromium acceptance: exercise the actual pinned Go/WASM callbacks in
-  // the browser-only Theia Plugin Worker with a deliberately incomplete Skill.
-  // It proves transport and failure atomicity only, not a qualified Owner build.
-  if(typeof globalThis.Worker==="function"&&
-     typeof globalThis.location!=="undefined"&&
-     /^(localhost|127(?:\.\d{1,3}){3})$/.test(globalThis.location.hostname)){
+  // Internal acceptance command: exercise the actual pinned Go/WASM callbacks
+  // in either the browser Worker or Node worker_threads host. It proves
+  // transport and failure atomicity only, not a qualified Owner build.
+  const nodeExtensionHost=typeof process!=="undefined"&&Boolean(process.versions?.node);
+  const localBrowserHost=typeof globalThis.Worker==="function"&&
+    typeof globalThis.location!=="undefined"&&
+    /^(localhost|127(?:\.\d{1,3}){3})$/.test(globalThis.location.hostname);
+  if(nodeExtensionHost||localBrowserHost){
     context.subscriptions.push(vscode.commands.registerCommand(
       "skillStudio.internal.compilerWorkerAcceptance",async()=>{
         const request={
@@ -652,6 +654,17 @@ export function registerCompilerIntegration(vscode,context,{
     provider:artifacts,
     problems:problemsProvider,
     getArtifactProvider:()=>artifacts,
+    compilerVersion:COMPILER_VERSION,
+    async checkRequest(request){
+      if(request?.languageTarget!==COMPILER_LANGUAGE_TARGET){
+        throw new Error("AI Authoring Compiler Check requires "+COMPILER_LANGUAGE_TARGET);
+      }
+      const result=await client.request("check",request);
+      if(!Array.isArray(result)){
+        throw new Error("Compiler Check returned an invalid Diagnostic[] response");
+      }
+      return result;
+    },
     dispose(){client.dispose();diagnostics.dispose?.();output.dispose?.();}
   };
 }

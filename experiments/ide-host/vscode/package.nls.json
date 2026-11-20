@@ -25,5 +25,7 @@
   "command.checkSkill": "Check Skill",
   "command.buildSkill": "Build Skill",
   "command.inspectCompilerDependencies": "Inspect Dependencies",
-  "command.showActivationDiagnostics": "Show Activation Diagnostics"
+  "command.showActivationDiagnostics": "Show Activation Diagnostics",
+  "ai.authoring": "SKILL Studio: AI Author Procedure",
+  "ai.gateway.token": "SKILL Studio: Configure Shared AI Gateway Token"
 }
