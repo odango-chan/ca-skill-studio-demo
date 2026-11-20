@@ -16,7 +16,7 @@ export function pagesBuildInfo({sourceSha,expectedSha,ref,runId}){
 if(process.argv[1]&&resolve(process.argv[1])===fileURLToPath(import.meta.url)){
   const arg=name=>{const i=process.argv.indexOf(name);if(i<0||!process.argv[i+1])throw Error("Missing "+name);return process.argv[i+1];};
   const sha=cwd=>execFileSync("git",["rev-parse","HEAD"],{cwd,encoding:"utf8"}).trim();
-  const info=pagesBuildInfo({sourceSha:sha(arg("--source")),expectedSha:process.env.GITHUB_SHA,
+  const info=pagesBuildInfo({sourceSha:sha(arg("--source")),expectedSha:process.env.EXPECTED_SOURCE_SHA??process.env.GITHUB_SHA,
     ref:process.env.GITHUB_REF,runId:process.env.GITHUB_RUN_ID});
   writeFileSync(arg("--output"),JSON.stringify(info,null,2)+"\n");
   console.log("STUDIO_PAGES_EXACT_SOURCE",JSON.stringify(info));
