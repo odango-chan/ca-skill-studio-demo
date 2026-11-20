@@ -38,7 +38,7 @@ export async function configureAiGatewayToken(vscode, secrets) {
   if (value === undefined) return false;
   if (typeof value !== "string") throw new TypeError("Gateway token must be text.");
   const token = value.trim();
-  if (token && /[\\u0000-\\u001f\\u007f]/.test(token)) {
+  if (token && /[\u0000-\u001f\u007f]/.test(token)) {
     throw new TypeError("Gateway token must contain printable characters only.");
   }
   if (token) {
