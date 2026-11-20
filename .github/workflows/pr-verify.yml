@@ -42,10 +42,13 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: odango-chan/ca-skill-compiler
-          ref: v2.0.2
+          ref: e98a7b26acabfa2a5e1587974ab9be5742e70bf7
           path: compiler-source
           token: ${{ secrets.CA_SKILL_COMPILER_READ_TOKEN }}
           persist-credentials: false
+      - name: Verify pinned CA Skill Compiler v2.0.2 source identity
+        working-directory: compiler-source
+        run: test "$(git rev-parse HEAD)" = "e98a7b26acabfa2a5e1587974ab9be5742e70bf7"
       - name: Go 1.26.6 for the pinned Compiler WASM build
         uses: actions/setup-go@v5
         with:

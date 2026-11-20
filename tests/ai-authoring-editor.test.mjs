@@ -125,6 +125,7 @@ test("AI Authoring Webview has a nonce-only script/style policy and no direct ne
   assert.ok(html.includes('id="candidateSource"'));
   assert.match(html, /Compiler Check: NOT_RUN/);
   assert.match(html, /不自动保存/);
+  assert.ok(html.includes("message.compilerCheck||'UNAVAILABLE'"), "applied state must display the actual final Compiler result");
   assert.throws(() => renderAiAuthoringHtml("not-a-secure-nonce"), /nonce/);
 });
 
