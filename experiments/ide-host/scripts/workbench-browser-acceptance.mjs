@@ -1038,14 +1038,59 @@ export async function runWorkbenchAcceptance({
       throw Error("Native current language-provider acceptance failed: "+
         JSON.stringify(currentLanguageFeatures));
     semanticTokenEvidence=await nativeCommand("skillStudio.internal.semanticTokenDiagnostics");
+    const rendererState=semanticTokenEvidence?.rendererDiagnostics;
     if(semanticTokenEvidence?.registered!==true||
        !(semanticTokenEvidence?.lastTokenCount>0)||
        semanticTokenEvidence?.renderer!=="theia-text-editor-decoration"||
        !(semanticTokenEvidence?.renderedTokenCount>0)||
        !(semanticTokenEvidence?.renderedTypeCount>=2)||
-       semanticTokenEvidence?.renderError)
-      throw Error("Native v1alpha5 semantic tokens were not rendered: "+
-        JSON.stringify(semanticTokenEvidence));
+       semanticTokenEvidence?.renderError||
+       !(rendererState?.lastMatchingEditorCount>0)||
+       !(rendererState?.lastVersionMatchedEditorCount>0)||
+       !(rendererState?.lastAppliedEditorCount>0)||
+       !(rendererState?.lastAppliedRangeCount>0))
+      throw Error("Native v1alpha5 semantic token ranges were not applied to the visible editor: "+
+        JSON.stringify({semanticTokenEvidence,rendererState}));
+    const predicateColorEvidence=await evalJS(`(()=>{
+      const widget=document.getElementById(${JSON.stringify(procedurePair.source.id)});
+      const editor=widget?.querySelector('.monaco-editor')??
+        [...document.querySelectorAll('.monaco-editor')].find(node=>{
+          const r=node.getBoundingClientRect();return r.width>150&&r.height>100;
+        });
+      const lines=[...(editor?.querySelectorAll('.view-lines .view-line')??[])];
+      const line=lines.find(node=>node.textContent.replace(/\\u00a0/g,' ')
+        .includes('predicate: establishment.request.supported'));
+      const span=[...(line?.querySelectorAll('span')??[])].find(node=>
+        node.textContent.replace(/\\u00a0/g,' ').trim()==='establishment.request.supported');
+      return {visible:!!editor&&editor.getBoundingClientRect().width>150,
+        lineText:line?.textContent??null,text:span?.textContent??null,
+        color:span?getComputedStyle(span).color:null,className:span?.className??null};
+    })()`);
+    const outcomeMarker=await nativeCommand("skillStudio.internal.revealSemanticColorAcceptance");
+    await sleep(180);
+    const outcomeColorEvidence=await evalJS(`(()=>{
+      const widget=document.getElementById(${JSON.stringify(procedurePair.source.id)});
+      const editor=widget?.querySelector('.monaco-editor')??
+        [...document.querySelectorAll('.monaco-editor')].find(node=>{
+          const r=node.getBoundingClientRect();return r.width>150&&r.height>100;
+        });
+      const lines=[...(editor?.querySelectorAll('.view-lines .view-line')??[])];
+      const line=lines.find(node=>node.textContent.replace(/\\u00a0/g,' ')
+        .includes('PASS: subscribe-sm-data'));
+      const span=[...(line?.querySelectorAll('span')??[])].find(node=>
+        node.textContent.replace(/\\u00a0/g,' ').trim()==='PASS');
+      return {visible:!!editor&&editor.getBoundingClientRect().width>150,
+        lineText:line?.textContent??null,text:span?.textContent??null,
+        color:span?getComputedStyle(span).color:null,className:span?.className??null};
+    })()`);
+    if(predicateColorEvidence?.color!=="rgb(49, 125, 192)"||
+       outcomeColorEvidence?.color!=="rgb(173, 101, 23)")
+      throw Error("Custom CA-SL semantic colors are not visible in the native editor DOM: "+
+        JSON.stringify({predicateColorEvidence,outcomeColorEvidence,outcomeMarker,rendererState}));
+    console.log("STUDIO_CURRENT_LANGUAGE_SEMANTIC_COLOR_RENDER_CHROMIUM",JSON.stringify({
+      predicate:predicateColorEvidence,outcome:outcomeColorEvidence,
+      outcomeMarker,renderer:rendererState
+    }));
     console.log("STUDIO_CURRENT_LANGUAGE_LANGUAGE_FEATURES_CHROMIUM",
       JSON.stringify(currentLanguageFeatures));
     console.log("STUDIO_CURRENT_LANGUAGE_SEMANTIC_TOKENS_CHROMIUM",
