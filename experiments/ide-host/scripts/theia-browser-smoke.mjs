@@ -1464,6 +1464,8 @@ try{
               "candidateSource:document.getElementById('candidateSource')?.textContent??'',"+
               "compilerStatus:document.getElementById('compilerStatus')?.textContent??'',"+
               "patchState:document.getElementById('patchState')?.textContent??'',"+
+              "statusText:document.getElementById('status')?.textContent??'',"+
+              "patchError:document.getElementById('patchError')?.textContent??'',"+
               "applyDisabled:document.getElementById('apply')?.disabled!==false"+
               "}))()"
           });
@@ -1558,8 +1560,25 @@ try{
            view.candidateSource.includes("ai-authoring-smoke-node"))proposalView=view;
         if(!proposalView)await sleep(100);
       }
-      if(!proposalView)
-        throw Error("Mock model response did not become a source-preserving Patch preview");
+      if(!proposalView){
+        const finalView=await readAiView();
+        throw Error("Mock model response did not become a source-preserving Patch preview: "+
+          JSON.stringify({
+            gatewayRequestCount:gatewayRequests.length,
+            model:gatewayRequests[0]?.body?.model,
+            responseFormat:gatewayRequests[0]?.body?.response_format,
+            sessionHeaderPresent:Boolean(gatewayRequests[0]?.headers?.["x-opencode-session"]),
+            view:finalView?{
+              bodyText:finalView.bodyText.slice(-1400),
+              proposalSummary:finalView.proposalSummary,
+              compilerStatus:finalView.compilerStatus,
+              patchState:finalView.patchState,
+              statusText:finalView.statusText,
+              patchError:finalView.patchError,
+              applyDisabled:finalView.applyDisabled
+            }:null
+          }));
+      }
       if(!proposalView.compilerStatus.includes("Compiler v2.0.2 Check: FAIL")||
          !proposalView.patchState.includes("Compiler Check failed")||
          !proposalView.applyDisabled)
