@@ -13,7 +13,6 @@ Studio 拥有浏览器编辑器，不拥有正式 Skill/Runtime/MCP 业务真相
 5. [Plugin-managed Configuration v0.1](architecture/plugin-managed-configuration-v0.1.md) — 原生 Settings、Dependency Snapshot / Lock、Compiler 输入与所有权边界
 6. [Workbench](design/authoring-workbench.md) — 当前 UX / Patch / Source 交互
 7. [AI Procedure Authoring](design/ai-procedure-authoring.md) — v1alpha5-only AI 编辑、Host-owned Change Set、独立 Go Gateway、本机 / 内网部署与 Compiler Apply gate
-   - [Authoring Core](../authoring/core/README.md) — 平台无关 Model Client / ModelProposal
    - [Go AI Gateway](https://github.com/odango-chan/ai-gateway) · [Browser CORS issue #4](https://github.com/odango-chan/ai-gateway/issues/4)
 8 [D3 Route Designer](design/route-designer.md) — `operator.on` 有界编辑已实现；Runtime 资格未验收
 9 [D4 Phase Designer](design/phase-designer.md) — A1/A2.1/A2.2a 已合入；A2.2b1 消费者 ABI 对照通过浏览器测试；A2.2b2/A3/A4 Proposed
