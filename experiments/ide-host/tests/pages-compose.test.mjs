@@ -4,6 +4,7 @@ import {mkdtemp,mkdir,readFile,rm,writeFile,stat} from "node:fs/promises";
 import {join} from "node:path";
 import {tmpdir} from "node:os";
 import {composePagesRelease} from "../scripts/compose-pages-release.mjs";
+import {pagesBuildInfo} from "../scripts/write-pages-build-info.mjs";
 
 async function put(root,path,content){
   const target=join(root,path);
@@ -100,4 +101,33 @@ test("Pages workflow cannot reintroduce the Classic application",async()=>{
   const workflow=await readFile(new URL("../../../.github/workflows/pages.yml",import.meta.url),"utf8");
   assert.doesNotMatch(workflow,/--classic|preserve Classic/i);
   assert.match(workflow,/test ! -e dist\/classic/);
+});
+
+
+test("Pages preview builds the exact PR head without deploying it",async()=>{
+  const workflow=await readFile(new URL("../../../.github/workflows/pages.yml",import.meta.url),"utf8");
+  assert.match(workflow,/^  pull_request:/m);
+  assert.match(workflow,/ref: \$\{\{ github\.event\.pull_request\.head\.sha \|\| 'main' \}\}/);
+  assert.match(workflow,/ref: \$\{\{ github\.event\.pull_request\.head\.sha \|\| github\.ref_name \}\}/);
+  assert.match(workflow,/github\.event_name == 'pull_request' \|\| github\.ref == 'refs\/heads\/main'/);
+  assert.match(workflow,/if: github\.event_name != 'pull_request' && github\.ref == 'refs\/heads\/main'/);
+  assert.match(workflow,/THEIA_REQUIRE_WEBVIEW: "1"/);
+  assert.match(workflow,/THEIA_REQUIRE_BROWSER_LSP: "1"/);
+  assert.match(workflow,/THEIA_REQUIRE_COMPILER_WORKER: "1"/);
+  assert.match(workflow,/Verify deployed Pages build identity/);
+});
+
+test("Pages build identity binds the exact candidate head rather than a PR merge ref",()=>{
+  const head="a".repeat(40);
+  const info=pagesBuildInfo({
+    sourceSha:head,expectedSha:head,
+    ref:"refs/pull/248/merge",runId:"123456"
+  });
+  assert.equal(info.sourceSha,head);
+  assert.equal(info.workflowSha,head);
+  assert.equal(info.workflowRunId,"123456");
+  assert.throws(()=>pagesBuildInfo({
+    sourceSha:head,expectedSha:"b".repeat(40),
+    ref:"refs/pull/248/merge",runId:"123456"
+  }),/refusing to publish a different source SHA/);
 });
