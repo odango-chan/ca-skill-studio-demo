@@ -485,7 +485,7 @@ export function activate(context){
         try{
           const source=new TextDecoder("utf-8",{fatal:true})
             .decode(await vscode.workspace.fs.readFile(contract));
-          contractApiVersion=/^\\s*apiVersion\\s*:\\s*["']?([^"'\\s]+)/m.exec(source)?.[1]??null;
+          contractApiVersion=/^\s*apiVersion\s*:\s*["']?([^"'\s]+)/m.exec(source)?.[1]??null;
         }catch{}
       }
       return {
@@ -516,8 +516,8 @@ export function activate(context){
         await vscode.workspace.fs.createDirectory(vscode.Uri.joinPath(root,"lib"));
         await vscode.workspace.fs.createDirectory(vscode.Uri.joinPath(root,"output"));
         await vscode.workspace.fs.writeFile(contract,new TextEncoder().encode(
-          "apiVersion: connectionagent.io/v1alpha1\\n"+
-          "kind: Contract\\nmetadata:\\n  name: legacy-example\\n"
+          "apiVersion: connectionagent.io/v1alpha1\n"+
+          "kind: Contract\nmetadata:\n  name: legacy-example\n"
         ));
         return {root:root.toString(),contract:contract.toString(),
           seededApiVersion:"connectionagent.io/v1alpha1"};
