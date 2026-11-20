@@ -509,7 +509,7 @@ export function activate(context){
   // Example profile without exposing a destructive command in the public Pages
   // build. The real loadExample command must still ask before replacing it.
   if(typeof globalThis.location!=="undefined"&&
-     /^(localhost|127(?:\\.\\d{1,3}){3})$/.test(globalThis.location.hostname)){
+     /^(localhost|127(?:\.\d{1,3}){3})$/.test(globalThis.location.hostname)){
     context.subscriptions.push(vscode.commands.registerCommand(
       "skillStudio.internal.seedLegacyExampleAcceptance",async()=>{
         const root=vscode.Uri.joinPath(context.globalStorageUri,EXAMPLE_PROJECT_NAME);
