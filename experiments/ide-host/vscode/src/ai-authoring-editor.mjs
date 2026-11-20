@@ -347,17 +347,17 @@ export function renderAiAuthoringHtml(nonce) {
     "function status(text,kind){const el=byId('status');el.textContent=text||'';el.className='status '+(kind||'');}",
     "function setBusy(value){busy=value;byId('generate').disabled=value||!window.gatewayConfigured||!contextReady;byId('cancel').disabled=!value;byId('refresh').disabled=value;byId('apply').disabled=value||!canApply;}",
     "function clear(el){while(el.firstChild)el.removeChild(el.firstChild);}",
-    "function clearProposal(){canApply=false;previewSequence++;clear(byId('plan'));clear(byId('assumptions'));clear(byId('blockers'));clear(byId('groups'));byId('proposalSummary').textContent='';byId('currentSource').textContent='';byId('candidateSource').textContent='';byId('patchState').textContent='尚未生成';byId('patchError').textContent='';byId('apply').disabled=true;byId('discard').disabled=true;}",
+    "function clearProposal(){canApply=false;previewSequence++;clear(byId('plan'));clear(byId('assumptions'));clear(byId('blockers'));clear(byId('groups'));byId('proposalSummary').textContent='';byId('currentSource').textContent='';byId('candidateSource').textContent='';byId('patchState').textContent='尚未生成';byId('patchError').textContent='';byId('compilerStatus').textContent='Compiler Check: NOT_RUN';byId('apply').disabled=true;byId('discard').disabled=true;}",
     "function addList(id,items){const root=byId(id);clear(root);if(!items||!items.length)return;const ul=document.createElement('ul');for(const value of items){const li=document.createElement('li');li.textContent=value;ul.appendChild(li);}root.appendChild(ul);}",
     "function requestSourcePreview(){const requestId=++previewSequence;const groupIds=[...document.querySelectorAll('[data-group-id]:checked')].map(item=>item.dataset.groupId);vscode.postMessage({type:'preview',requestId,groupIds});}",
     "function renderContext(message){contextReady=true;clearProposal();window.gatewayConfigured=message.gatewayConfigured===true;byId('packageInfo').textContent=message.packageName+' · '+message.documentVersion+' · Package revision '+message.packageGeneration;byId('gatewayNotice').textContent=window.gatewayConfigured?'Gateway 路由与模型 '+message.modelId+' 已配置；Provider API Key 只保留在 Gateway 主机。远程 Gateway 可通过命令面板配置共享访问令牌。':'请先在应用设置中配置 connectionAgent.skillStudio.ai.gatewayUrl 与 connectionAgent.skillStudio.ai.model。';const list=byId('sources');clear(list);for(const item of message.sources||[]){const label=document.createElement('label');label.className='source';const input=document.createElement('input');input.type='checkbox';input.checked=item.selected===true;input.value=item.id;input.disabled=busy;const body=document.createElement('span');body.className='source-main';const kind=document.createElement('span');kind.className='kind';kind.textContent=item.kind;const name=document.createElement('span');name.className='source-label';name.textContent=item.label;const size=document.createElement('span');size.className='source-bytes';size.textContent=item.bytes+' bytes'+(item.explicitOptIn?' · 每次任务需显式选择':'');body.append(kind,name,size);label.append(input,body);list.appendChild(label);}status('上下文已就绪。发送前会再次显示明确的数据披露确认。');setBusy(false);}",
-    "function renderProposal(message){previewSequence++;canApply=message.canApply===true;byId('proposalSummary').textContent=message.summary||'';byId('currentSource').textContent=message.currentSource||'';byId('candidateSource').textContent=message.candidateSource||'';addList('plan',message.plan||[]);addList('assumptions',message.assumptions||[]);addList('blockers',message.blockers||[]);byId('blockers').className=(message.blockers&&message.blockers.length)?'subsection warning':'subsection';byId('patchState').textContent=message.patchState||'NOT_RUN';byId('patchError').textContent=message.patchError||'';const list=byId('groups');clear(list);for(const group of message.groups||[]){const label=document.createElement('label');label.className='group';const input=document.createElement('input');input.type='checkbox';input.checked=true;input.value=group.id;input.dataset.groupId=group.id;input.addEventListener('change',requestSourcePreview);const body=document.createElement('span');body.className='group-main';const title=document.createElement('span');title.className='group-title';title.textContent=group.label+' · '+group.operationIds.length+' 项';const details=document.createElement('details');const summary=document.createElement('summary');summary.textContent='查看操作与理由';const ul=document.createElement('ul');for(const operation of group.operations||[]){const li=document.createElement('li');li.textContent=operation.type+' — '+operation.rationale;ul.appendChild(li);}details.append(summary,ul);body.append(title,details);label.append(input,body);list.appendChild(label);}byId('apply').disabled=!canApply||busy;byId('discard').disabled=false;status(canApply?'本地 Patch Plan READY；这不是 Compiler Check。':'提案已返回，但当前不能应用修改。',canApply?'':'warning');}",
+    "function renderProposal(message){previewSequence++;canApply=message.canApply===true;byId('proposalSummary').textContent=message.summary||'';byId('currentSource').textContent=message.currentSource||'';byId('candidateSource').textContent=message.candidateSource||'';addList('plan',message.plan||[]);addList('assumptions',message.assumptions||[]);addList('blockers',message.blockers||[]);byId('blockers').className=(message.blockers&&message.blockers.length)?'subsection warning':'subsection';byId('patchState').textContent=message.patchState||'NOT_RUN';byId('patchError').textContent=message.patchError||'';byId('compilerStatus').textContent='Compiler '+(message.compilerVersion||'v2.0.2')+' Check: '+(message.compilerState||'NOT_RUN');const list=byId('groups');clear(list);for(const group of message.groups||[]){const label=document.createElement('label');label.className='group';const input=document.createElement('input');input.type='checkbox';input.checked=true;input.value=group.id;input.dataset.groupId=group.id;input.addEventListener('change',requestSourcePreview);const body=document.createElement('span');body.className='group-main';const title=document.createElement('span');title.className='group-title';title.textContent=group.label+' · '+group.operationIds.length+' 项';const details=document.createElement('details');const summary=document.createElement('summary');summary.textContent='查看操作与理由';const ul=document.createElement('ul');for(const operation of group.operations||[]){const li=document.createElement('li');li.textContent=operation.type+' — '+operation.rationale;ul.appendChild(li);}details.append(summary,ul);body.append(title,details);label.append(input,body);list.appendChild(label);}byId('apply').disabled=!canApply||busy;byId('discard').disabled=false;status(canApply?'Compiler v2.0.2 对精确候选返回 PASS；可应用选中修改。':'提案已返回；请检查 Compiler Check 与阻塞项。',canApply?'':'warning');}",
     "byId('generate').addEventListener('click',()=>{const task=byId('task').value.trim();const selectedIds=[...document.querySelectorAll('#sources input:checked')].map(item=>item.value);clearProposal();vscode.postMessage({type:'generate',task,selectedIds});});",
     "byId('cancel').addEventListener('click',()=>vscode.postMessage({type:'cancel'}));",
     "byId('refresh').addEventListener('click',()=>{clearProposal();vscode.postMessage({type:'refresh'});});",
     "byId('apply').addEventListener('click',()=>{const groupIds=[...document.querySelectorAll('[data-group-id]:checked')].map(item=>item.dataset.groupId);vscode.postMessage({type:'apply',groupIds});});",
     "byId('discard').addEventListener('click',()=>vscode.postMessage({type:'discard'}));",
-    "window.addEventListener('message',event=>{const message=event.data||{};if(message.type==='context')renderContext(message);else if(message.type==='status'){status(message.message,message.kind);if(message.busy!==undefined)setBusy(message.busy);}else if(message.type==='proposal')renderProposal(message);else if(message.type==='preview'&&message.requestId===previewSequence){byId('candidateSource').textContent=message.candidateSource||'';}else if(message.type==='error'){if(message.contextUnavailable===true){contextReady=false;clear(byId('sources'));clearProposal();}status(message.message,'error');setBusy(false);}else if(message.type==='applied'){canApply=false;byId('apply').disabled=true;byId('discard').disabled=true;status('已应用到原生编辑器缓冲区；尚未保存。Compiler Check: NOT_RUN。');}else if(message.type==='discarded'){clearProposal();status('提案已丢弃。');}});",
+    "window.addEventListener('message',event=>{const message=event.data||{};if(message.type==='context')renderContext(message);else if(message.type==='status'){status(message.message,message.kind);if(message.busy!==undefined)setBusy(message.busy);}else if(message.type==='proposal')renderProposal(message);else if(message.type==='preview'&&message.requestId===previewSequence){byId('candidateSource').textContent=message.candidateSource||'';byId('compilerStatus').textContent='Compiler '+(message.compilerVersion||'v2.0.2')+' Check: '+(message.compilerState||'NOT_RUN');byId('patchState').textContent=message.patchState||'PREVIEW ONLY';byId('patchError').textContent=message.patchError||'';canApply=message.canApply===true;byId('apply').disabled=busy||!canApply;status(canApply?'Compiler PASS；可应用当前选中组。':'当前选中组仍为 PREVIEW ONLY。',canApply?'':'warning');}else if(message.type==='error'){if(message.contextUnavailable===true){contextReady=false;clear(byId('sources'));clearProposal();}status(message.message,'error');setBusy(false);}else if(message.type==='applied'){canApply=false;byId('apply').disabled=true;byId('discard').disabled=true;status('已应用到原生编辑器缓冲区；尚未保存。Compiler Check: NOT_RUN。');}else if(message.type==='discarded'){clearProposal();status('提案已丢弃。');}});",
     "vscode.postMessage({type:'ready'});",
   ].join("\n");
   return [
@@ -369,8 +369,8 @@ export function renderAiAuthoringHtml(nonce) {
     "<main>",
     "<section class=\"card\"><h2>任务说明</h2><textarea id=\"task\" maxlength=\"4000\" placeholder=\"描述希望如何修改当前 Procedure。模型只会提出语义修改，不会直接写文件或执行 Tool。\"></textarea><div class=\"note\"><strong>数据披露：</strong>选中的上下文将在你确认后发送到配置的 AI Gateway。Provider API Key 只保留在 Gateway 主机。</div><div id=\"gatewayNotice\" class=\"note warning\"></div><div class=\"actions\"><button id=\"generate\">生成修改提案</button><button id=\"cancel\" class=\"secondary\" disabled>取消请求</button></div></section>",
     "<section class=\"card\"><h2>上下文来源</h2><p class=\"note\">Procedure 当前缓冲区必定包含。Contract、Predicate、Schema 和已验证依赖默认选中；Reference / Script 需要逐任务显式选择。</p><div id=\"sources\" class=\"source-list\"></div></section>",
-    "<section class=\"card proposal\"><div class=\"top-actions spread\"><h2>修改提案</h2><span class=\"compiler\">Compiler Check: NOT_RUN</span></div><div id=\"proposalSummary\" class=\"summary\"></div><div class=\"subsection\"><h3>执行计划</h3><div id=\"plan\"></div></div><div class=\"subsection\"><h3>假设</h3><div id=\"assumptions\"></div></div><div class=\"subsection\"><h3>阻塞项</h3><div id=\"blockers\"></div></div><div class=\"subsection\"><h3>可独立接受的原子修改组</h3><div id=\"patchState\" class=\"kind\">尚未生成</div><div id=\"patchError\" class=\"note error\"></div><div id=\"groups\" class=\"group-list\"></div></div><div class=\"subsection\"><h3>Host 生成的 YAML 候选预览</h3><p class=\"note\">左侧是当前缓冲区，右侧是所选原子修改组生成的候选内容；模型不能直接提交原始 YAML。</p><div class=\"source-preview\"><div><h4>当前 YAML</h4><pre id=\"currentSource\"></pre></div><div><h4>候选 YAML</h4><pre id=\"candidateSource\"></pre></div></div></div><div class=\"actions\"><button id=\"apply\" disabled>应用选中修改</button><button id=\"discard\" class=\"secondary\" disabled>丢弃提案</button></div></section>",
-    "</main><footer class=\"status\"><span id=\"status\">正在初始化…</span><span>仅修改当前 Procedure 缓冲区 · 不自动保存 · Compiler Check 不在本阶段执行</span></footer>",
+    "<section class=\"card proposal\"><div class=\"top-actions spread\"><h2>修改提案</h2><span id=\"compilerStatus\" class=\"compiler\">Compiler Check: NOT_RUN</span></div><div id=\"proposalSummary\" class=\"summary\"></div><div class=\"subsection\"><h3>执行计划</h3><div id=\"plan\"></div></div><div class=\"subsection\"><h3>假设</h3><div id=\"assumptions\"></div></div><div class=\"subsection\"><h3>阻塞项</h3><div id=\"blockers\"></div></div><div class=\"subsection\"><h3>可独立接受的原子修改组</h3><div id=\"patchState\" class=\"kind\">尚未生成</div><div id=\"patchError\" class=\"note error\"></div><div id=\"groups\" class=\"group-list\"></div></div><div class=\"subsection\"><h3>Host 生成的 YAML 候选预览</h3><p class=\"note\">左侧是当前缓冲区，右侧是所选原子修改组生成的候选内容；模型不能直接提交原始 YAML。</p><div class=\"source-preview\"><div><h4>当前 YAML</h4><pre id=\"currentSource\"></pre></div><div><h4>候选 YAML</h4><pre id=\"candidateSource\"></pre></div></div></div><div class=\"actions\"><button id=\"apply\" disabled>应用选中修改</button><button id=\"discard\" class=\"secondary\" disabled>丢弃提案</button></div></section>",
+    "</main><footer class=\"status\"><span id=\"status\">正在初始化…</span><span>仅修改当前 Procedure 缓冲区 · 不自动保存 · 每个候选都必须通过 Compiler v2.0.2 Check；Wait 还需要可信 IngressCatalog 绑定</span></footer>",
     "<script nonce=\"" + nonce + "\">" + script + "</script></body></html>",
   ].join("\n");
 }
@@ -647,6 +647,7 @@ export function registerAiAuthoringEditor(vscode, context, { getActiveDocument, 
       let patchPlan = null;
       let patchError = null;
       let candidateSource = null;
+      let candidateDigest = null;
       if (proposalResult.proposal.blockers.length === 0 &&
         proposalResult.proposal.operations.length > 0) {
         try {
@@ -665,6 +666,7 @@ export function registerAiAuthoringEditor(vscode, context, { getActiveDocument, 
           });
           if (!isCurrent()) return;
           candidateSource = preview.source;
+          candidateDigest = preview.digest;
         } catch (error) {
           if (!isCurrent()) return;
           patchError = String(error?.message ?? error);
@@ -672,14 +674,27 @@ export function registerAiAuthoringEditor(vscode, context, { getActiveDocument, 
       }
       if (!isCurrent()) return;
       const waitGate = containsWaitMutation(changeSet.operations);
-      // Compiler PR #38 is CANDIDATE_PARTIAL and does not implement the full
-      // inherited v1alpha5 static semantics. No proposal is applicable until
-      // the pinned Compiler returns a complete authoritative PASS.
-      const compilerCheck = null;
+      let compilerCheck = null;
+      let compilerCheckError = null;
+      if (patchPlan && candidateSource !== null && candidateDigest) {
+        try {
+          compilerCheck = await createAuthoringCompilerCheck({
+            compilerIntegration,
+            state: initial,
+            document,
+            changeSet,
+            candidateSource,
+            candidateDigest,
+          });
+        } catch (error) {
+          compilerCheckError = String(error?.message ?? error);
+        }
+      }
+      if (!isCurrent()) return;
       const canApply = isAuthoringApplyAllowed({
         patchPlan,
         changeSet,
-        candidateDigest: patchPlan?.candidateDigest,
+        candidateDigest,
         blockers: proposalResult.proposal.blockers,
         waitMutation: waitGate,
         compilerCheck,
@@ -692,6 +707,9 @@ export function registerAiAuthoringEditor(vscode, context, { getActiveDocument, 
         proposalResult,
         changeSet,
         patchPlan,
+        state: initial,
+        candidateSource,
+        candidateDigest,
         compilerCheck,
         canApply,
       } : null;
@@ -701,14 +719,23 @@ export function registerAiAuthoringEditor(vscode, context, { getActiveDocument, 
         plan: proposalResult.proposal.plan,
         assumptions: proposalResult.proposal.assumptions,
         blockers: proposalResult.proposal.blockers,
+        compilerVersion: compilerCheck?.compilerVersion ?? COMPILER_VERSION,
+        compilerState: compilerCheck?.state ?? "UNAVAILABLE",
         patchState: patchPlan
-          ? (waitGate ? "PREVIEW ONLY · Wait / Owner qualification gate" : "PREVIEW ONLY · full v1alpha5 Compiler Check unavailable")
+          ? (canApply ? "READY · Compiler v2.0.2 PASS" :
+            waitGate ? "PREVIEW ONLY · trusted IngressCatalog binding required" :
+            compilerCheck?.state === "FAIL" ? "BLOCKED · Compiler Check failed" :
+            "PREVIEW ONLY · Compiler Check unavailable")
           : patchError ? "BLOCKED · patch planning failed" : "NOT_RUN",
-        patchError: waitGate
-          ? "Wait edits additionally require a trusted IngressCatalog v1alpha1 Owner binding. All edits remain preview-only until the complete v1alpha5 Compiler Check is available and returns PASS."
-          : patchPlan
-            ? "The current v1alpha5 Compiler candidate is CANDIDATE_PARTIAL and does not cover inherited static semantics. No AI-generated change can be applied until a complete authoritative v1alpha5 Compiler Check returns PASS."
-            : patchError,
+        patchError: compilerCheckError ??
+          (waitGate
+            ? "Wait edits additionally require a trusted IngressCatalog v1alpha1 Owner binding. Static Check alone does not establish that trust."
+            : compilerCheck?.state === "FAIL"
+              ? compilerCheck.diagnostics.slice(0, 6).map(item =>
+                (item.code ? item.code + ": " : "") + item.message).join("\\n")
+              : canApply ? "" :
+                patchPlan ? "Compiler v2.0.2 Check is unavailable; no AI-generated change can be applied."
+                  : patchError),
         canApply,
         currentSource: patchPlan ? document.getText() : "",
         candidateSource: candidateSource ?? "",
@@ -734,7 +761,7 @@ export function registerAiAuthoringEditor(vscode, context, { getActiveDocument, 
       if (isCurrent()) {
         if (activeSession.controller === controller) activeSession.controller = null;
         activeSession.generating = false;
-        post({ type: "status", message: "请求结束。Compiler Check: NOT_RUN。", busy: false });
+        post({ type: "status", message: "请求结束。Compiler Check: " + (activeSession.pending?.compilerCheck?.state ?? "UNAVAILABLE") + "。", busy: false });
       }
     }
   }
