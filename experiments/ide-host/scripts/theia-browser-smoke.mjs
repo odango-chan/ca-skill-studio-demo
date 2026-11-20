@@ -497,7 +497,7 @@ try{
     await sleep(350);
     const visibleMenus=await evalJS(\`[...document.querySelectorAll('.lm-Menu,.p-Menu')]
       .filter(node=>getComputedStyle(node).display!=='none')
-      .map(node=>node.innerText||node.textContent).join('\\\\n')\`);
+      .map(node=>node.innerText||node.textContent).join('\\n')`);
     for(const expectedLabel of expected)
       if(!visibleMenus.includes(expectedLabel))
         throw Error('Native Studio '+label+' submenu is missing '+expectedLabel+': '+visibleMenus);
