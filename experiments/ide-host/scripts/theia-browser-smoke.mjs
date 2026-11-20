@@ -1197,9 +1197,9 @@ try{
   const openExamplePosition=await evalJS("(()=>{const item=[...document.querySelectorAll('.lm-Menu-item')].find(x=>x.innerText.trim()==='Open Example Project'||x.innerText.trim()==='打开示例项目');if(!item)return null;const r=item.getBoundingClientRect();return {x:r.left+r.width/2,y:r.top+r.height/2,label:item.innerText.trim()}})()");
   if(!openExamplePosition)
     throw Error("Project menu lost its explicit Open Example Project action");
-  await command("Input.dispatchMouseEvent",{type:"mouseMoved",...openExamplePosition});
-  await command("Input.dispatchMouseEvent",{type:"mousePressed",...openExamplePosition,button:"left",clickCount:1});
-  await command("Input.dispatchMouseEvent",{type:"mouseReleased",...openExamplePosition,button:"left",clickCount:1});
+  await command("Input.dispatchMouseEvent",{type:"mouseMoved",x:openExamplePosition.x,y:openExamplePosition.y});
+  await command("Input.dispatchMouseEvent",{type:"mousePressed",x:openExamplePosition.x,y:openExamplePosition.y,button:"left",clickCount:1});
+  await command("Input.dispatchMouseEvent",{type:"mouseReleased",x:openExamplePosition.x,y:openExamplePosition.y,button:"left",clickCount:1});
   const waitForDialogButton=async labels=>{
     for(let attempt=0;attempt<80;attempt++){
       const position=await evalJS("(()=>{const labels="+JSON.stringify(labels)+";const button=[...document.querySelectorAll('button')].find(item=>{const r=item.getBoundingClientRect();return r.width>0&&r.height>0&&labels.includes(item.innerText.trim())});if(!button)return null;const r=button.getBoundingClientRect();return {x:r.left+r.width/2,y:r.top+r.height/2,label:button.innerText.trim()}})()");
@@ -1210,9 +1210,9 @@ try{
       (await evalJS("document.body.innerText.slice(-900)")));
   };
   const cancelPosition=await waitForDialogButton(["Cancel","取消"]);
-  await command("Input.dispatchMouseEvent",{type:"mouseMoved",...cancelPosition});
-  await command("Input.dispatchMouseEvent",{type:"mousePressed",...cancelPosition,button:"left",clickCount:1});
-  await command("Input.dispatchMouseEvent",{type:"mouseReleased",...cancelPosition,button:"left",clickCount:1});
+  await command("Input.dispatchMouseEvent",{type:"mouseMoved",x:cancelPosition.x,y:cancelPosition.y});
+  await command("Input.dispatchMouseEvent",{type:"mousePressed",x:cancelPosition.x,y:cancelPosition.y,button:"left",clickCount:1});
+  await command("Input.dispatchMouseEvent",{type:"mouseReleased",x:cancelPosition.x,y:cancelPosition.y,button:"left",clickCount:1});
   let afterCancel=null;
   for(let attempt=0;attempt<30;attempt++){
     afterCancel=await evalJS("(()=>{const c=window.theia.container;const k=[...c._bindingDictionary._map.keys()].find(x=>typeof x==='function'&&x.prototype?.executeCommand&&x.prototype?.registerCommand&&x.prototype?.getCommand);return c.get(k).executeCommand('skillStudio.internal.workspaceIdentityAcceptance')})()");
@@ -1233,9 +1233,9 @@ try{
   await command("Input.dispatchMouseEvent",{type:"mousePressed",...retryPosition,button:"left",clickCount:1});
   await command("Input.dispatchMouseEvent",{type:"mouseReleased",...retryPosition,button:"left",clickCount:1});
   const replacePosition=await waitForDialogButton(["Replace Example","替换 Example"]);
-  await command("Input.dispatchMouseEvent",{type:"mouseMoved",...replacePosition});
-  await command("Input.dispatchMouseEvent",{type:"mousePressed",...replacePosition,button:"left",clickCount:1});
-  await command("Input.dispatchMouseEvent",{type:"mouseReleased",...replacePosition,button:"left",clickCount:1});
+  await command("Input.dispatchMouseEvent",{type:"mouseMoved",x:replacePosition.x,y:replacePosition.y});
+  await command("Input.dispatchMouseEvent",{type:"mousePressed",x:replacePosition.x,y:replacePosition.y,button:"left",clickCount:1});
+  await command("Input.dispatchMouseEvent",{type:"mouseReleased",x:replacePosition.x,y:replacePosition.y,button:"left",clickCount:1});
   let upgradedIdentity=null,upgradedEvidence=null;
   for(let attempt=0;attempt<120;attempt++){
     try{
