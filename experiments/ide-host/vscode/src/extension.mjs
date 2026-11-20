@@ -595,6 +595,11 @@ export function activate(context){
               exampleText.replacePrompt,{modal:true},
               exampleText.replaceAction,exampleText.cancelAction
             );
+            console.log("STUDIO_EXAMPLE_REPLACEMENT_DECISION",JSON.stringify({
+              existingExample,choice:choice??null,
+              replaceAction:exampleText.replaceAction,
+              replaceExisting:choice===exampleText.replaceAction
+            }));
             if(choice!==exampleText.replaceAction)return null;
             replaceExisting=true;
           }
@@ -618,6 +623,16 @@ export function activate(context){
                     else if(phase==="project-ready")report(exampleText.workspace);
                   }
                 });
+              console.log("STUDIO_EXAMPLE_IMPORT_RESULT",JSON.stringify({
+                root:result.root.toString(),replaceRequested:replaceExisting,
+                replacedExisting:result.replacedExisting,
+                candidateFiles:result.candidateFiles,created:result.created,
+                skipped:result.skipped,readmeUpdated:result.readmeUpdated
+              }));
+              if(replaceExisting&&(!result.replacedExisting||
+                 result.created!==result.candidateFiles||result.skipped!==0||
+                 !result.readmeUpdated))
+                throw Error("Explicit Example replacement did not replace the complete existing root");
               // A Theia browser-only session may currently be backed by an
               // Untitled multi-root workspace file. Opening the project folder
               // natively replaces that workspace and gives the workbench its
