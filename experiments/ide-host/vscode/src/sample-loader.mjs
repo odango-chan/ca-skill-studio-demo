@@ -17,6 +17,28 @@ const describeError=error=>({
   code:error?.code??null,
   message:String(error?.message??error)
 });
+async function clearDirectoryContents(vscode,fs,root){
+  if(typeof fs.readDirectory!=="function")
+    fail("Host file system cannot enumerate the existing Example directory");
+  let entries;
+  try{entries=await fs.readDirectory(root);}
+  catch(error){
+    fail("Cannot enumerate the existing Example directory: "+
+      JSON.stringify(describeError(error)));
+  }
+  for(const [name] of entries){
+    if(typeof name!=="string"||!name||name==="."||name===".."||
+       name.includes("/")||name.includes("\\\\"))
+      fail("Host file system returned an unsafe Example child name");
+    const child=vscode.Uri.joinPath(root,name);
+    await fs.delete(child,{recursive:true,useTrash:false});
+  }
+  const remaining=await fs.readDirectory(root);
+  if(remaining.length)
+    fail("Existing Example contents remain after replacement cleanup: "+
+      remaining.map(([name])=>name).join(", "));
+  return entries.map(([name])=>name);
+}
 // Theia 1.76 browser-only currently supplies an HTTP(S) extensionUri in this
 // hosted-plugin worker. Fetch only same-origin extension assets in that case.
 // Hosts exposing the documented theia-plugin:/vscode-vfs: schemes continue
@@ -126,10 +148,16 @@ export async function seedExampleProject(vscode,extensionUri,storageUri,
     const replacedExisting=Boolean(replaceExisting&&hadExisting);
     if(replacedExisting){
       phase="replace-existing-example";
-      await fs.delete(root,{recursive:true,useTrash:false});
+      // The Example root is also the active workspace folder in Theia OPFS.
+      // Keep that directory handle/path stable and remove only its children;
+      // deleting the active workspace root itself is not a portable operation
+      // across VS Code and Theia filesystem providers.
+      await clearDirectoryContents(vscode,fs,root);
+    }else{
+      phase="create-project-layout";
+      await fs.createDirectory(root);
     }
     phase="create-project-layout";
-    await fs.createDirectory(root);
     await fs.createDirectory(skillsRoot);
 
     const readmeSource=vscode.Uri.joinPath(extensionUri,"samples","v1alpha5",candidate.projectReadme);
@@ -168,6 +196,21 @@ export async function seedExampleProject(vscode,extensionUri,storageUri,
       report({phase:"files",completed:created+skipped,total});
     }
 
+    if(replacedExisting){
+      phase="verify-replaced-example";
+      if(created!==total||skipped!==0||!readmeUpdated)
+        fail("Confirmed Example replacement was incomplete: "+
+          JSON.stringify({created,skipped,total,readmeUpdated}));
+      const rootNames=(await fs.readDirectory(root)).map(([name])=>name).sort();
+      if(JSON.stringify(rootNames)!==JSON.stringify(["README.md","skills"]))
+        fail("Retired Example root contents remain after replacement: "+
+          rootNames.join(", "));
+      const skillNames=(await fs.readDirectory(skillsRoot))
+        .map(([name])=>name).sort();
+      if(JSON.stringify(skillNames)!==JSON.stringify([...SKILLS].sort()))
+        fail("Replacement did not restore exactly the current Skills: "+
+          skillNames.join(", "));
+    }
     report({phase:"project-ready"});
     const procedures=Object.fromEntries(SKILLS.map(name=>
       [name,vscode.Uri.joinPath(skillsRoot,name,"assurance","procedure.yaml")]));
