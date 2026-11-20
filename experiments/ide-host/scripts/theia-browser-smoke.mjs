@@ -1244,7 +1244,7 @@ try{
          upgradedIdentity?.procedureApiVersion==="connectionagent.io/v1alpha5"){
         upgradedEvidence=await evalJS("(()=>{const c=window.theia.container;const k=[...c._bindingDictionary._map.keys()].find(x=>typeof x==='function'&&x.prototype?.executeCommand&&x.prototype?.registerCommand&&x.prototype?.getCommand);return c.get(k).executeCommand('skillStudio.showActivationDiagnostics')})()");
         if(upgradedEvidence?.packageInventory?.state==="ready"&&
-           upgradedEvidence.packageInventory.packageCount===2)break;
+           upgradedEvidence.packageInventory.packages?.length===2)break;
       }
     }catch{upgradedIdentity=null;}
     await sleep(250);
@@ -1253,7 +1253,7 @@ try{
      upgradedIdentity?.procedureApiVersion!=="connectionagent.io/v1alpha5"||
      upgradedIdentity?.libExists||upgradedIdentity?.outputExists||
      upgradedIdentity?.workspaceFolders?.length!==1||
-     upgradedEvidence?.packageInventory?.packageCount!==2||
+     upgradedEvidence?.packageInventory?.packages?.length!==2||
      upgradedEvidence?.failures?.length)
     throw Error("Explicit Example replacement did not restore a clean current v1alpha5 project: "+
       JSON.stringify({identity:upgradedIdentity,activation:upgradedEvidence}).slice(0,3200));
@@ -1262,7 +1262,7 @@ try{
     cancelPreserved:afterCancel.contractApiVersion,
     upgradedVersion:upgradedIdentity.contractApiVersion,
     libRemoved:!upgradedIdentity.libExists,outputRemoved:!upgradedIdentity.outputExists,
-    packages:upgradedEvidence.packageInventory.packageCount
+    packages:upgradedEvidence.packageInventory.packages.length
   }));
   console.log("STUDIO_PERSISTED_WORKSPACE_RELOAD_PASS",JSON.stringify({
     workspace:persistedIdentity.workspaceName,
