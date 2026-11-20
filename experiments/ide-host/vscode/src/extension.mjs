@@ -501,16 +501,32 @@ export function activate(context){
         try{await vscode.workspace.fs.stat(uri);return true;}
         catch{return false;}
       };
-      const readApiVersion=async uri=>{
-        if(!uri)return null;
+      const readSource=async uri=>{
+        if(!uri)return {text:null,error:'URI unavailable'};
         try{
-          const source=new TextDecoder("utf-8",{fatal:true})
+          const text=new TextDecoder('utf-8',{fatal:true})
             .decode(await vscode.workspace.fs.readFile(uri));
-          return /^\s*apiVersion\s*:\s*["']?([^"'\s]+)/m.exec(source)?.[1]??null;
-        }catch{return null;}
+          return {text,error:null};
+        }catch(error){return {text:null,error:String(error?.message??error)};}
       };
-      const contractApiVersion=await readApiVersion(contract);
-      const procedureApiVersion=await readApiVersion(defaultProcedure);
+      const contractRead=await readSource(contract);
+      const procedureRead=await readSource(defaultProcedure);
+      const apiVersion=source=>/^\\s*apiVersion\\s*:\\s*[\"']?([^\"'\\s]+)/m.exec(source??'')?.[1]??null;
+      const contractApiVersion=apiVersion(contractRead.text);
+      const procedureApiVersion=apiVersion(procedureRead.text);
+      // CA-SL v1alpha5 intentionally has no apiVersion field in each source file.
+      // Its frozen authoring shape is a top-level Contract and a start/nodes DAG.
+      const contractCurrentShape=Boolean(contractRead.text&&
+        /^\\s*goal\\s*:/m.test(contractRead.text)&&
+        /^\\s*precondition\\s*:/m.test(contractRead.text)&&
+        /^\\s*requestSchema\\s*:/m.test(contractRead.text)&&
+        /^\\s*contextSchema\\s*:/m.test(contractRead.text)&&
+        /^\\s*dependencies\\s*:/m.test(contractRead.text)&&
+        /^\\s*capabilities\\s*:/m.test(contractRead.text));
+      const procedureCurrentShape=Boolean(procedureRead.text&&
+        /^\\s*start\\s*:/m.test(procedureRead.text)&&
+        /^\\s*nodes\\s*:/m.test(procedureRead.text)&&
+        !/^\\s*procedures\\s*:/m.test(procedureRead.text));
       return {
         workspaceName:vscode.workspace.name??null,
         workspaceFile:vscode.workspace.workspaceFile?.toString?.()??null,
@@ -521,6 +537,8 @@ export function activate(context){
         masProcedure:masProcedure?.toString?.()??null,
         masProcedureExists:await exists(masProcedure),
         contractApiVersion,procedureApiVersion,
+        contractCurrentShape,procedureCurrentShape,
+        contractReadError:contractRead.error,procedureReadError:procedureRead.error,
         libExists:await exists(lib),
         outputExists:await exists(output),
         ...(seededApiVersion?{seededApiVersion}:{})
