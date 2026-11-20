@@ -504,7 +504,7 @@ export function activate(context){
         outputExists:await exists(output)
       };
     }
-  ));
+    );
   // Localhost-only acceptance fixture: simulate an existing, pre-v1alpha5
   // Example profile without exposing a destructive command in the public Pages
   // build. The real loadExample command must still ask before replacing it.
