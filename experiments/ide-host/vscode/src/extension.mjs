@@ -1,4 +1,4 @@
-import {openNativeSource} from "./native-source.mjs";
+import {openNativeSource,openTextDocumentWithRetry} from "./native-source.mjs";
 import {registerPreviewHost} from "./preview-host.mjs";
 import {mountMarkdownPreview} from "./markdown-preview.mjs";
 
@@ -783,7 +783,7 @@ export function activate(context){
       if(folders.length!==1)throw Error("Python syntax probe needs one Example workspace");
       const uri=vscode.Uri.joinPath(folders[0].uri,"skills",
         "establish-pdu-session","scripts","validate-subscription-request.py");
-      const doc=await vscode.workspace.openTextDocument(uri);
+      const doc=await openTextDocumentWithRetry(vscode,uri);
       const editor=await vscode.window.showTextDocument(doc,{
         viewColumn:vscode.ViewColumn.One,preserveFocus:false,preview:false
       });
@@ -830,7 +830,7 @@ export function activate(context){
       const pythonFiles=await vscode.workspace.findFiles(
         "**/scripts/validate-subscription-request.py","**/node_modules/**",5);
       if(!pythonFiles.length)throw Error("CA-SL v1alpha5 Python acceptance fixture is missing");
-      const python=await vscode.workspace.openTextDocument(pythonFiles[0]);
+      const python=await openTextDocumentWithRetry(vscode,pythonFiles[0]);
       await vscode.window.showTextDocument(python,{
         viewColumn:vscode.ViewColumn.One,preserveFocus:false,preview:false
       });
@@ -853,7 +853,7 @@ export function activate(context){
       const yamlUri=projectRoot.with({path:projectRoot.path+"/.studio-editor-group-acceptance.yaml"});
       await vscode.workspace.fs.writeFile(yamlUri,
         new TextEncoder().encode("kind: editor-group-acceptance\\n"));
-      const yamlDocument=await vscode.workspace.openTextDocument(yamlUri);
+      const yamlDocument=await openTextDocumentWithRetry(vscode,yamlUri);
       if(yamlDocument.isDirty&&!await yamlDocument.save())
         throw Error("Temporary YAML fixture could not be saved");
       if(yamlDocument.isDirty)
