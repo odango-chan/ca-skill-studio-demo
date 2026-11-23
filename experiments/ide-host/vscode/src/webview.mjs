@@ -5,6 +5,7 @@ import "../../../../site/light.css";
 import "./webview.css";
 import {analyzeCurrentSource} from "../../../../language/core/source.ts";
 import {layoutProcedureELK} from "../../../../site/layout.mjs";
+import {withProcedureTerminalViews} from "../../../../site/procedure-terminal-view.mjs";
 import {mountProcedureCanvas} from "../../../../site/react-flow-canvas.tsx";
 import {mountNodeFocusCanvas} from "../../../../site/node-focus-flow.tsx";
 import {projectNodeFocusFlow} from "../../../../site/node-focus-graph.mjs";
@@ -323,13 +324,7 @@ function receiveSnapshot(data){
     return;
   }
   const sourceProcedure=projected.procedure.procedures[0];
-  const terminalIds=[...new Set(sourceProcedure.routes
-    .map(route=>route.target)
-    .filter(target=>["SUCCEEDED","FAILED","UNRESOLVED","SAFE_STOPPED"].includes(target)))];
-  const terminalNodes=terminalIds.map(id=>({
-    id,operator:"terminal",value:id,line:0,phases:[],children:[],viewOnly:true
-  }));
-  const procedure={...sourceProcedure,nodes:[...sourceProcedure.nodes,...terminalNodes]};
+  const procedure=withProcedureTerminalViews(sourceProcedure);
   const model={state:"READY",entry:procedure.name,
     procedures:new Map([[procedure.name,procedure]])};
   if(model.state!=="READY"){
