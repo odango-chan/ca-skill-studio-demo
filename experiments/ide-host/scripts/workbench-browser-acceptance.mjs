@@ -594,13 +594,19 @@ export async function runPackageOverviewAcceptance({command,evalJS,sleep,require
   await invoke('skillStudio.refreshPackages');
   await invoke('skillStudio.refreshPackages');
   const postExpansion=await evalJS('window.__skillStudioLastCommandResult??null');
-  if(postExpansion?.state!=='ready'||postExpansion.packages?.length!==2)
-    throw Error('Package Explorer refresh did not preserve both Package inventories: '+
+  if(postExpansion?.state!=='ready'||postExpansion.packages?.length!==4)
+    throw Error('Package Explorer refresh did not preserve four Package inventories: '+
       JSON.stringify(postExpansion));
   assertGroupInventory(postExpansion,'establish-pdu-session',{
     definition:1,assurance:3,schemas:1,scripts:3
   });
   assertGroupInventory(postExpansion,'establish-pdu-session-mas',{
+    definition:1,assurance:3,schemas:1,references:1
+  });
+  assertGroupInventory(postExpansion,'modify-pdu-session-mas',{
+    definition:1,assurance:3,schemas:1,references:1
+  });
+  assertGroupInventory(postExpansion,'release-pdu-session-mas',{
     definition:1,assurance:3,schemas:1,references:1
   });
   const previous=activityState?.previous;
@@ -642,7 +648,7 @@ export async function runPackageOverviewAcceptance({command,evalJS,sleep,require
     exactPackageUris:true,restoredActivity:restored
   };
   console.log('STUDIO_PACKAGE_OVERVIEW_TWO_SKILLS_CHROMIUM',JSON.stringify(evidence));
-  return {required:true,twoSkills:true,evidence};
+  return {required:true,fourSkills:true,evidence};
 }
 
 

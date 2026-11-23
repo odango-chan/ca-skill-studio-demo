@@ -911,7 +911,7 @@ try{
         JSON.stringify(pythonTextMate));
   }
   const packageOverviewEvidence=workbenchEvidence?.packageOverview
-    ?{required:true,twoSkills:true,evidence:workbenchEvidence.packageOverview}
+    ?{required:true,fourSkills:true,evidence:workbenchEvidence.packageOverview}
     :{required:false};
   const nativeMarkdownActivation=requireEditor
     ?await evalJS("(async()=>{const c=window.theia.container;"+
@@ -1193,7 +1193,7 @@ try{
       return {inventory,activation,semantic};
     })()`);
     const inventory=persistedEvidence?.inventory??persistedEvidence?.activation?.packageInventory;
-    if(inventory?.state==="ready"&&inventory?.packages?.length===2&&
+    if(inventory?.state==="ready"&&inventory?.packages?.length===4&&
        persistedEvidence.activation?.workbenchReady===true&&
        persistedEvidence.semantic?.registered===true)break;
     await sleep(200);
@@ -1203,7 +1203,7 @@ try{
   if(!persistedEvidence?.inventory&&persistedEvidence?.activation?.packageInventory)
     persistedEvidence.inventory=persistedEvidence.activation.packageInventory;
   if(persistedEvidence.inventory?.state!=="ready"||
-     persistedEvidence.inventory?.packages?.length!==2||
+     persistedEvidence.inventory?.packages?.length!==4||
      persistedEvidence.activation?.failures?.length||
      persistedEvidence.activation?.workbenchReady!==true||
      persistedEvidence.semantic?.registered!==true)
@@ -1330,7 +1330,7 @@ try{
          upgradedIdentity?.procedureCurrentShape===true){
         upgradedEvidence=await evalJS("(()=>{const c=window.theia.container;const k=[...c._bindingDictionary._map.keys()].find(x=>typeof x==='function'&&x.prototype?.executeCommand&&x.prototype?.registerCommand&&x.prototype?.getCommand);return c.get(k).executeCommand('skillStudio.showActivationDiagnostics')})()");
         if(upgradedEvidence?.packageInventory?.state==="ready"&&
-           upgradedEvidence.packageInventory.packages?.length===2)break;
+           upgradedEvidence.packageInventory.packages?.length===4)break;
       }
     }catch{upgradedIdentity=null;}
     await sleep(250);
@@ -1339,7 +1339,7 @@ try{
      upgradedIdentity?.procedureCurrentShape!==true||
      upgradedIdentity?.libExists||upgradedIdentity?.outputExists||
      upgradedIdentity?.workspaceFolders?.length!==1||
-     upgradedEvidence?.packageInventory?.packages?.length!==2||
+     upgradedEvidence?.packageInventory?.packages?.length!==4||
      upgradedEvidence?.failures?.length)
     throw Error("Explicit Example replacement did not restore a clean current v1alpha5 project: "+
       JSON.stringify({identity:upgradedIdentity,activation:upgradedEvidence}).slice(0,3200));
