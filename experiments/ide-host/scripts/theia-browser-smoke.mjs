@@ -1639,7 +1639,7 @@ try{
       const diffMode=await command("Runtime.evaluate",{
         contextId:aiContextId,returnByValue:true,
         expression:"(()=>{const select=document.getElementById('monacoDiffMode');"+
-          "if(!select||!window.skillStudioAiYamlDiff)return false;"+
+          "if(!select||!document.getElementById('monacoDiffSurface'))return false;"+
           "select.value='inline';select.dispatchEvent(new Event('change',{bubbles:true}));"+
           "document.getElementById('monacoDiffNext').click();"+
           "document.getElementById('monacoDiffPrevious').click();"+
