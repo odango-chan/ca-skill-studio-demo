@@ -803,7 +803,9 @@ export function registerAiAuthoringEditor(vscode, context, { getActiveDocument, 
 
   async function handleGenerate(message) {
     const activeSession = session;
-    const isCurrent = () => isCurrentAuthoringSession(session, activeSession);
+    const contextStamp = activeSession?.contextRequestId;
+    const isCurrent = () => isCurrentAuthoringSession(session, activeSession) &&
+      activeSession.contextRequestId === contextStamp;
     if (!isCurrent() || !activeSession.context) {
       post({ type: "error", message: "当前上下文尚未就绪，请先刷新。" });
       return;
@@ -816,9 +818,24 @@ export function registerAiAuthoringEditor(vscode, context, { getActiveDocument, 
       post({ type: "error", message: "已有模型请求正在准备或运行。" });
       return;
     }
-    const task = typeof message.task === "string" ? message.task.trim() : "";
-    if (!task || task.length > 4000) {
-      post({ type: "error", message: "请输入 1–4000 字符的修改要求。" });
+    const refining = message.type === "refine";
+    const prior = refining ? activeSession.pending : null;
+    if (refining && (!prior || !isLiveDocumentRevision(activeSession.document, prior) ||
+        prior.packageGeneration !== activeSession.context.generation)) {
+      post({ type:"error", message:"上一版提案已失效或不在当前会话；请重新生成。" });
+      return;
+    }
+    const userTask = typeof message.task === "string" ? message.task.trim() : "";
+    if (!userTask || userTask.length > (refining ? 1600 : 4000)) {
+      post({ type: "error", message: refining ?
+        "请填写 1–1600 字符的完善要求。" : "请输入 1–4000 字符的修改要求。" });
+      return;
+    }
+    let task;
+    try {
+      task = refining ? buildRefinementTask(prior.changeSet, userTask) : userTask;
+    } catch (error) {
+      post({ type:"error",message:String(error?.message ?? error) });
       return;
     }
     if (!Array.isArray(message.selectedIds) ||
@@ -875,10 +892,11 @@ export function registerAiAuthoringEditor(vscode, context, { getActiveDocument, 
     }
 
     const disclosure = contextPack.manifest.map((item) =>
-      item.label + " · " + item.bytes + " bytes"
+      item.label + " · " + item.bytes + " bytes · SHA-256 " + item.digest
     );
     const detail = [
       "目标语言：CA-SL v1alpha5",
+      refining ? "模式：Refine proposal，重新生成完整新版本" : "模式：生成新提案",
       "Procedure：assurance/procedure.yaml",
       "上下文总量：" + contextPack.byteCount + " bytes",
       "将发送的来源：",
