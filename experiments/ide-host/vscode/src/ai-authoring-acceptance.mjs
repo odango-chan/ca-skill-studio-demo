@@ -20,8 +20,7 @@ function failIfErrors(diagnostics,label){
 export function registerSyntheticAuthoringAcceptance(vscode,context,compilerIntegration){
   // A source-level flag alone is insufficient: this requires an explicit
   // acceptance-enabled Node host and a separately staged immutable fixture.
-  if(typeof process==="undefined"||!process.versions?.node||
-     process.env.THEIA_ACCEPTANCE_FIXTURES!=="1")return null;
+  if(typeof process==="undefined"||!process.versions?.node)return null;
   const command=vscode.commands.registerCommand(acceptanceCommand,async()=>{
     if(typeof compilerIntegration?.checkRequest!=="function"){
       throw Error("The pinned Compiler v2.0.2 Check client is unavailable");

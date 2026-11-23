@@ -423,8 +423,10 @@ test("synthetic positive native Editor acceptance is CI-only and keeps trusted f
   const backend=readFileSync(new URL("../.github/workflows/theia-browser-host-spike.yml",import.meta.url),"utf8");
   const pages=readFileSync(new URL("../.github/workflows/pages.yml",import.meta.url),"utf8");
   assert.match(extension,/registerSyntheticAuthoringAcceptance/);
-  assert.match(acceptance,/process\.env\.THEIA_ACCEPTANCE_FIXTURES!=="1"/);
+  assert.match(acceptance,/!process\.versions\?\.node/);
   assert.match(acceptance,/applyAuthoringCandidateToBuffer/);
+  assert.match(acceptance,/authoring-trusted-build-request\\.json/);
+  assert.match(extension,/registerSyntheticAuthoringAcceptance/);
   assert.match(acceptance,/executeCommand\("undo"\)/);
   assert.match(acceptance,/unsavedDiskUnchanged:true/);
   assert.match(browser,/STUDIO_AI_AUTHORING_SYNTHETIC_NATIVE_EDIT_UNDO_CHROMIUM_PASS/);

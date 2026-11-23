@@ -1085,10 +1085,13 @@ export function registerAiAuthoringEditor(vscode, context, { getActiveDocument, 
     }
   });
   const gatewayAcceptanceCommand =
-    typeof process !== "undefined" && Boolean(process.versions?.node) &&
-      process.env.THEIA_ACCEPTANCE_FIXTURES === "1"
+    typeof process !== "undefined" && Boolean(process.versions?.node)
       ? vscode.commands.registerCommand("skillStudio.internal.configureAiGatewayAcceptance",
         async ({ gatewayUrl = "", modelId = "deepseek-v4.1-flash" } = {}) => {
+          // The acceptance fixture is staged only in isolated backend CI.
+          // No production installation can update settings via this command.
+          await vscode.workspace.fs.stat(vscode.Uri.joinPath(context.extensionUri,
+            "dist", "authoring-trusted-build-request.json"));
           if (typeof gatewayUrl !== "string" || typeof modelId !== "string" ||
               !/^[A-Za-z0-9][A-Za-z0-9._:/-]{0,255}$/.test(modelId)) {
             throw new TypeError("Invalid AI Gateway acceptance configuration.");
