@@ -86,3 +86,27 @@ jobs:
           cp dist/wasm_exec.js ../experiments/ide-host/vscode/dist/wasm_exec.js
       - name: Verify synthetic AI proposal and exact Compiler v2.0.2 candidate PASS
         run: node experiments/ide-host/scripts/ai-authoring-compiler-acceptance.mjs compiler-source
+
+  portable-windows-smoke:
+    name: Native Windows standalone Authoring smoke
+    needs: verify
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - uses: actions/download-artifact@v4
+        with:
+          name: studio-ai-authoring-live-smoke-windows
+          path: dist/ai-authoring-live-smoke-windows
+      - name: Verify the actual downloaded artifact on Windows with synthetic Provider
+        shell: pwsh
+        run: |
+          node --check dist/ai-authoring-live-smoke-windows/ai-authoring-live-gateway-smoke.mjs
+          if ($LASTEXITCODE -ne 0) { throw 'Portable Windows smoke script has invalid syntax' }
+          node --test experiments/ide-host/acceptance/ai-authoring-live-bundle.test.mjs
+          if ($LASTEXITCODE -ne 0) { throw 'Portable Windows bundled Authoring Core acceptance failed' }
+          if (-not (Test-Path dist/ai-authoring-live-smoke-windows/run-live-gateway-smoke.cmd)) {
+            throw 'Missing native Windows launcher'
+          }
