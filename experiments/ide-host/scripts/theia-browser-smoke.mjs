@@ -1006,10 +1006,10 @@ try{
   const importedNotification=afterImport.notificationText.some(message=>
     (message.includes("示例项目已载入并打开工作区：skill-studio-demo/")&&
      message.includes("默认已打开 CA-SL current Procedure（DRAFT / NOT_QUALIFIED）")&&
-     message.includes("导入当前 CA-SL Skill 文件 14 个"))||
+     message.includes("导入当前 CA-SL Skill 文件 26 个"))||
     (message.includes("Example project opened: skill-studio-demo/")&&
      message.includes("CA-SL current Procedure is open (DRAFT / NOT_QUALIFIED)")&&
-     message.includes("Imported 14 current CA-SL Skill files")));
+     message.includes("Imported 26 current CA-SL Skill files")));
   if(!importedNotification||!afterImport.explorerText.includes("skills")||
      !afterImport.explorerText.includes("establish-pdu-session"))
     throw Error("Theia did not open the current CA-SL Example project: "+
