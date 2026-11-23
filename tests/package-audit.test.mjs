@@ -197,6 +197,16 @@ test("local Schema documents report YAML syntax and unsupported dialect defects"
   assert.equal(parseDiagnostic.path,"schemas/establishment-request.schema.yaml");
   assert.equal(parseDiagnostic.status,"confirmed");
   assert.equal(parseDiagnostic.severity,"error");
+
+  const invalidJson=clone(valid);
+  invalidJson.set("schemas/invalid.schema.json",{text:"{type: object}\n"});
+  const jsonDiagnostic=find(auditPackage({files:invalidJson,
+    dependencyContext:{available:false}}),"SCHEMA_DOCUMENT_PARSE_ERROR","invalid.schema.json");
+  assert.ok(jsonDiagnostic,
+    "YAML-compatible flow mappings must not be accepted as JSON Schema .json files");
+  assert.equal(jsonDiagnostic.path,"schemas/invalid.schema.json");
+  assert.equal(jsonDiagnostic.status,"confirmed");
+  assert.equal(jsonDiagnostic.severity,"error");
 });
 
 test("local Schema $id collisions are reported at the duplicate declaration",()=>{
