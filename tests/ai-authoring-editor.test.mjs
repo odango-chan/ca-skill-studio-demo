@@ -533,3 +533,38 @@ test("canceling model picker does not write settings or trigger any model reques
   }),false);
   assert.equal(writes,0);
 });
+
+test("AI Workbench renders Context / Plan / Flow / Diff / Validation / Change Set within one Editor Tab",()=>{
+  const html=renderAiAuthoringHtml("c".repeat(48));
+  for(const id of ["contextPanel","contextMeta","sources","view-plan","view-flow","view-diff",
+    "view-validation","flowChanges","diffRows","diffSummary","validationIdentity",
+    "diagnostics","groups","revisionInfo","task","generate","apply","discard"]) {
+    assert.ok(html.includes('id="'+id+'"'),"missing Workbench section "+id);
+  }
+  assert.match(html,/role="tablist"/);
+  assert.match(html,/aria-selected="true"/);
+  assert.match(html,/aria-labelledby="tab-flow"/);
+  assert.match(html,/class="card context-panel"/);
+  assert.match(html,/class="card review-panel"/);
+  assert.match(html,/class="card changeset-panel"/);
+  assert.match(html,/function selectReviewTab/);
+  assert.match(html,/ArrowRight/);
+  assert.match(html,/renderLineDiff/);
+  assert.match(html,/renderFlowChanges/);
+  assert.match(html,/renderValidationView/);
+  assert.match(html,/connect-src 'none'/);
+  assert.doesNotMatch(html,/fetch\s*\(/);
+});
+
+test("AI Workbench only displays Host review data and never changes Compiler Apply authority",()=>{
+  const source=readFileSync(new URL("../experiments/ide-host/vscode/src/ai-authoring-editor.mjs",import.meta.url),"utf8");
+  assert.match(source,/createAuthoringLineDiff/);
+  assert.match(source,/createAuthoringFlowChanges/);
+  assert.match(source,/createAuthoringValidationView/);
+  assert.match(source,/isAuthoringApplyAllowed/);
+  assert.match(source,/candidateDigest: preview\.digest/);
+  assert.match(source,/renderReviewData\(message\)/);
+  assert.match(source,/byId\('apply'\)\.disabled=true;byId\('compilerStatus'\)/);
+  assert.match(source,/sourceDigest: "sha256:" \+ await sha256Hex/);
+  assert.doesNotMatch(source,/showTextDocument\(.*ViewColumn\.Three/);
+});
