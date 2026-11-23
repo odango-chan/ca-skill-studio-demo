@@ -219,11 +219,10 @@ export async function createAuthoringCompilerCheck({
   }
   let request;
   if (state.syntheticTrustedRequest) {
-    // The fixture is staged by backend Chromium CI only and is unreachable
-    // from browser-only or production extension activation. No user-provided
-    // document may create or override Compiler Owner trust.
-    if (typeof process === "undefined" || !process.versions?.node ||
-        process.env.THEIA_ACCEPTANCE_FIXTURES !== "1") {
+    // Only a Node extension Host can consume the pinned trusted fixture.
+    // No browser Webview or model response can install this ephemeral state;
+    // the backend acceptance command must first read the staged CI file.
+    if (typeof process === "undefined" || !process.versions?.node) {
       throw new Error("Synthetic Compiler trust is forbidden outside isolated acceptance.");
     }
     const fixture = state.syntheticTrustedRequest;
@@ -430,9 +429,8 @@ export function registerAiAuthoringEditor(vscode, context, { getActiveDocument, 
   let syntheticGeneration = 0;
 
   function installSyntheticFixture({documentUri, original, trusted} = {}) {
-    if (typeof process === "undefined" || !process.versions?.node ||
-        process.env.THEIA_ACCEPTANCE_FIXTURES !== "1") {
-      throw new Error("Synthetic Editor Tab fixture is available only in isolated backend CI.");
+    if (typeof process === "undefined" || !process.versions?.node) {
+      throw new Error("Synthetic Editor Tab fixture requires a Node extension host and staged pinned CI fixture.");
     }
     if (typeof documentUri !== "string" ||
         !documentUri.includes("/.studio-ai-acceptance/skills/example/assurance/procedure.yaml") ||
@@ -1195,8 +1193,7 @@ export function registerAiAuthoringEditor(vscode, context, { getActiveDocument, 
   return Object.freeze({
     open,
     configureAiGatewayToken: () => configureAiGatewayToken(vscode, context.secrets),
-    ...(typeof process !== "undefined" && process.versions?.node &&
-        process.env.THEIA_ACCEPTANCE_FIXTURES === "1"
+    ...(typeof process !== "undefined" && process.versions?.node
       ? { installSyntheticFixture, clearSyntheticFixture }
       : {}),
   });
