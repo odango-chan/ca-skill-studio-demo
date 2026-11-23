@@ -18,13 +18,13 @@ function setupYaml() {
   monaco.languages.setMonarchTokensProvider("yaml", {
     tokenizer: {
       root: [
-        [/^\\s*#.*$/, "comment"],
+        [/^\s*#.*$/, "comment"],
         [/#.*$/, "comment"],
-        [/"(?:[^"\\\\]|\\\\.)*"/, "string"],
+        [/"(?:[^"\\]|\\.)*"/, "string"],
         [/'(?:[^']|'')*'/, "string"],
-        [/\\b(?:true|false|null|PASS|FAIL)\\b/, "keyword"],
-        [/-?\\d+(?:\\.\\d+)?/, "number"],
-        [/[A-Za-z_][\\w.-]*(?=\\s*:)/, "key"],
+        [/\b(?:true|false|null|PASS|FAIL)\b/, "keyword"],
+        [/-?\d+(?:\.\d+)?/, "number"],
+        [/[A-Za-z_][\w.-]*(?=\s*:)/, "key"],
       ],
     },
   });
@@ -113,9 +113,20 @@ function setMode(next) {
 }
 
 function jump(direction) {
-  if (!editor || !currentIdentity) return;
-  if (direction === "previous") editor.goToDiff("previous");
-  else if (direction === "next") editor.goToDiff("next");
+  if (!editor || !currentIdentity || !["previous", "next"].includes(direction)) return false;
+  const modified = editor.getModifiedEditor?.();
+  const changes = editor.getLineChanges?.() ?? [];
+  if (!modified || !Array.isArray(changes) || changes.length === 0) return false;
+  const positions = [...new Set(changes.map(change =>
+    Math.max(1, change.modifiedStartLineNumber ?? 1)))].sort((x,y)=>x-y);
+  const here = modified.getPosition()?.lineNumber ?? 1;
+  const target = direction === "next"
+    ? (positions.find(line=>line>here) ?? positions[0])
+    : ([...positions].reverse().find(line=>line<here) ?? positions[positions.length-1]);
+  if (!Number.isSafeInteger(target)) return false;
+  modified.revealLineInCenter(target);
+  modified.setPosition({ lineNumber: target, column: 1 });
+  return true;
 }
 
 function resize() {
