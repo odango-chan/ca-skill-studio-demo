@@ -1,7 +1,7 @@
 // AI Workbench F3: a private, read-only Monaco DiffEditor inside the existing Editor Tab.
 // It never shares Monaco models with the native source editor or writes workspace files.
-import * as monaco from "monaco-editor/esm/vs/editor/editor.api";
-import "monaco-editor/min/vs/editor/editor.main.css";
+import * as monaco from "monaco-editor/editor/editor.api";
+import "../../../../node_modules/monaco-editor/min/vs/editor/editor.main.css";
 
 const MAX_DIFF_BYTES = 256 * 1024;
 const encoder = new TextEncoder();
