@@ -1838,6 +1838,22 @@ try{
       }
       if(!historicalReadOnly)
         throw Error("F4 historical inspection did not revoke Compiler Apply authority");
+      // F4 disposal gate: close the specific AI Editor Tab in Theia's
+      // actual main shell. A history inspection must not leave the Webview
+      // focused while the subsequent independent native Undo fixture runs.
+      const closedAiTab=await evalJS(
+        "(async()=>{const c=window.theia.container;"+
+        "const key=[...c._bindingDictionary._map.keys()].find(k=>"+
+        "typeof k==='function'&&k.prototype?.activateWidget&&k.prototype?.addWidget);"+
+        "if(!key)throw Error('Theia application shell not found');"+
+        "const shell=c.get(key);"+
+        "const widget=shell.getWidgets('main').find(w=>w.title?.label==='AI Procedure Authoring');"+
+        "if(!widget)return {closed:false,reason:'AI Editor Tab missing before disposal'};"+
+        "await shell.closeWidget(widget.id);"+
+        "return {closed:!shell.getWidgets('main').some(w=>w.id===widget.id),id:widget.id};})()"
+      );
+      if(closedAiTab?.closed!==true)
+        throw Error("F4 session Editor Tab did not dispose cleanly: "+JSON.stringify(closedAiTab));
       console.log("STUDIO_AI_AUTHORING_REFINEMENT_HISTORY_CHROMIUM_PASS",JSON.stringify({
         modelRequests:2,sessionRevisions:2,repeatedDisclosure:true,
         refinementUsesSemanticHistory:true,historicalApplyBlocked:true
