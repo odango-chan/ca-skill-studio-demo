@@ -22,7 +22,7 @@ const normal=[
  ["verify-pdu-session-establishment",["postcondition"]]
 ];
 const mas=[
- ["validate-sm-subscription",["precondition","operation","observation","postcondition"]],
+ ["validate-sm-subscription",["precondition","operation","postcondition"]],
  ["skip-secondary-authentication",["operation","postcondition"]],
  ["create-sm-context",["operation","postcondition"]],
  ["register-uecm",["operation","postcondition"]],

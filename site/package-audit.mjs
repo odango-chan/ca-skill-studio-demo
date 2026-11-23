@@ -299,9 +299,9 @@ export function auditPackage({
       const seen=new Set();
       for(const item of capabilityNode.items){
         const id=scalar(item);
-        if(!id||!id.startsWith("urn:")){
+        if(!id||(!id.startsWith("urn:")&&!/^[A-Za-z][A-Za-z0-9_-]*(?:\.[A-Za-z][A-Za-z0-9_-]*)+$/.test(id))){
           add(diagnostics,FILES.contract,contract,item,
-            "CAPABILITY_GRANT_INVALID","Capability grant must be a non-empty URN CapabilityId",
+            "CAPABILITY_GRANT_INVALID","Capability grant must be a non-empty CapabilityId (qualified dotted ID or URN)",
             {domain:"capabilities",category:"structure"});
           continue;
         }
