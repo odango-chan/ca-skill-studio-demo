@@ -125,6 +125,16 @@ await build({
   loader:{".tsx":"tsx",".css":"css"},
   logLevel:"info"
 });
+// Bundle the private, read-only Monaco DiffEditor inside the AI Editor Tab.
+// Keep all code, CSS and fonts in the local extension media root; no CDN.
+await build({
+  entryPoints:[join(root,"src/ai-yaml-diff.mjs")],
+  outfile:join(root,"media/ai-yaml-diff.js"),
+  bundle:true,format:"iife",platform:"browser",target:"es2022",
+  minify:true,
+  loader:{".css":"css",".ttf":"file",".woff":"file",".woff2":"file"},
+  assetNames:"assets/[name]-[hash]",logLevel:"info"
+});
 // Bundle only the pinned CA-SL v1alpha5 released Example. v1alpha4 remains
 // an immutable historical language baseline and is not shipped as an active Example.
 // Remove all previously staged active/legacy sample directories before copying the
