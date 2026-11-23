@@ -104,11 +104,13 @@ function auditLocalSchema(path,file,diagnostics,ids){
     try{JSON.parse(file.text);}
     catch(error){
       const message=String(error?.message??error);
-      const position=Number(/position\s+(\d+)/i.exec(message)?.[1]??0);
+      const positionMatch=/position\s+(\d+)/i.exec(message);
       const counter=new LineCounter();
       const parsed={counter,text:file.text};
-      add(diagnostics,path,parsed,
-        {range:[position,Math.min(file.text.length,position+1)]},
+      const node=positionMatch
+        ?{range:[Number(positionMatch[1]),Math.min(file.text.length,Number(positionMatch[1])+1)]}
+        :null;
+      add(diagnostics,path,parsed,node,
         "SCHEMA_DOCUMENT_PARSE_ERROR",
         "Cannot parse local JSON Schema "+path+": "+message,
         {domain:"schemas",category:"syntax"});
