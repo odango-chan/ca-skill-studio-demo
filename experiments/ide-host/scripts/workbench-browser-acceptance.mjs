@@ -249,7 +249,7 @@ export async function runPackageOverviewAcceptance({command,evalJS,sleep,require
   let rows=[];
   for(let attempt=0;attempt<100;attempt++){
     rows=await readTreeRows();
-    if(rows.some(x=>x.visible&&x.text.includes('2 SKILL Packages'))&&
+    if(rows.some(x=>x.visible&&x.text.includes('4 SKILL Packages'))&&
        rows.some(x=>x.visible&&x.text.includes('establish-pdu-session · 3/3 core ·')))break;
     await sleep(100);
   }
@@ -273,16 +273,20 @@ export async function runPackageOverviewAcceptance({command,evalJS,sleep,require
     },true);
     return true;
   })()`);
-  const expectedNames=['establish-pdu-session','establish-pdu-session-mas'];
+  const expectedNames=['establish-pdu-session','establish-pdu-session-mas','modify-pdu-session-mas','release-pdu-session-mas'];
   const discovered=(scan?.packages??[]).map(x=>x.name).sort();
   if(scan?.state!=='ready'||JSON.stringify(discovered)!==JSON.stringify(expectedNames.slice().sort()))
-    throw Error('Package Overview must discover both sample Skills in one Workspace: '+
+    throw Error('Package Overview must discover all four current sample Skills in one Workspace: '+
       JSON.stringify({scan,expectedNames}));
   const classic=scan.packages.find(x=>x.name==='establish-pdu-session');
   const mas=scan.packages.find(x=>x.name==='establish-pdu-session-mas');
+  const modify=scan.packages.find(x=>x.name==='modify-pdu-session-mas');
+  const release=scan.packages.find(x=>x.name==='release-pdu-session-mas');
   if(classic?.fileCount!==8||classic?.corePresent!==3||
-     mas?.fileCount!==6||mas?.corePresent!==3)
-    throw Error('Two-SKILL v1alpha5 inventory does not match the pinned sample manifest: '+
+     mas?.fileCount!==6||mas?.corePresent!==3||
+     modify?.fileCount!==6||modify?.corePresent!==3||
+     release?.fileCount!==6||release?.corePresent!==3)
+    throw Error('Four-SKILL v1alpha5 inventory does not match the pinned sample manifest: '+
       JSON.stringify({classic,mas}));
   function assertGroupInventory(result,packageName,expected){
     const pkg=result?.packages?.find(item=>item.name===packageName);
@@ -298,6 +302,12 @@ export async function runPackageOverviewAcceptance({command,evalJS,sleep,require
     definition:1,assurance:3,schemas:1,scripts:3
   });
   assertGroupInventory(scan,'establish-pdu-session-mas',{
+    definition:1,assurance:3,schemas:1,references:1
+  });
+  assertGroupInventory(scan,'modify-pdu-session-mas',{
+    definition:1,assurance:3,schemas:1,references:1
+  });
+  assertGroupInventory(scan,'release-pdu-session-mas',{
     definition:1,assurance:3,schemas:1,references:1
   });
 
@@ -373,12 +383,14 @@ export async function runPackageOverviewAcceptance({command,evalJS,sleep,require
     const evidence={
       skills:[
         {name:'establish-pdu-session',files:classic.fileCount,core:'3/3'},
-        {name:'establish-pdu-session-mas',files:mas.fileCount,core:'3/3'}
+        {name:'establish-pdu-session-mas',files:mas.fileCount,core:'3/3'},
+        {name:'modify-pdu-session-mas',files:modify.fileCount,core:'3/3'},
+        {name:'release-pdu-session-mas',files:release.fileCount,core:'3/3'}
       ],
       treeVisible:true,scanState:scan.state,composite:compositeEvidence
     };
     console.log('STUDIO_PACKAGE_EXPLORER_BROWSER_ONLY_CHROMIUM',JSON.stringify(evidence));
-    return {required:true,twoSkills:true,browserOnlyInventory:true,evidence};
+    return {required:true,fourSkills:true,browserOnlyInventory:true,evidence};
   }
   const packageNames=expectedNames;
   const isPackageRow=row=>packageNames.some(name=>
@@ -1488,9 +1500,9 @@ export async function runWorkbenchAcceptance({
   const packageOverviewEvidence=await runPackageOverviewAcceptance({
     command,evalJS,sleep,requireEditor
   });
-  if(!packageOverviewEvidence?.twoSkills||
-     packageOverviewEvidence.evidence?.skills?.length!==2)
-    throw Error("Package Overview did not discover both v1alpha5 Skills: "+
+  if(!packageOverviewEvidence?.fourSkills||
+     packageOverviewEvidence.evidence?.skills?.length!==4)
+    throw Error("Package Overview did not discover all four v1alpha5 Skills: "+
       JSON.stringify(packageOverviewEvidence));
   // Keep unrelated editors open; closing every tab can block Theia's Webview command bridge.
   await nativeCommand("skillStudio.openProcedure",defaultProcedureUri);

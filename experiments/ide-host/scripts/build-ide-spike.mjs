@@ -131,7 +131,8 @@ for(const set of sampleSets){
      manifest.sourceStatus!==set.status||manifest.sourceRef!==set.ref||
      (set.version&&manifest.languageVersion!==set.version)||
      JSON.stringify([...manifest.skills].sort())!==
-       JSON.stringify(["establish-pdu-session","establish-pdu-session-mas"].sort())||
+       JSON.stringify(["establish-pdu-session","establish-pdu-session-mas",
+         "modify-pdu-session-mas","release-pdu-session-mas"].sort())||
      !manifest.blobs||!Array.isArray(manifest.files)||manifest.files.length<5||
      manifest.files.length>100||new Set(manifest.files).size!==manifest.files.length||
      !manifest.files.every(path=>

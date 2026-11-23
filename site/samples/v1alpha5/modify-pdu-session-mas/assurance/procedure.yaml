@@ -1,0 +1,148 @@
+# CA-SL v1alpha5. Operation nodes map only to declared OES steps.
+# The mas dependency and all new Owner exports remain unpublished candidates.
+start: validate-modify-request
+nodes:
+  validate-modify-request:
+    precondition:
+      predicates:
+        - predicate: modify.request.admitted
+          arguments:
+            - context.supi
+            - context.request.pduSessionId
+            - context.request.entryKind
+            - context.request.qosFlowsDelta.qfi
+      routes:
+        PASS: m0
+        FAIL: FAILED
+        UNKNOWN: UNRESOLVED
+
+  # OES m0: SC.UPDATE_SM_CONTEXT. ue_identity / psi are Owner scope bindings;
+  # the pinned OES step declares no operation inputs.
+  m0:
+    operation:
+      tool: mas::SC.UPDATE_SM_CONTEXT
+      arguments:
+        ue_identity: context.supi
+        psi: context.request.pduSessionId
+      routes:
+        FAILED: FAILED
+        DENIED: FAILED
+        OUTCOME_UNKNOWN: SAFE_STOPPED
+    postcondition:
+      predicates:
+        - predicate: modify.mas.sm_context_operational
+          arguments:
+            - m0.operation.output
+      routes:
+        PASS: m3
+        FAIL: SAFE_STOPPED
+        UNKNOWN: SAFE_STOPPED
+
+  # OES m3: UPN.MODIFY_UP_SESSION with up_intent=1 and no AN tunnel.
+  # This is a distinct typed callable profile from the existing s11 m5 export.
+  m3:
+    operation:
+      tool: mas::UPN.MODIFY_UP_SESSION_INTENT
+      arguments:
+        ue_identity: context.supi
+        psi: context.request.pduSessionId
+        upIntent: "1"
+      routes:
+        FAILED: SAFE_STOPPED
+        DENIED: SAFE_STOPPED
+        OUTCOME_UNKNOWN: SAFE_STOPPED
+    postcondition:
+      predicates:
+        - predicate: modify.mas.upn_intent_applied
+          arguments:
+            - m3.operation.output
+      routes:
+        PASS: m4
+        FAIL: SAFE_STOPPED
+        UNKNOWN: SAFE_STOPPED
+
+  # OES m4: SSM.SIGNAL_UE_AN. It is a Modify occurrence, not Establishment s10.
+  # The Owner completes this Operation only after the matching AN result is known.
+  m4:
+    operation:
+      tool: mas::SSM.SIGNAL_UE_AN_MODIFY
+      arguments:
+        ue_identity: context.supi
+        psi: context.request.pduSessionId
+      routes:
+        FAILED: SAFE_STOPPED
+        DENIED: SAFE_STOPPED
+        OUTCOME_UNKNOWN: SAFE_STOPPED
+    postcondition:
+      predicates:
+        - predicate: modify.mas.an_tunnel_ready
+          arguments:
+            - m4.operation.output
+      routes:
+        PASS: m5
+        FAIL: SAFE_STOPPED
+        UNKNOWN: SAFE_STOPPED
+
+  # OES m5: UPN.MODIFY_QOS_FLOWS applies the exact typed GBR/MBR delta on the
+  # target QFI and completes only after the PFCP/N1/N2 Owner transaction.
+  m5:
+    operation:
+      tool: mas::UPN.MODIFY_QOS_FLOWS
+      arguments:
+        ue_identity: context.supi
+        psi: context.request.pduSessionId
+        anTunnelTeid: m4.operation.output.an_tunnel_teid
+        anTunnelIp: m4.operation.output.an_tunnel_ip
+        n4Seid: m3.operation.output.n4_seid
+        qosFlowsDelta: "1"
+        qfi: context.request.qosFlowsDelta.qfi
+        fiveQi: context.request.qosFlowsDelta.fiveQi
+        gfbrUl: context.request.qosFlowsDelta.gfbrUl
+        gfbrDl: context.request.qosFlowsDelta.gfbrDl
+        mfbrUl: context.request.qosFlowsDelta.mfbrUl
+        mfbrDl: context.request.qosFlowsDelta.mfbrDl
+      routes:
+        FAILED: SAFE_STOPPED
+        DENIED: SAFE_STOPPED
+        OUTCOME_UNKNOWN: SAFE_STOPPED
+    postcondition:
+      predicates:
+        - predicate: modify.mas.qos_delta_applied
+          arguments:
+            - m5.operation.output
+            - context.request.qosFlowsDelta.qfi
+            - context.request.qosFlowsDelta.fiveQi
+            - context.request.qosFlowsDelta.gfbrUl
+            - context.request.qosFlowsDelta.gfbrDl
+            - context.request.qosFlowsDelta.mfbrUl
+            - context.request.qosFlowsDelta.mfbrDl
+      routes:
+        PASS: verify-modify-completion
+        FAIL: SAFE_STOPPED
+        UNKNOWN: SAFE_STOPPED
+
+  verify-modify-completion:
+    postcondition:
+      predicates:
+        - predicate: modify.mas.sm_context_operational
+          arguments:
+            - m0.operation.output
+        - predicate: modify.mas.upn_intent_applied
+          arguments:
+            - m3.operation.output
+        - predicate: modify.mas.an_tunnel_ready
+          arguments:
+            - m4.operation.output
+        - predicate: modify.mas.qos_delta_applied
+          arguments:
+            - m5.operation.output
+            - context.request.qosFlowsDelta.qfi
+            - context.request.qosFlowsDelta.fiveQi
+            - context.request.qosFlowsDelta.gfbrUl
+            - context.request.qosFlowsDelta.gfbrDl
+            - context.request.qosFlowsDelta.mfbrUl
+            - context.request.qosFlowsDelta.mfbrDl
+      routes:
+        PASS: SUCCEEDED
+        FAIL: SAFE_STOPPED
+        UNKNOWN: SAFE_STOPPED

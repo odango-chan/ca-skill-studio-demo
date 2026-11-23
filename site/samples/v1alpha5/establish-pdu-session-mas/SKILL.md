@@ -11,7 +11,7 @@ description: CA-SL v1alpha5 illustrative OpenAMSM MAS policy-first initial PDU S
 
 ## Scope
 
-One admitted, initial IPv4 / SSC1, local non-roaming PDU Session request with `allocator=LOCAL_POOL` and no secondary authentication. The first business Node performs the read-only subscription-validation Operation and then a supplementary exact UE/PSI SMF context Observation in the same Node. Only when the subscription is validated and the Observation proves `ABSENT` may the initial creation chain begin. `PRESENT` (including a projection with `UNAVAILABLE`) and `UNKNOWN` do not.
+One admitted initial IPv4 / SSC1, local non-roaming PDU Session request with `allocator=LOCAL_POOL` and no secondary authentication. This MAS Procedure **replaces the initial PDU Session establishment business flow**; it does not run after a separate successful Session creation. The Host authenticates and correlates the already-admitted initial `CreateSMContext` ingress, including duplicate suppression for its exact original invocation. AMF registration is an upstream ingress assumption, not a second network query authored by this Skill. No `cm_state=connected` gate is required. The first MAS Operation `SC.VALIDATE_SUBSCRIPTION` can cause the OpenAMSM `/invoke` resolver to materialize a session shell; neither that shell nor `sessionPresence=PRESENT` proves that establishment already succeeded. The Skill therefore does not use a separate SMF session-absence Observation as an admission predicate.
 
 The Skill is deliberately a policy-first MAS compatibility profile. It is not the conventional 3GPP-first `establish-pdu-session` Skill and does not change that Skill's terminology or business flow.
 
@@ -49,7 +49,7 @@ The full source-by-source mapping, exact outputs, candidate callable identities 
 
 ## Host and asynchronous boundary
 
-The incoming TS 23.502 V19.9.0 §4.3.2.2.1 step-3 CreateSMContext Request (Nsmf API: TS 29.502 V19.7.0 §5.2/§6.1, OpenAPI Annex A.2) supplies the 3GPP `supi` and `pduSessionId` used by the Skill. Host performs ingress admission, duplicate suppression and private lifecycle/Invocation correlation before this graph starts; it does not generate a UE identity alias.
+The incoming TS 23.502 V19.9.0 §4.3.2.2.1 step-3 CreateSMContext Request (Nsmf API: TS 29.502 V19.7.0 §5.2/§6.1, OpenAPI Annex A.2) supplies the 3GPP `supi` and `pduSessionId` used by the Skill. Host performs trusted ingress authentication, initial-request classification, duplicate suppression and private lifecycle/Invocation correlation before this graph starts; it does not generate a UE identity alias or call AMF again to decide this Skill's eligibility.
 
 The SSM `SIGNAL_UE_AN` Owner Operation sends the Step 11 `Namf_Communication_N1N2MessageTransfer` (TS 29.518 V19.8.0 §5.2, OpenAPI Annex A.2) and may remain pending until the later Step 15 `Nsmf_PDUSession_UpdateSMContext Request` (TS 29.502 V19.7.0 §5.2/§6.1, OpenAPI Annex A.2) supplies the access-network result/F-TEID. Host correlates that exact request to the pending Operation and Runtime resumes this same Invocation. It is not a new Skill invocation and does not require a Skill Wait/Await/Poll Node. The paired step-17 response remains a Host service-exit obligation after N4 Modification and the Procedure's terminal business outcome.
 
@@ -74,7 +74,7 @@ The MAS graph is a CA policy-first implementation profile, not a normative 3GPP 
 
 | Procedure Node | NW Agent / OES source | 3GPP interaction and classification |
 |---|---|---|
-| `validate-sm-subscription` | TS 23.502 V19.9.0 §4.3.2.2.1 step 4; UDM API TS 29.503 V19.7.0 §6.1 / OpenAPI Annex A.2 — s1 `SC.VALIDATE_SUBSCRIPTION`, then exact UE/PSI SMF context Observation | `CA_ADAPTER` — wraps the UDM `Nudm_SDM_Get` path; the supplementary `CA_EXTENSION` Observation is co-located before Postcondition and before any mutation. |
+| `validate-sm-subscription` | TS 23.502 V19.9.0 §4.3.2.2.1 step 4; UDM API TS 29.503 V19.7.0 §6.1 / OpenAPI Annex A.2 — s1 `SC.VALIDATE_SUBSCRIPTION` | `CA_ADAPTER` — wraps UDM `Nudm_SDM_Get`; its MAS `/invoke` resolver may materialize an SMF Session shell. Treat the candidate as potentially mutating until Owner proves its Effect and publishes trusted evidence. No standalone Session ABSENT gate. |
 | `skip-secondary-authentication` | TS 23.502 V19.9.0 §4.3.2.2.1 step 6 (optional); s2 — `SAA.SECONDARY_AUTH`, fixed `required=0` | `CA_ADAPTER` — source-plan skip only; no secondary-authentication exchange is executed. |
 | `create-sm-context` | TS 23.502 V19.9.0 §4.3.2.2.1 steps 3/5; Nsmf API TS 29.502 V19.7.0 §5.2/§6.1/§6.1.2.4 / OpenAPI Annex A.2; TS 29.571 V19.7.0 §5.4.4.14 — s3 `SC.CREATE_SM_CONTEXT` | `CA_ADAPTER` — SM Context creation at the Step 3/5 service boundary; the early Step 5 response is not final Goal proof. |
 | `register-uecm` | TS 23.502 V19.9.0 §4.3.2.2.1 step 16c; UDM API TS 29.503 V19.7.0 §6.2 / OpenAPI Annex A.3 — s3r `SC.REGISTER_UECM` | `3GPP_NATIVE` — UDM `Nudm_UECM_Registration`; MAS ordering is earlier than conventional Step 16c. |
@@ -100,7 +100,7 @@ The MAS adapter boundary uses the same Release 19 SBI payload contract as the co
 3. MAS Operation Evidence Guarantees and source-to-Host Scope/Correlation contracts are unpublished.
 4. Charging is a source-confirmed stub. The `"1"` marker and the corresponding skip Evidence attest only to completion of the skipped plan step.
 5. The SAA path is hard-coded to skip; auth-required legacy case 06 is unsupported.
-6. The generic SMF session-context Observation package and its temporal Evidence guarantee are not published.
+6. Host/Integration must demonstrate authenticated initial `CreateSMContext` admission and exact original-invocation deduplication; no duplicate AMF registration or CM-connected lookup is part of this Skill.
 7. Host/Owner pending SSM continuation, duplicate/late result, Deadline and paired step-17 response contracts are not qualified.
 8. Host-owned exact-original reconciliation for `SC.COMPENSATE_RELEASE` is not published.
 

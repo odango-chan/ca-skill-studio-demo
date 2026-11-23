@@ -10,7 +10,11 @@ nodes:
   # The Operation receives the source OES identity fields directly: `ue_identity` from 3GPP `supi` and `psi` from `pduSessionId`.
   # The source output exposed by the plan is sub_summary ("ok" on validation).
   # This is a CA adapter around the SMF's UDM SDM Get path, not a new 3GPP API.
-  # The exact UE/PSI context Observation follows this read-only Operation in the same Node, before any mutation.
+  # The OpenAMSM /invoke resolver can materialize an SMF session shell even for s1.
+  # Therefore s1 is not presumed READ; a generic SMF Session ABSENT gate is not
+  # valid for this MAS-owned initial establishment flow. Host owns authenticated
+  # ingress, duplicate suppression, and exact SUPI/PSI/lifecycle correlation.
+  # This Skill does not re-query AMF registration or require CM CONNECTED.
   # 3GPP: CA_ADAPTER — TS 23.502 V19.9.0 §4.3.2.2.1 step 4; NW Agent s1 SC.VALIDATE_SUBSCRIPTION wraps UDM Nudm_SDM_Get. UDM API: TS 29.503 V19.7.0 §6.1 / OpenAPI Annex A.2; callable publication is pending.
   validate-sm-subscription:
     precondition:
@@ -31,28 +35,17 @@ nodes:
         dnn: context.request.dnn
         sNssai: context.request.sNssai
       routes:
-        FAILED: FAILED
-        UNKNOWN: UNRESOLVED
+        FAILED: SAFE_STOPPED
+        OUTCOME_UNKNOWN: UNRESOLVED
         DENIED: FAILED
-    observation:
-      tool: ca-session-context::context.smf.session.read
-      arguments:
-        supi: context.supi
-        pduSessionId: context.request.pduSessionId
-      routes:
-        FAILED: UNRESOLVED
-        UNKNOWN: UNRESOLVED
     postcondition:
       predicates:
         - predicate: establishment.mas.subscription_validated
           arguments:
             - validate-sm-subscription.operation.output
-        - predicate: establishment.smf.session_context_absent
-          arguments:
-            - validate-sm-subscription.observation.output
       routes:
         PASS: skip-secondary-authentication
-        FAIL: FAILED
+        FAIL: SAFE_STOPPED
         UNKNOWN: UNRESOLVED
   # OpenAMSM OES: SAA.SECONDARY_AUTH (s2, optional). The current plan hard-codes
   # required="0"; this operation therefore returns phase=SKIPPED. It is not a

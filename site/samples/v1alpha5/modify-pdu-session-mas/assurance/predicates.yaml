@@ -1,0 +1,96 @@
+# CA-SL v1alpha5 PredicateSet.
+# Every MAS Schema and Evidence Guarantee below is an unpublished Owner candidate.
+predicates:
+  modify.request.admitted:
+    parameters:
+      - supi: string
+      - pduSessionId: integer
+      - entryKind: string
+      - qfi: string
+    evaluator:
+      type: cel
+      expression: >-
+        supi != "" &&
+        pduSessionId >= 1 &&
+        pduSessionId <= 15 &&
+        (entryKind == "UE_INITIATED" ||
+         entryKind == "AMF_INITIATED" ||
+         entryKind == "NETWORK_TRIGGERED") &&
+        qfi != ""
+
+  modify.mas.sm_context_operational:
+    parameters:
+      - result: mas::wtlab:openamsm:mas:v0.3.0:sc-update-sm-context-result
+    evidence:
+      requires:
+        result: [mas::sc.context-updated]
+    evaluator:
+      type: cel
+      expression: result.lifecycle == "OPERATIONAL"
+
+  modify.mas.upn_intent_applied:
+    parameters:
+      - result: mas::wtlab:openamsm:mas:v0.3.0:upn-modify-intent-result
+    evidence:
+      requires:
+        result: [mas::upn.modify-intent-applied]
+    evaluator:
+      type: cel
+      expression: result.n4_seid != "" && result.n4_seid != "0"
+
+  modify.mas.an_tunnel_ready:
+    parameters:
+      - result: mas::wtlab:openamsm:mas:v0.2.0:ssm-signal-ue-an-result
+    evidence:
+      requires:
+        result: [mas::ssm.modify-an-tunnel-ready]
+    evaluator:
+      type: cel
+      expression: >-
+        result.an_tunnel == "1" &&
+        result.an_tunnel_teid != "" &&
+        result.an_tunnel_ip != ""
+
+  # The Postcondition compares every requested QoS target field, not only the
+  # Owner state string. The Owner contract constrains both the request values
+  # and the result values to canonical decimal strings (no sign, no leading
+  # zero), so CEL string equality is exact numeric equality. CA-SL CEL forbids
+  # implicit string/number conversion and ordering on strings, so no float or
+  # arbitrary-precision parsing is introduced here. The Skill request Schema
+  # does not redeclare `pattern` (unsupported by CA-SL v1alpha5): a
+  # non-canonical request can only fail closed, never create a false PASS.
+  #
+  # State semantics:
+  # - APPLIED: the PFCP Update QER was accepted AND the native N1/N2 Modify was
+  #   dispatched (n1n2_dispatched == "1").
+  # - ALREADY: the Owner's authoritative flow already equals the exact target;
+  #   no PFCP and no N1/N2 are dispatched (n1n2_dispatched absent).
+  # - PFCP_APPLIED_N1N2_FAILED: never satisfies this Goal.
+  # A missing target field, a mismatched target or an unknown state fails
+  # closed; the request parameters are Request/Host-exempt comparison inputs.
+  modify.mas.qos_delta_applied:
+    parameters:
+      - result: mas::wtlab:openamsm:mas:v0.3.0:upn-modify-qos-flows-result
+      - expectedQfi: string
+      - expectedFiveQi: string
+      - expectedGfbrUl: string
+      - expectedGfbrDl: string
+      - expectedMfbrUl: string
+      - expectedMfbrDl: string
+    evidence:
+      requires:
+        result: [mas::upn.qos-delta-applied]
+    evaluator:
+      type: cel
+      expression: >-
+        ((result.qos_delta_state == "APPLIED" &&
+          has(result.n1n2_dispatched) &&
+          result.n1n2_dispatched == "1") ||
+         (result.qos_delta_state == "ALREADY" &&
+          !has(result.n1n2_dispatched))) &&
+        result.qfi == expectedQfi &&
+        has(result.five_qi) && result.five_qi == expectedFiveQi &&
+        result.gfbr_ul == expectedGfbrUl &&
+        result.gfbr_dl == expectedGfbrDl &&
+        result.mfbr_ul == expectedMfbrUl &&
+        result.mfbr_dl == expectedMfbrDl

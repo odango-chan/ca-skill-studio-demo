@@ -1,0 +1,75 @@
+# CA-SL v1alpha5 PredicateSet.
+# Every MAS Schema and Evidence Guarantee below is an unpublished Owner candidate.
+predicates:
+  release.request.admitted:
+    parameters:
+      - supi: string
+      - pduSessionId: integer
+      - entryKind: string
+      - trigger: integer
+    evaluator:
+      type: cel
+      expression: >-
+        supi != "" &&
+        pduSessionId >= 1 &&
+        pduSessionId <= 15 &&
+        ((entryKind == "UE_INITIATED" && trigger == 2) ||
+         (entryKind == "AMF_INITIATED" && (trigger == 6 || trigger == 7)) ||
+         (entryKind == "NETWORK_TRIGGERED" &&
+          (trigger == 1 || trigger == 3 || trigger == 4 || trigger == 5)))
+
+  release.mas.up_session_deleted:
+    parameters:
+      - result: mas::wtlab:openamsm:mas:v0.3.0:upn-delete-up-session-result
+    evidence:
+      requires:
+        result: [mas::upn.up-session-released]
+    evaluator:
+      type: cel
+      expression: result.released == "1"
+
+  # The OES plan declares no output fields. The empty object is the typed result;
+  # the Owner Evidence Guarantee proves no-signal-required or AMF confirmation.
+  release.mas.signal_settled:
+    parameters:
+      - result: mas::wtlab:openamsm:mas:v0.3.0:ssm-signal-ue-an-release-result
+    evidence:
+      requires:
+        result: [mas::ssm.release-signal-settled]
+    evaluator:
+      type: cel
+      expression: result != null
+
+  # The OES plan declares no output fields. Evidence distinguishes DELETED from
+  # a verified NOT_PRESENT association for this exact SUPI / PSI / generation.
+  release.mas.policy_association_released:
+    parameters:
+      - result: mas::wtlab:openamsm:mas:v0.3.0:pa-delete-sm-policy-result
+    evidence:
+      requires:
+        result: [mas::pa.policy-association-released]
+    evaluator:
+      type: cel
+      expression: result != null
+
+  release.mas.sm_context_release_progressed:
+    parameters:
+      - result: mas::wtlab:openamsm:mas:v0.3.0:sc-release-sm-context-result
+    evidence:
+      requires:
+        result: [mas::sc.context-release-committed]
+    evaluator:
+      type: cel
+      expression: result.lifecycle == "RELEASING"
+
+  # The OES plan declares no output fields. Source C updates an in-memory marker;
+  # Evidence must not imply durable persistence or external event delivery.
+  release.mas.release_event_marker_written:
+    parameters:
+      - result: mas::wtlab:openamsm:mas:v0.3.0:se-emit-release-event-result
+    evidence:
+      requires:
+        result: [mas::se.release-event-marker-written]
+    evaluator:
+      type: cel
+      expression: result != null

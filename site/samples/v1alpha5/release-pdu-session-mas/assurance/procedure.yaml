@@ -1,0 +1,154 @@
+# CA-SL v1alpha5. Operation nodes map only to declared OES steps.
+# The mas dependency and all new Owner exports remain unpublished candidates.
+start: validate-release-request
+nodes:
+  validate-release-request:
+    precondition:
+      predicates:
+        - predicate: release.request.admitted
+          arguments:
+            - context.supi
+            - context.request.pduSessionId
+            - context.request.entryKind
+            - context.request.trigger
+      routes:
+        PASS: r2
+        FAIL: FAILED
+        UNKNOWN: UNRESOLVED
+
+  # OES r2: UPN.DELETE_UP_SESSION. The numeric trigger is Host-derived.
+  r2:
+    operation:
+      tool: mas::UPN.DELETE_UP_SESSION
+      arguments:
+        ue_identity: context.supi
+        psi: context.request.pduSessionId
+        trigger: context.request.trigger
+      routes:
+        FAILED: FAILED
+        DENIED: FAILED
+        OUTCOME_UNKNOWN: SAFE_STOPPED
+    postcondition:
+      predicates:
+        - predicate: release.mas.up_session_deleted
+          arguments:
+            - r2.operation.output
+      routes:
+        PASS: r3
+        FAIL: SAFE_STOPPED
+        UNKNOWN: SAFE_STOPPED
+
+  # OES r3: SSM.SIGNAL_UE_AN release profile. Some triggers require no N1/N2;
+  # other triggers remain pending until the matching AMF release result arrives.
+  r3:
+    operation:
+      tool: mas::SSM.SIGNAL_UE_AN_RELEASE
+      arguments:
+        ue_identity: context.supi
+        psi: context.request.pduSessionId
+        release: "1"
+        trigger: context.request.trigger
+      routes:
+        FAILED: SAFE_STOPPED
+        DENIED: SAFE_STOPPED
+        OUTCOME_UNKNOWN: SAFE_STOPPED
+    postcondition:
+      predicates:
+        - predicate: release.mas.signal_settled
+          arguments:
+            - r3.operation.output
+      routes:
+        PASS: r4
+        FAIL: SAFE_STOPPED
+        UNKNOWN: SAFE_STOPPED
+
+  # OES r4: PA.DELETE_SM_POLICY. The plan declares no public output.
+  r4:
+    operation:
+      tool: mas::PA.DELETE_SM_POLICY
+      arguments:
+        ue_identity: context.supi
+        psi: context.request.pduSessionId
+        release: "1"
+      routes:
+        FAILED: SAFE_STOPPED
+        DENIED: SAFE_STOPPED
+        OUTCOME_UNKNOWN: SAFE_STOPPED
+    postcondition:
+      predicates:
+        - predicate: release.mas.policy_association_released
+          arguments:
+            - r4.operation.output
+      routes:
+        PASS: r5
+        FAIL: SAFE_STOPPED
+        UNKNOWN: SAFE_STOPPED
+
+  # OES r5: SC.RELEASE_SM_CONTEXT. The declared lifecycle output is RELEASING,
+  # not a Host ResourceMap tombstone or a claim of RELEASED.
+  r5:
+    operation:
+      tool: mas::SC.RELEASE_SM_CONTEXT
+      arguments:
+        ue_identity: context.supi
+        psi: context.request.pduSessionId
+        release: "1"
+      routes:
+        FAILED: SAFE_STOPPED
+        DENIED: SAFE_STOPPED
+        OUTCOME_UNKNOWN: SAFE_STOPPED
+    postcondition:
+      predicates:
+        - predicate: release.mas.sm_context_release_progressed
+          arguments:
+            - r5.operation.output
+      routes:
+        PASS: r6
+        FAIL: SAFE_STOPPED
+        UNKNOWN: SAFE_STOPPED
+
+  # OES r6: SE.EMIT_EVENTS(ev=RELEASED). The source writes only a local,
+  # in-memory MAS marker; it declares no public output.
+  r6:
+    operation:
+      tool: mas::SE.EMIT_RELEASE_EVENT
+      arguments:
+        ue_identity: context.supi
+        psi: context.request.pduSessionId
+        ev: "RELEASED"
+      routes:
+        FAILED: SAFE_STOPPED
+        DENIED: SAFE_STOPPED
+        OUTCOME_UNKNOWN: SAFE_STOPPED
+    postcondition:
+      predicates:
+        - predicate: release.mas.release_event_marker_written
+          arguments:
+            - r6.operation.output
+      routes:
+        PASS: verify-release-completion
+        FAIL: SAFE_STOPPED
+        UNKNOWN: SAFE_STOPPED
+
+  verify-release-completion:
+    postcondition:
+      predicates:
+        - predicate: release.mas.up_session_deleted
+          arguments:
+            - r2.operation.output
+        - predicate: release.mas.signal_settled
+          arguments:
+            - r3.operation.output
+        - predicate: release.mas.policy_association_released
+          arguments:
+            - r4.operation.output
+        - predicate: release.mas.sm_context_release_progressed
+          arguments:
+            - r5.operation.output
+        - predicate: release.mas.release_event_marker_written
+          arguments:
+            - r6.operation.output
+      routes:
+        PASS: SUCCEEDED
+        FAIL: SAFE_STOPPED
+        UNKNOWN: SAFE_STOPPED

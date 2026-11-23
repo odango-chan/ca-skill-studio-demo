@@ -6,22 +6,20 @@ requestSchema: schemas/establishment-request.schema.yaml
 contextSchema: ca-context::urn:connectionagent:ca:context:subject:v1
 dependencies:
   ca-context: urn:connectionagent:ca:host-context
-  ca-session-context: urn:connectionagent:ca:host:smf-session-context
-  mas: urn:example:connectionagent:openamsm-mas-tool-contracts
+  mas: wtlab:packages:openamsm:mas-compiler-contract
 capabilities:
-  - urn:example:connectionagent:capability:ca:smf-session-context-read:v1
-  - urn:example:connectionagent:capability:mas:sc-validate-subscription:v1
-  - urn:example:connectionagent:capability:mas:saa-secondary-auth:v1
-  - urn:example:connectionagent:capability:mas:sc-create-sm-context:v1
-  - urn:example:connectionagent:capability:mas:sc-register-uecm:v1
-  - urn:example:connectionagent:capability:mas:pa-create-sm-policy:v1
-  - urn:example:connectionagent:capability:mas:ups-decide-anchor:v1
-  - urn:example:connectionagent:capability:mas:iam-allocate-address:v1
-  - urn:example:connectionagent:capability:mas:pa-update-sm-policy:v1
-  - urn:example:connectionagent:capability:mas:ca-create-charging:v1
-  - urn:example:connectionagent:capability:mas:upn-create-up-session:v1
-  - urn:example:connectionagent:capability:mas:ssm-signal-ue-an:v1
-  - urn:example:connectionagent:capability:mas:upn-modify-up-session:v1
-  - urn:example:connectionagent:capability:mas:se-emit-events:v1
+  - mas.sc.subscription.validate
+  - mas.saa.secondary.auth
+  - mas.sc.context.create
+  - mas.sc.uecm.register
+  - mas.pa.sm.policy.create
+  - mas.ups.anchor.decide
+  - mas.iam.address.allocate
+  - mas.pa.sm.policy.update
+  - mas.ca.charging.create
+  - mas.upn.up.session.create
+  - mas.ssm.ue.an.signal
+  - mas.upn.up.session.modify
+  - mas.se.events.emit
 limits:
   maxActions: 32

@@ -55,7 +55,7 @@ The NW Agent plan starts with:
 
 Both Skill request Schemas represent `sNssai.sd` as the 3GPP six-hex-digit hexadecimal string, matching the OpenAMSM plan's string input. The OES plan defaults an absent SD to the empty string; the Owner adapter must apply that exact default rather than stringify a number or invent a value.
 
-The Owner binds every Operation to the exact Host-admitted UE/PSI business instance. The admitted 3GPP `supi` remains the UE identity; no intermediate identity alias is created or resolved. The MAS operations run against the same SMF session; the Skill passes declared business inputs (including 3GPP SUPI and PSI) and typed Operation results, not `stateRef`, Host lifecycle IDs or transport references.
+The Owner binds every Operation to the exact Host-admitted UE/PSI business instance. The admitted 3GPP `supi` remains the UE identity; no intermediate identity alias is created or resolved. The MAS operations run against the same SMF session; the Skill passes declared business inputs (including 3GPP SUPI and PSI) and typed Operation results, not `stateRef`, Host lifecycle IDs or transport references. The fact that the request reached this authenticated initial `CreateSMContext` entry point is the integration-side admission assumption; registration and CM status are not re-queried inside the Skill. Duplicate/replayed request handling is per original Host admission identity, not a blanket `sessionPresence == ABSENT` requirement.
 
 ## Operation input boundary
 
@@ -69,7 +69,7 @@ Therefore, the Skill's `ue_identity` is source-aligned with the plan's `ue_ident
 
 | NW Agent step | MAS / OES operation | Plan outputs | Source-grounded meaning and Skill treatment |
 |---|---|---|---|
-| s1 | SC / `VALIDATE_SUBSCRIPTION` | `sub_summary` | Calls the SMF UDM SDM Get path and marks the SC subscription state validated. The current source writes summary `"ok"`; this is a CA adapter around UDM, not a separately published 3GPP callable. |
+| s1 | SC / `VALIDATE_SUBSCRIPTION` | `sub_summary` | Calls the SMF UDM SDM Get path and marks subscription validated. OpenAMSM `/invoke` can materialize an SMF session shell before dispatch, so `READ` is not a proven callable Effect. Until Owner verification, treat as mutation-capable with an `OUTCOME_UNKNOWN` safety route; `"ok"` is a source marker, not an Owner commit proof. |
 | s2 | SAA / `SECONDARY_AUTH` (optional) | `phase` | Plan hard-codes `required='0'`; source returns `SKIPPED`. This does not perform or dynamically decide secondary authentication. Auth-required profiles are out of scope and the legacy case 06 is not covered by this plan. |
 | s3 | SC / `CREATE_SM_CONTEXT` | `session_keys`, `lifecycle`, `sm_context_ref` | Creates/binds the SMF context and sends the early CreateSMContext response when a stream is supplied. `lifecycle` becomes `OPERATIONAL`. The step-5 response is early, not final session success. `sm_context_ref` is an internal source reference and must not be exposed as a 3GPP Location or Host correlation ID. |
 | s3r | SC / `REGISTER_UECM` | `uecm_registered` | Performs UDM UECM registration. The MAS plan places it before PCF/N4, earlier than the conventional TS 23.502 V19.9.0 §4.3.2.2.1 step 16c position; this is an explicit MAS ordering deviation. |
@@ -89,7 +89,7 @@ Therefore, the Skill's `ue_identity` is source-aligned with the plan's `ue_ident
 
 1. Removed every invented `stateRef` field. The OpenAMSM plan and the mapped outputs do not define `stateRef`.
 2. Replaced the invented `mas::ca.pdu_session.*` callable names with source-derived MAS/OES operation identities. They remain placeholders until the Owner publishes them.
-3. Added the exact UE/PSI entry Observation after the read-only s1 subscription-validation Operation in the same first business Node. Only `ABSENT` may select initial creation; `PRESENT` (including SC `UNAVAILABLE`) stops safely; query errors are `UNKNOWN`.
+3. The MAS Skill owns initial establishment. Removed the redundant SMF Session ABSENT Observation and its Predicate/Capability because `/invoke` may create an uninitialized Session shell before a nominally read-only s1 Operation. Host authenticates and deduplicates the original initial `CreateSMContext` ingress; no extra AMF registration or CM-CONNECTED lookup is authored. s1 is treated as mutation-capable until Owner establishes a trustworthy Effect and proof path.
 4. Renamed the SAA stage to `skip-secondary-authentication` and fixed `required="0"` to match the plan. It is not described as an auth decision.
 5. Removed the mandatory address-confirm stage for this fixed `LOCAL_POOL` profile.
 6. Renamed the SSM stage to `signal-ue-and-access-network`; it owns the pending N1/N2-to-step-15 completion boundary. There is no extra callback or Wait Node.
@@ -113,7 +113,7 @@ Therefore, the Skill's `ue_identity` is source-aligned with the plan's `ue_ident
 - Publish typed Owner output Schemas for the exact fields in the table; do not copy Owner schemas into Skill-owned files.
 - Publish and test the Owner's exact mapping from the six-hex-digit `sNssai.sd` string to OES `s_nssai_sd`, including the plan's empty-string default when SD is absent.
 - Replace every `urn:example:` Schema, ToolCatalog and Capability placeholder with trusted Owner exports.
-- Close the generic SMF context Observation's source-authority and temporal/freshness contract. v0.10 does not supply source timestamps; source inspection alone is not Owner publication.
+- Verify Host initial `CreateSMContext` ingress authenticity, exact SUPI/PSI/lifecycle deduplication, and refusal to create a second independent invocation for a replayed original request. A Session shell does not establish business success; no generic SMF Session-absence Observation is required by this MAS Skill.
 - Preserve the pinned s7 behavior: accept `charging_ref="1"` only as the source-defined successful skip marker, never as a real charging resource identity. A future charging implementation requires a new source/profile revision and new Owner contract.
 - Publish Host/Owner correlation, Deadline, duplicate/late-result and paired step-17 response contracts for the pending SSM operation.
 - Define Host-owned exact-original Reconcile semantics for `SC.COMPENSATE_RELEASE`; do not inherit `compensate_then_replan_once`.

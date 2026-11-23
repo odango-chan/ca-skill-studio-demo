@@ -1,0 +1,22 @@
+# CA-SL v1alpha5. MAS exports and Evidence Guarantees are unpublished candidates.
+#
+# Goal scope: pdu_session.qos_delta_applied means the Owner accepted the PFCP
+# Update QER for the exact requested QFI/5QI/GBR/MBR target and dispatched the
+# native N1/N2 Modify (APPLIED), or authoritatively proved the exact target was
+# already in force (ALREADY). It does NOT prove RAN/UE acceptance and does NOT
+# prove an independent post-modification target read; those are separate
+# observations (RAN_MODIFICATION_CONFIRMED / TARGET_STATE_VERIFIED).
+goal: pdu_session.qos_delta_applied
+precondition: validate-modify-request.precondition
+requestSchema: schemas/modify-request.schema.yaml
+contextSchema: ca-context::urn:connectionagent:ca:context:subject:v1
+dependencies:
+  ca-context: urn:connectionagent:ca:host-context
+  mas: wtlab:packages:openamsm:mas-compiler-contract
+capabilities:
+  - mas.sc.context.update
+  - mas.upn.up.session.modify
+  - mas.upn.up.qos.modify
+  - mas.ssm.ue.an.signal
+limits:
+  maxActions: 16

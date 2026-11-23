@@ -1026,7 +1026,7 @@ try{
   if(requireEditor&&(!workbenchEvidence?.phaseEvidence?.visible||
       !workbenchEvidence.phaseEvidence.sourceOnly||
       !workbenchEvidence?.packageOverview?.skills||
-      workbenchEvidence.packageOverview.skills.length!==2))
+      workbenchEvidence.packageOverview.skills.length!==4))
     throw Error("v1alpha5 Inspector or Package Overview acceptance did not complete: "+
       JSON.stringify({phaseEvidence:workbenchEvidence?.phaseEvidence,
         packageOverview:workbenchEvidence?.packageOverview}).slice(0,3000));
@@ -1070,7 +1070,7 @@ try{
   if(!activationDiagnostics||activationDiagnostics.failures?.length||
      activationDiagnostics.components?.Workbench!=="READY"||
      activationDiagnostics.components?.["Package Explorer"]!=="READY"||
-     activationDiagnostics.packageInventory?.packageCount!==2||
+     activationDiagnostics.packageInventory?.packageCount!==4||
      activationDiagnostics.packageInventory?.state!=="ready"||
      !/^[0-9a-f]{40}$/.test(activationDiagnostics.buildId??"")||
      activationDiagnostics.welcomeCommandRegistered!==true||

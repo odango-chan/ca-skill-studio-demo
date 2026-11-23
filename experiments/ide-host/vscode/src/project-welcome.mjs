@@ -27,7 +27,7 @@ export function registerProjectWelcome(vscode,context){
     importing:"正在加载示例项目…",completed:"示例项目已打开",failed:"示例项目载入失败"
   }:{
     title:"Welcome to SKILL Studio",
-    description:"Create or open a Skill project. The Example contains current CA-SL 5GC/MAS reference Skills (DRAFT / NOT_QUALIFIED).",
+    description:"Create or open a Skill project. The Example contains current CA-SL 5GC Establish, MAS Establish / Modify / Release reference Skills (DRAFT / NOT_QUALIFIED).",
     newProject:"New Project",openProject:"Open Project",example:"Open Example Project",
     reference:"Documentation",spec:"Skill Language Specification",guide:"Authoring Guide",
     importing:"Loading example project…",completed:"Example project opened",failed:"Example project failed to load"
