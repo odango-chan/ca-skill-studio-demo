@@ -586,9 +586,15 @@ export async function runPackageOverviewAcceptance({command,evalJS,sleep,require
   const classicContract=await openPackageContract('establish-pdu-session');
   await ensurePackageExpanded('establish-pdu-session-mas');
   const masContract=await openPackageContract('establish-pdu-session-mas');
+  await ensurePackageExpanded('modify-pdu-session-mas');
+  const modifyContract=await openPackageContract('modify-pdu-session-mas');
+  await ensurePackageExpanded('release-pdu-session-mas');
+  const releaseContract=await openPackageContract('release-pdu-session-mas');
   if(classicContract.contractName!=='establish-pdu-session'||
      masContract.contractName!=='establish-pdu-session-mas'||
-     classicContract.contractName===masContract.contractName)
+     modifyContract.contractName!=='modify-pdu-session-mas'||
+     releaseContract.contractName!=='release-pdu-session-mas'||
+     new Set([classicContract,masContract,modifyContract,releaseContract].map(c=>c.contractName)).size!==4)
     throw Error('Package file navigation did not preserve each exact Contract URI: '+
       JSON.stringify({classicContract,masContract}));
   await invoke('skillStudio.refreshPackages');
@@ -641,13 +647,19 @@ export async function runPackageOverviewAcceptance({command,evalJS,sleep,require
     },{
       name:'establish-pdu-session-mas',files:mas.fileCount,core:'3/3',
       groups:mas.groups.map(group=>({key:group.key,count:group.count})),contract:masContract
+    },{
+      name:'modify-pdu-session-mas',files:modify.fileCount,core:'3/3',
+      groups:modify.groups.map(group=>({key:group.key,count:group.count})),contract:modifyContract
+    },{
+      name:'release-pdu-session-mas',files:release.fileCount,core:'3/3',
+      groups:release.groups.map(group=>({key:group.key,count:group.count})),contract:releaseContract
     }],
     treeVisible:true,scanState:scan.state,
     composite:compositeEvidence,
     treeReadsByKind:postExpansion.treeReadsByKind,
     exactPackageUris:true,restoredActivity:restored
   };
-  console.log('STUDIO_PACKAGE_OVERVIEW_TWO_SKILLS_CHROMIUM',JSON.stringify(evidence));
+  console.log('STUDIO_PACKAGE_OVERVIEW_FOUR_SKILLS_CHROMIUM',JSON.stringify(evidence));
   return {required:true,fourSkills:true,evidence};
 }
 
