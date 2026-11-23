@@ -83,6 +83,11 @@ export function createGatewayModelClient({
   if (typeof fetchImpl !== "function") throw new TypeError("A Fetch-compatible implementation is required.");
   const endpoint = gatewayEndpoint(gatewayBaseUrl);
   const selectedModelId = validateModelId(modelId);
+  // HTTPS Pages -> HTTP loopback needs Chromium Local Network Access consent.
+  // Explicitly classify the destination so the browser can request its narrowly
+  // scoped permission rather than leaving the request indefinitely pending.
+  // Non-loopback HTTPS gateways must never request this permission.
+  const loopbackAddressSpace = isLoopbackHostname(new URL(endpoint).hostname);
   const sharedGatewayToken = validateGatewayToken(gatewayToken);
   const stableSessionId = validateSessionId(sessionId);
   const outputTokenLimit = Number.isFinite(maxOutputTokens) ? Math.max(1, Math.min(Math.trunc(maxOutputTokens), 8192)) : 2048;
@@ -107,7 +112,10 @@ export function createGatewayModelClient({
 
       let response;
       try {
-        response = await fetchImpl(endpoint, { method: "POST", credentials: "omit", headers, body: serialized, signal });
+        response = await fetchImpl(endpoint, {
+          method: "POST", credentials: "omit", headers, body: serialized, signal,
+          ...(loopbackAddressSpace ? { targetAddressSpace: "loopback" } : {}),
+        });
       } catch {
         throw new GatewayRequestError("The AI Gateway request could not be completed.");
       }
