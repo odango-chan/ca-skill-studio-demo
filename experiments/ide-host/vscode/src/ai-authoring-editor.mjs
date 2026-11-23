@@ -5,6 +5,7 @@ import {
 import { createProcedureAgent } from "../../../../authoring/core/procedure-agent.mjs";
 import { createGatewayModelClient, listGatewayModels, validateModelId } from "../../../../authoring/core/gateway-client.mjs";
 import { createChangeSet } from "../../../../authoring/core/change-set.mjs";
+import { createSessionProposalHistory, buildRefinementTask } from "../../../../authoring/core/proposal-history.mjs";
 import { createAuthoringLineDiff, createAuthoringFlowChanges, createAuthoringValidationView } from "../../../../authoring/core/review-presentation.mjs";
 import { buildAiFlowGraphReview } from "./ai-flow-projection.mjs";
 import {
@@ -718,6 +719,9 @@ export function registerAiAuthoringEditor(vscode, context, { getActiveDocument, 
     const document = activeSession.document;
     const requestId = (activeSession.contextRequestId ?? 0) + 1;
     activeSession.contextRequestId = requestId;
+    activeSession.controller?.abort();
+    activeSession.controller = null;
+    activeSession.generating = false;
     activeSession.pending = null;
     post({ type: "status", message: "正在读取当前 Procedure、Package 文件和锁定依赖…", busy: true });
     try {
@@ -1179,6 +1183,26 @@ export function registerAiAuthoringEditor(vscode, context, { getActiveDocument, 
     }
   }
 
+  async function handleInspectHistory(message) {
+    const activeSession = session;
+    if (!isCurrentAuthoringSession(session, activeSession)) return;
+    if (activeSession.generating || activeSession.applying || activeSession.controller) {
+      post({ type:"error",message:"正在生成或应用提案，不能切换历史修订。" });
+      return;
+    }
+    if (typeof message.id !== "string") return;
+    const historical = activeSession.history.inspect(message.id);
+    if (!historical) {
+      post({ type:"error",message:"会话内不存在该历史修订。" });
+      return;
+    }
+    // Inspection revokes the active proposal capability even if the historical
+    // revision was once Compiler PASS. No reactivation without regeneration.
+    activeSession.pending = null;
+    activeSession.previewRequestId = (activeSession.previewRequestId ?? 0) + 1;
+    post(historical);
+  }
+
   async function handleApply(message) {
     const activeSession = session;
     const isCurrent = () => isCurrentAuthoringSession(session, activeSession);
@@ -1315,6 +1339,7 @@ export function registerAiAuthoringEditor(vscode, context, { getActiveDocument, 
             document,
             sessionId: globalThis.crypto.randomUUID(),
             context: null,
+            history: createSessionProposalHistory(),
             pending: null,
             controller: null,
             disposed: false,
@@ -1339,6 +1364,7 @@ export function registerAiAuthoringEditor(vscode, context, { getActiveDocument, 
         document,
         sessionId: globalThis.crypto.randomUUID(),
         context: null,
+        history: createSessionProposalHistory(),
         pending: null,
         controller: null,
         disposed: false,
@@ -1365,7 +1391,8 @@ export function registerAiAuthoringEditor(vscode, context, { getActiveDocument, 
       context.subscriptions.push(panel.webview.onDidReceiveMessage(async (message) => {
         if (!message || typeof message.type !== "string") return;
         if (message.type === "ready" || message.type === "refresh") await refreshContext();
-        else if (message.type === "generate") await handleGenerate(message);
+        else if (message.type === "generate" || message.type === "refine") await handleGenerate(message);
+        else if (message.type === "inspectHistory") await handleInspectHistory(message);
         else if (message.type === "chooseModel") await handleChooseModel();
         else if (message.type === "cancel") {
           session?.controller?.abort();
