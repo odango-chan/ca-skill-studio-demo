@@ -17,7 +17,7 @@ function failIfErrors(diagnostics,label){
   return {diagnostics:diagnostics.length,errors:0};
 }
 
-export function registerSyntheticAuthoringAcceptance(vscode,context,compilerIntegration){
+export function registerSyntheticAuthoringAcceptance(vscode,context,compilerIntegration,authoringEditor=null){
   // A source-level flag alone is insufficient: this requires an explicit
   // acceptance-enabled Node host and a separately staged immutable fixture.
   if(typeof process==="undefined"||!process.versions?.node)return null;
@@ -180,6 +180,111 @@ export function registerSyntheticAuthoringAcceptance(vscode,context,compilerInte
         }
       }
     });
-  context.subscriptions.push(command,verify);
+  // Separate from the earlier direct-native acceptance: this fixture drives
+  // the exact production AI Editor Tab Generate -> model-shaped Gateway reply
+  // -> Patch -> Compiler Check -> Apply button -> frontend Undo. It cannot run
+  // without the pinned fixture staged by the backend Chromium CI host.
+  let editorFixture=null;
+  const editorPrepare=vscode.commands.registerCommand(
+    "skillStudio.internal.prepareSyntheticEditorTabAcceptance",async()=>{
+      if(!authoringEditor?.installSyntheticFixture)
+        throw Error("Isolated Editor Tab synthetic fixture interface is unavailable");
+      if(editorFixture)throw Error("Another synthetic Editor Tab fixture is already prepared");
+      if(pendingUndo)throw Error("Previous native acceptance Undo must complete first");
+      const fixtureUri=vscode.Uri.joinPath(context.extensionUri,"dist",
+        "authoring-trusted-build-request.json");
+      const trusted=JSON.parse(new TextDecoder().decode(await vscode.workspace.fs.readFile(fixtureUri)));
+      if(trusted.apiVersion!=="connectionagent.io/compiler-build-request/v1alpha5"||
+         trusted.languageTarget!=="connectionagent.io/v1alpha5"||
+         !trusted.trustedBuildContext||!Array.isArray(trusted.files))
+        throw Error("Editor Tab acceptance requires the pinned v2.0.2 trusted fixture");
+      const file=trusted.files.find(item=>item.path===sourceRel);
+      if(!file||typeof file.bytes!=="string")throw Error("Trusted fixture Procedure is missing");
+      const original=Buffer.from(file.bytes,"base64").toString("utf8");
+      if(!original.includes("FAIL: SAFE_STOPPED"))
+        throw Error("Trusted synthetic baseline route was changed");
+      const roots=vscode.workspace.workspaceFolders??[];
+      if(roots.length!==1||roots[0].uri.scheme!=="file")
+        throw Error("Editor Tab acceptance requires one isolated local CI workspace");
+      const temporary=vscode.Uri.joinPath(roots[0].uri,".studio-ai-acceptance");
+      const assurance=vscode.Uri.joinPath(temporary,"skills","example","assurance");
+      const uri=vscode.Uri.joinPath(assurance,"procedure.yaml");
+      try{
+        await vscode.workspace.fs.stat(temporary);
+        throw Error("Synthetic acceptance directory already exists");
+      }catch(e){
+        if(!/not found|ENOENT|FileNotFound|EntryNotFound|nonexistent file/i.test(
+          String(e?.message??e)))throw e;
+      }
+      let created=false;
+      try{
+        await vscode.workspace.fs.createDirectory(assurance);
+        created=true;
+        await vscode.workspace.fs.writeFile(uri,new TextEncoder().encode(original));
+        const document=await vscode.workspace.openTextDocument(uri);
+        await vscode.window.showTextDocument(document,{
+          preview:false,preserveFocus:false,viewColumn:vscode.ViewColumn.One
+        });
+        authoringEditor.installSyntheticFixture({
+          documentUri:uri.toString(),original,trusted
+        });
+        editorFixture={document,original,uri,temporary};
+        created=false;
+        return {ready:true,syntheticOnly:true,documentUri:uri.toString()};
+      }finally{
+        if(created){
+          authoringEditor.clearSyntheticFixture?.();
+          await vscode.workspace.fs.delete(temporary,{recursive:true,useTrash:false});
+        }
+      }
+    });
+  const editorApplied=vscode.commands.registerCommand(
+    "skillStudio.internal.verifySyntheticEditorTabApplied",async()=>{
+      const state=editorFixture;
+      if(!state)throw Error("No Editor Tab acceptance fixture is pending");
+      for(let attempt=0;attempt<40&&
+          !state.document.getText().includes("FAIL: FAILED");attempt++){
+        await new Promise(resolve=>setTimeout(resolve,100));
+      }
+      if(!state.document.getText().includes("FAIL: FAILED"))
+        throw Error("The production Editor Tab Apply did not update the synthetic buffer");
+      const disk=new TextDecoder().decode(await vscode.workspace.fs.readFile(state.uri));
+      if(disk!==state.original)
+        throw Error("The production Editor Tab unexpectedly saved the synthetic source");
+      await vscode.window.showTextDocument(state.document,{
+        preview:false,preserveFocus:false,viewColumn:vscode.ViewColumn.One
+      });
+      return {nativeWorkspaceEdit:"PASS",unsavedDiskUnchanged:true,
+        autoSaved:false,pendingUndo:true};
+    });
+  const editorUndo=vscode.commands.registerCommand(
+    "skillStudio.internal.verifySyntheticEditorTabUndo",async()=>{
+      const state=editorFixture;
+      if(!state)throw Error("No synthetic Editor Tab Undo is pending");
+      try{
+        for(let attempt=0;attempt<40&&state.document.getText()!==state.original;attempt++){
+          await new Promise(resolve=>setTimeout(resolve,100));
+        }
+        if(state.document.getText()!==state.original)
+          throw Error("Theia Undo did not restore the Editor Tab synthetic source");
+        const disk=new TextDecoder().decode(await vscode.workspace.fs.readFile(state.uri));
+        if(disk!==state.original)throw Error("Editor Tab Undo changed the original disk bytes");
+        return {nativeUndo:"PASS",restoredOriginal:true,unsavedDiskUnchanged:true,autoSaved:false};
+      }finally{
+        editorFixture=null;
+        authoringEditor.clearSyntheticFixture?.();
+        try{
+          if(state.document.getText()===state.original){
+            await vscode.window.showTextDocument(state.document,{
+              preview:false,preserveFocus:false,viewColumn:vscode.ViewColumn.One
+            });
+            await vscode.commands.executeCommand("workbench.action.closeActiveEditor");
+          }
+        }finally{
+          await vscode.workspace.fs.delete(state.temporary,{recursive:true,useTrash:false});
+        }
+      }
+    });
+  context.subscriptions.push(command,verify,editorPrepare,editorApplied,editorUndo);
   return command;
 }
