@@ -613,7 +613,7 @@ test("F4 Workbench Refine + history is session-only, shows Context origin, and r
     assert.ok(html.includes('id="'+id+'"'),"missing F4 element "+id);
   }
   assert.match(html,/function renderHistory/);
-  assert.match(html,/renderHistory\\(message.history\\)/);
+  assert.ok(html.includes("renderHistory(message.history)"));
   assert.match(html,/message.readonly===true/);
   assert.match(html,/input.disabled=historical/);
   assert.match(html,/message.type==='historyInspect'/);
@@ -623,8 +623,8 @@ test("F4 Workbench Refine + history is session-only, shows Context origin, and r
   const source=readFileSync(new URL("../experiments/ide-host/vscode/src/ai-authoring-editor.mjs",import.meta.url),"utf8");
   assert.match(source,/createSessionProposalHistory/);
   assert.match(source,/buildRefinementTask/);
-  assert.match(source,/history\\.record\\(/);
-  assert.match(source,/history\\.inspect\\(/);
+  assert.ok(source.includes("history.record("));
+  assert.ok(source.includes("history.inspect("));
   assert.match(source,/activeSession\\.pending = null/);
   assert.match(source,/contextStamp/);
   assert.match(source,/isLiveDocumentRevision/);
