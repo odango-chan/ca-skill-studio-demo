@@ -625,6 +625,8 @@ test("F4 Workbench Refine + history is session-only, shows Context origin, and r
   assert.match(source,/buildRefinementTask/);
   assert.ok(source.includes("history.record("));
   assert.ok(source.includes("history.inspect("));
+  assert.ok(source.includes("compilerCheck.diagnostics?.[0]?.message"),"history must capture authoritative Compiler failure reason");
+  assert.ok(html.includes("提案版本 #"),"history should display session proposal number, not document version alone");
   assert.ok(source.includes("activeSession.pending = null"));
   assert.match(source,/contextStamp/);
   assert.match(source,/isLiveDocumentRevision/);
