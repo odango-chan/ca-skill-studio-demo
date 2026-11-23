@@ -190,11 +190,12 @@ export function activate(context){
       compilerProblemsProvider:compilerIntegration.problems
     }),unavailableWorkbench);
   workbenchReady=workbench!==unavailableWorkbench;
-  registerSafely("AI Authoring Editor",()=>registerAiAuthoringEditor(vscode,context,{
+  const authoringEditor=registerSafely("AI Authoring Editor",()=>registerAiAuthoringEditor(vscode,context,{
     getActiveDocument:()=>workbench?.getActiveDocument?.()??null,
     compilerIntegration
-  }));
-  registerSafely("Synthetic AI Authoring acceptance",()=>registerSyntheticAuthoringAcceptance(vscode,context,compilerIntegration));
+  }),null);
+  registerSafely("Synthetic AI Authoring acceptance",()=>registerSyntheticAuthoringAcceptance(
+    vscode,context,compilerIntegration,authoringEditor));
   registerSafely("Package diagnostic tests",()=>registerPackageDiagnosticTesting(vscode,context,{
     getActiveProcedure:()=>workbench?.getActiveDocument?.()??
       vscode.window.activeTextEditor?.document??null
