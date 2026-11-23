@@ -3,6 +3,10 @@ import assert from "node:assert/strict";
 import {readFileSync} from "node:fs";
 import {registerPackageDiagnosticTesting}
   from "../vscode/src/package-diagnostic-testing.mjs";
+import {DIAGNOSTIC_TEST_CASES}
+  from "../../../site/package-diagnostic-tests.mjs";
+
+const expectedTestCount=DIAGNOSTIC_TEST_CASES.length;
 
 const root=new URL("../../../site/samples/v1alpha5/",import.meta.url);
 const manifest=JSON.parse(readFileSync(new URL("files.json",root),"utf8"));
@@ -66,15 +70,15 @@ function host({native=true,activeProcedure=active,sourceSnapshot=snapshot}={}){
     get profile(){return profile;},get rootItem(){return rootItem;}};
 }
 
-test("native Test Explorer groups 11 diagnostic tests by domain",()=>{
+test("native Test Explorer groups every diagnostic regression by domain",()=>{
   const state=host();
   assert.equal(state.testing.hasNativeTestExplorer,true);
-  assert.equal(state.testing.testCount,11);
+  assert.equal(state.testing.testCount,expectedTestCount);
   assert.equal(state.rootItem.id,"skillStudio.diagnosticRegressions");
   const groups=state.rootItem.children.items;
   assert.ok(groups.some(item=>item.id==="domain:capabilities"));
   assert.ok(groups.some(item=>item.id==="domain:schemas"));
-  assert.equal(groups.reduce((sum,item)=>sum+item.children.items.length,0),11);
+  assert.equal(groups.reduce((sum,item)=>sum+item.children.items.length,0),expectedTestCount);
   assert.equal(state.profile.label,"Run offline diagnostics");
 });
 
@@ -82,7 +86,7 @@ test("native test run passes on synthetic Example defects without writing source
   const state=host();
   await state.profile.handler({}, {isCancellationRequested:false});
   const events=state.runs.at(-1);
-  assert.equal(events.filter(event=>event[0]==="passed").length,11);
+  assert.equal(events.filter(event=>event[0]==="passed").length,expectedTestCount);
   assert.ok(!events.some(event=>["failed","errored"].includes(event[0])));
   assert.equal(events.at(-1)[0],"end");
   assert.ok(state.lines.some(line=>line.includes("Skill qualification NOT_QUALIFIED")));
@@ -103,7 +107,7 @@ test("missing native Testing API still exposes a safe command-based results surf
   const state=host({native:false});
   assert.equal(state.testing.hasNativeTestExplorer,false);
   const result=await state.commands.get("skillStudio.runDiagnosticTests")();
-  assert.deepEqual(result.summary,{PASS:11,FAIL:0,NOT_RUN:0});
+  assert.deepEqual(result.summary,{PASS:expectedTestCount,FAIL:0,NOT_RUN:0});
   assert.ok(state.lines.some(line=>line.includes("Native Testing API unavailable")));
 });
 
@@ -113,7 +117,7 @@ test("missing or partial source produces NOT_RUN, never a qualified PASS",async(
     host({sourceSnapshot:{completeness:"partial",reason:"missing Schema",documents:[]}})
   ]){
     const result=await state.commands.get("skillStudio.runDiagnosticTests")();
-    assert.deepEqual(result.summary,{PASS:0,FAIL:0,NOT_RUN:11});
+    assert.deepEqual(result.summary,{PASS:0,FAIL:0,NOT_RUN:expectedTestCount});
     assert.equal(result.qualification,"NOT_QUALIFIED");
   }
 });

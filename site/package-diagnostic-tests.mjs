@@ -12,6 +12,8 @@ export const DIAGNOSTIC_TEST_CASES=Object.freeze([
     code:"REQUEST_SCHEMA_NOT_FOUND",status:"confirmed",severity:"error"},
   {id:"partial-inventory",domain:"package",label:"Partial inventory does not invent missing Schema",
     code:"REQUEST_SCHEMA_NOT_CHECKED",status:"not_checked",severity:"warning"},
+  {id:"schema-invalid-yaml",domain:"schemas",label:"Malformed local Schema YAML is detected",
+    code:"SCHEMA_DOCUMENT_PARSE_ERROR",status:"confirmed",severity:"error"},
   {id:"project-dependency-unconfigured",domain:"dependencies",label:"Unconfigured project dependency is detected",
     code:"DEPENDENCY_NOT_CONFIGURED",status:"confirmed",severity:"error"},
   {id:"capability-grant-duplicate",domain:"capabilities",label:"Duplicate Capability Grant is detected",
@@ -74,6 +76,12 @@ function setupCase(id,files){
       const schema=firstSchemaFile(files);
       if(!schema||!files.delete(schema))return null;
       completeness="partial";
+      break;
+    }
+    case "schema-invalid-yaml":{
+      const schema=firstSchemaFile(files);
+      if(!schema)return null;
+      files.get(schema).text="$schema: [unterminated\n";
       break;
     }
     case "project-dependency-unconfigured":
