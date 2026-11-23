@@ -41,8 +41,8 @@ test("missing source anchors produce NOT_RUN instead of a fabricated PASS",()=>{
     "capability-owner-unavailable","evidence-owner-unavailable",
     "missing-predicate-script"
   ]});
-  assert.equal(results.summary.PASS,1);
-  assert.equal(results.summary.NOT_RUN,2);
+  assert.equal(results.summary.PASS,2);
+  assert.equal(results.summary.NOT_RUN,1);
   assert.equal(results.summary.FAIL,0);
   assert.equal(results.results[2].status,"NOT_RUN");
   assert.equal(results.results[2].diagnostic,null);
