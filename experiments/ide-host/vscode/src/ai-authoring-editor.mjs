@@ -3,7 +3,7 @@ import {
   MAX_CONTEXT_PACK_BYTES,
 } from "../../../../authoring/core/context-pack.mjs";
 import { createProcedureAgent } from "../../../../authoring/core/procedure-agent.mjs";
-import { createGatewayModelClient } from "../../../../authoring/core/gateway-client.mjs";
+import { createGatewayModelClient, listGatewayModels, validateModelId } from "../../../../authoring/core/gateway-client.mjs";
 import { createChangeSet } from "../../../../authoring/core/change-set.mjs";
 import {
   planV1Alpha5Patch,
@@ -21,7 +21,85 @@ const MAX_CONTEXT_ITEMS = 512;
 const TEXT_DEPENDENCY_FILE = /\.(?:json|ya?ml|md)$/i;
 const SENSITIVE_SEGMENT = /(?:^|[._-])(?:secrets?|credentials?|passwords?|api[-_]?keys?|private[-_]?keys?|access[-_]?tokens?|tokens?|auth)(?:[._-]|$)/i;
 const GATEWAY_TOKEN_SECRET_KEY = "connectionAgent.skillStudio.ai.gatewayToken";
+export const DEFAULT_AI_GATEWAY_URL = "http://127.0.0.1:8787/opencode-go/openai";
+export const DEFAULT_AI_MODEL_ID = "deepseek-v4.1-flash";
 const encoder = new TextEncoder();
+
+
+/**
+ * Model discovery and selection stay in the VS Code/Theia extension Host.
+ * The Webview has connect-src 'none' and never receives a Gateway token.
+ * Catalog failure is not fatal: the user can still enter a custom model ID.
+ */
+export async function chooseAiAuthoringModel(vscode, secrets, {
+  discover = listGatewayModels,
+} = {}) {
+  if (typeof vscode?.window?.showQuickPick !== "function" ||
+      typeof vscode.window.showInputBox !== "function") {
+    throw new Error("The host model picker is unavailable.");
+  }
+  const settings = vscode.workspace.getConfiguration("connectionAgent.skillStudio.ai");
+  const gatewayUrl = settings.get("gatewayUrl", DEFAULT_AI_GATEWAY_URL);
+  const currentModel = settings.get("model", DEFAULT_AI_MODEL_ID);
+  let models = [], discoveryAvailable = false;
+  try {
+    const gatewayToken = typeof secrets?.get === "function"
+      ? await secrets.get(GATEWAY_TOKEN_SECRET_KEY) : undefined;
+    models = await discover({ gatewayBaseUrl: gatewayUrl, gatewayToken });
+    discoveryAvailable = models.length > 0;
+  } catch {
+    // Do not log provider responses, token or gateway error contents to UI.
+  }
+  const items = models.map(model => ({
+    label: model.name,
+    description: model.id,
+    modelId: model.id,
+  }));
+  if (typeof currentModel === "string" && currentModel.trim() &&
+      !items.some(item => item.modelId === currentModel.trim())) {
+    items.unshift({
+      label: currentModel.trim(),
+      description: "当前配置的模型（未出现在 Gateway 列表）",
+      modelId: currentModel.trim(),
+    });
+  }
+  items.push({
+    label: "手动输入模型 ID…",
+    description: "可用于自定义 Gateway；模型列表不可用时仍可选择",
+    manual: true,
+  });
+  const picked = await vscode.window.showQuickPick(items, {
+    title: "SKILL Studio · 选择 AI 模型",
+    placeHolder: discoveryAvailable
+      ? "来自已配置 Gateway 的模型列表；选择后记住设置"
+      : "Gateway 模型列表不可用；可以继续使用当前模型或手动输入",
+    matchOnDescription: true,
+    ignoreFocusOut: true,
+  });
+  if (!picked) return false;
+
+  let modelId = picked.modelId;
+  if (picked.manual) {
+    modelId = await vscode.window.showInputBox({
+      title: "SKILL Studio · 自定义模型 ID",
+      prompt: "请输入当前 Gateway 支持的 OpenAI-compatible Chat Completions 模型 ID",
+      value: typeof currentModel === "string" ? currentModel : DEFAULT_AI_MODEL_ID,
+      ignoreFocusOut: true,
+      validateInput: value => {
+        try { validateModelId(value); return undefined; }
+        catch { return "模型 ID 必须由英数字开头，仅含字母、数字、点、下划线、冒号、斜线或连字符。"; }
+      },
+    });
+    if (modelId === undefined) return false;
+  }
+  modelId = validateModelId(modelId);
+  if (modelId === currentModel) return false;
+  if (typeof settings.update !== "function" || vscode.ConfigurationTarget?.Global === undefined) {
+    throw new Error("无法保存应用级模型设置。");
+  }
+  await settings.update("model", modelId, vscode.ConfigurationTarget.Global);
+  return true;
+}
 
 export async function configureAiGatewayToken(vscode, secrets) {
   if (!secrets || typeof secrets.store !== "function" || typeof secrets.delete !== "function") {
@@ -390,16 +468,17 @@ export function renderAiAuthoringHtml(nonce) {
     "const byId=id=>document.getElementById(id);",
     "let busy=false,canApply=false,contextReady=false,previewSequence=0;",
     "function status(text,kind){const el=byId('status');el.textContent=text||'';el.className='status '+(kind||'');}",
-    "function setBusy(value){busy=value;byId('generate').disabled=value||!window.gatewayConfigured||!contextReady;byId('cancel').disabled=!value;byId('refresh').disabled=value;byId('apply').disabled=value||!canApply;}",
+    "function setBusy(value){busy=value;byId('generate').disabled=value||!window.gatewayConfigured||!contextReady;byId('cancel').disabled=!value;byId('refresh').disabled=value;byId('chooseModel').disabled=value;byId('apply').disabled=value||!canApply;}",
     "function clear(el){while(el.firstChild)el.removeChild(el.firstChild);}",
     "function clearProposal(){canApply=false;previewSequence++;clear(byId('plan'));clear(byId('assumptions'));clear(byId('blockers'));clear(byId('groups'));byId('proposalSummary').textContent='';byId('currentSource').textContent='';byId('candidateSource').textContent='';byId('patchState').textContent='尚未生成';byId('patchError').textContent='';byId('compilerStatus').textContent='Compiler Check: NOT_RUN';byId('apply').disabled=true;byId('discard').disabled=true;}",
     "function addList(id,items){const root=byId(id);clear(root);if(!items||!items.length)return;const ul=document.createElement('ul');for(const value of items){const li=document.createElement('li');li.textContent=value;ul.appendChild(li);}root.appendChild(ul);}",
     "function requestSourcePreview(){const requestId=++previewSequence;const groupIds=[...document.querySelectorAll('[data-group-id]:checked')].map(item=>item.dataset.groupId);vscode.postMessage({type:'preview',requestId,groupIds});}",
-    "function renderContext(message){contextReady=true;clearProposal();window.gatewayConfigured=message.gatewayConfigured===true;byId('packageInfo').textContent=message.packageName+' · '+message.documentVersion+' · Package revision '+message.packageGeneration;byId('gatewayNotice').textContent=window.gatewayConfigured?'Gateway 路由与模型 '+message.modelId+' 已配置；Provider API Key 只保留在 Gateway 主机。远程 Gateway 可通过命令面板配置共享访问令牌。':'请先在应用设置中配置 connectionAgent.skillStudio.ai.gatewayUrl 与 connectionAgent.skillStudio.ai.model。';const list=byId('sources');clear(list);for(const item of message.sources||[]){const label=document.createElement('label');label.className='source';const input=document.createElement('input');input.type='checkbox';input.checked=item.selected===true;input.value=item.id;input.disabled=busy;const body=document.createElement('span');body.className='source-main';const kind=document.createElement('span');kind.className='kind';kind.textContent=item.kind;const name=document.createElement('span');name.className='source-label';name.textContent=item.label;const size=document.createElement('span');size.className='source-bytes';size.textContent=item.bytes+' bytes'+(item.explicitOptIn?' · 每次任务需显式选择':'');body.append(kind,name,size);label.append(input,body);list.appendChild(label);}status('上下文已就绪。发送前会再次显示明确的数据披露确认。');setBusy(false);}",
+    "function renderContext(message){contextReady=true;clearProposal();window.gatewayConfigured=message.gatewayConfigured===true;byId('modelLabel').textContent='当前模型：'+(message.modelId||'未配置');byId('packageInfo').textContent=message.packageName+' · '+message.documentVersion+' · Package revision '+message.packageGeneration;byId('gatewayNotice').textContent=window.gatewayConfigured?'Gateway 已配置：'+(message.gatewayUrl||'当前地址')+'；默认仅连接本机，选择模型会获取该 Gateway 的公开模型目录。Provider API Key 保留在 Gateway 主机。':'请检查 Gateway 和模型设置；本机默认 Gateway 为 127.0.0.1:8787，可以使用「选择模型」。';const list=byId('sources');clear(list);for(const item of message.sources||[]){const label=document.createElement('label');label.className='source';const input=document.createElement('input');input.type='checkbox';input.checked=item.selected===true;input.value=item.id;input.disabled=busy;const body=document.createElement('span');body.className='source-main';const kind=document.createElement('span');kind.className='kind';kind.textContent=item.kind;const name=document.createElement('span');name.className='source-label';name.textContent=item.label;const size=document.createElement('span');size.className='source-bytes';size.textContent=item.bytes+' bytes'+(item.explicitOptIn?' · 每次任务需显式选择':'');body.append(kind,name,size);label.append(input,body);list.appendChild(label);}status('上下文已就绪。发送前会再次显示明确的数据披露确认。');setBusy(false);}",
     "function renderProposal(message){previewSequence++;canApply=message.canApply===true;byId('proposalSummary').textContent=message.summary||'';byId('currentSource').textContent=message.currentSource||'';byId('candidateSource').textContent=message.candidateSource||'';addList('plan',message.plan||[]);addList('assumptions',message.assumptions||[]);addList('blockers',message.blockers||[]);byId('blockers').className=(message.blockers&&message.blockers.length)?'subsection warning':'subsection';byId('patchState').textContent=message.patchState||'NOT_RUN';byId('patchError').textContent=message.patchError||'';byId('compilerStatus').textContent='Compiler '+(message.compilerVersion||'v2.0.2')+' Check: '+(message.compilerState||'NOT_RUN');const list=byId('groups');clear(list);for(const group of message.groups||[]){const label=document.createElement('label');label.className='group';const input=document.createElement('input');input.type='checkbox';input.checked=true;input.value=group.id;input.dataset.groupId=group.id;input.addEventListener('change',requestSourcePreview);const body=document.createElement('span');body.className='group-main';const title=document.createElement('span');title.className='group-title';title.textContent=group.label+' · '+group.operationIds.length+' 项';const details=document.createElement('details');const summary=document.createElement('summary');summary.textContent='查看操作与理由';const ul=document.createElement('ul');for(const operation of group.operations||[]){const li=document.createElement('li');li.textContent=operation.type+' — '+operation.rationale;ul.appendChild(li);}details.append(summary,ul);body.append(title,details);label.append(input,body);list.appendChild(label);}byId('apply').disabled=!canApply||busy;byId('discard').disabled=false;status(canApply?'Compiler v2.0.2 对精确候选返回 PASS；可应用选中修改。':'提案已返回；请检查 Compiler Check 与阻塞项。',canApply?'':'warning');}",
     "byId('generate').addEventListener('click',()=>{const task=byId('task').value.trim();const selectedIds=[...document.querySelectorAll('#sources input:checked')].map(item=>item.value);clearProposal();vscode.postMessage({type:'generate',task,selectedIds});});",
     "byId('cancel').addEventListener('click',()=>vscode.postMessage({type:'cancel'}));",
     "byId('refresh').addEventListener('click',()=>{clearProposal();vscode.postMessage({type:'refresh'});});",
+    "byId('chooseModel').addEventListener('click',()=>vscode.postMessage({type:'chooseModel'}));",
     "byId('apply').addEventListener('click',()=>{const groupIds=[...document.querySelectorAll('[data-group-id]:checked')].map(item=>item.dataset.groupId);vscode.postMessage({type:'apply',groupIds});});",
     "byId('discard').addEventListener('click',()=>vscode.postMessage({type:'discard'}));",
     "window.addEventListener('message',event=>{const message=event.data||{};if(message.type==='context')renderContext(message);else if(message.type==='status'){status(message.message,message.kind);if(message.busy!==undefined)setBusy(message.busy);}else if(message.type==='busy'){setBusy(message.busy===true);}else if(message.type==='proposal')renderProposal(message);else if(message.type==='preview'&&message.requestId===previewSequence){byId('candidateSource').textContent=message.candidateSource||'';byId('compilerStatus').textContent='Compiler '+(message.compilerVersion||'v2.0.2')+' Check: '+(message.compilerState||'NOT_RUN');byId('patchState').textContent=message.patchState||'PREVIEW ONLY';byId('patchError').textContent=message.patchError||'';canApply=message.canApply===true;byId('apply').disabled=busy||!canApply;status(canApply?'Compiler PASS；可应用当前选中组。':'当前选中组仍为 PREVIEW ONLY。',canApply?'':'warning');}else if(message.type==='error'){if(message.contextUnavailable===true){contextReady=false;clear(byId('sources'));clearProposal();}status(message.message,'error');setBusy(false);}else if(message.type==='applied'){canApply=false;byId('apply').disabled=true;byId('discard').disabled=true;status('已应用到原生编辑器缓冲区；尚未保存。Compiler Check: '+(message.compilerCheck||'UNAVAILABLE')+'。');}else if(message.type==='discarded'){clearProposal();status('提案已丢弃。');}});",
@@ -410,7 +489,7 @@ export function renderAiAuthoringHtml(nonce) {
     "<meta http-equiv=\"Content-Security-Policy\" content=\"default-src 'none'; img-src data:; style-src 'nonce-" + nonce + "'; script-src 'nonce-" + nonce + "'; connect-src 'none'; font-src 'none';\">",
     "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">",
     "<title>AI Procedure Authoring</title><style nonce=\"" + nonce + "\">" + css + "</style></head><body>",
-    "<header class=\"topbar\"><div class=\"heading\"><strong>AI Procedure Authoring</strong><small id=\"packageInfo\">读取当前 Package…</small></div><div class=\"top-actions\"><span class=\"compiler\">CA-SL v1alpha5 · FROZEN / RELEASED</span><button id=\"refresh\" class=\"secondary\">刷新上下文</button></div></header>",
+    "<header class=\"topbar\"><div class=\"heading\"><strong>AI Procedure Authoring</strong><small id=\"packageInfo\">读取当前 Package…</small></div><div class=\"top-actions\"><span id=\"modelLabel\" class=\"compiler\">当前模型：读取中…</span><button id=\"chooseModel\" class=\"secondary\" title=\"从 Gateway 选择模型或手动输入模型 ID\">选择模型</button><span class=\"compiler\">CA-SL v1alpha5 · FROZEN / RELEASED</span><button id=\"refresh\" class=\"secondary\">刷新上下文</button></div></header>",
     "<main>",
     "<section class=\"card\"><h2>任务说明</h2><textarea id=\"task\" maxlength=\"4000\" placeholder=\"描述希望如何修改当前 Procedure。模型只会提出语义修改，不会直接写文件或执行 Tool。\"></textarea><div class=\"note\"><strong>数据披露：</strong>选中的上下文将在你确认后发送到配置的 AI Gateway。Provider API Key 只保留在 Gateway 主机。</div><div id=\"gatewayNotice\" class=\"note warning\"></div><div class=\"actions\"><button id=\"generate\">生成修改提案</button><button id=\"cancel\" class=\"secondary\" disabled>取消请求</button></div></section>",
     "<section class=\"card\"><h2>上下文来源</h2><p class=\"note\">Procedure 当前缓冲区必定包含。Contract、Predicate、Schema 和已验证依赖默认选中；Reference / Script 需要逐任务显式选择。</p><div id=\"sources\" class=\"source-list\"></div></section>",
@@ -550,8 +629,8 @@ export function registerAiAuthoringEditor(vscode, context, { getActiveDocument, 
       activeSession.context = state;
       activeSession.pending = null;
       const aiSettings = vscode.workspace.getConfiguration("connectionAgent.skillStudio.ai");
-      const gatewayBaseUrl = aiSettings.get("gatewayUrl", "");
-      const modelId = aiSettings.get("model", "deepseek-v4.1-flash");
+      const gatewayBaseUrl = aiSettings.get("gatewayUrl", DEFAULT_AI_GATEWAY_URL);
+      const modelId = aiSettings.get("model", DEFAULT_AI_MODEL_ID);
       const gatewayConfigured = typeof gatewayBaseUrl === "string" && gatewayBaseUrl.trim().length > 0 &&
         typeof modelId === "string" && modelId.trim().length > 0;
       post({
@@ -561,6 +640,7 @@ export function registerAiAuthoringEditor(vscode, context, { getActiveDocument, 
         documentVersion: document.version,
         packageGeneration: state.generation,
         gatewayConfigured,
+        gatewayUrl: typeof gatewayBaseUrl === "string" ? gatewayBaseUrl.trim() : "",
         modelId: typeof modelId === "string" ? modelId.trim() : "",
         sources: state.resources.map((item) => ({
           id: item.id,
@@ -580,11 +660,39 @@ export function registerAiAuthoringEditor(vscode, context, { getActiveDocument, 
     }
   }
 
+  async function handleChooseModel() {
+    const activeSession = session;
+    const isCurrent = () => isCurrentAuthoringSession(session, activeSession);
+    if (!isCurrent() || activeSession.choosingModel ||
+        activeSession.generating || activeSession.applying || activeSession.controller) return;
+    activeSession.choosingModel = true;
+    post({ type: "status", message: "正在读取 Gateway 模型列表；此操作不发送 Procedure 内容…" });
+    try {
+      const updated = await chooseAiAuthoringModel(vscode, context.secrets);
+      if (!isCurrent()) return;
+      if (updated) {
+        activeSession.pending = null;
+        await refreshContext();
+        if (isCurrent()) post({ type: "status", message: "模型选择已保存；下次生成将使用新模型。" });
+      } else {
+        post({ type: "status", message: "模型选择未改变。" });
+      }
+    } catch {
+      if (isCurrent()) post({ type: "error", message: "无法保存模型选择，请检查 Studio 应用设置。" });
+    } finally {
+      if (isCurrent()) activeSession.choosingModel = false;
+    }
+  }
+
   async function handleGenerate(message) {
     const activeSession = session;
     const isCurrent = () => isCurrentAuthoringSession(session, activeSession);
     if (!isCurrent() || !activeSession.context) {
       post({ type: "error", message: "当前上下文尚未就绪，请先刷新。" });
+      return;
+    }
+    if (activeSession.choosingModel) {
+      post({ type: "error", message: "正在选择模型，请完成模型选择后再生成。" });
       return;
     }
     if (activeSession.generating || activeSession.controller) {
@@ -608,8 +716,8 @@ export function registerAiAuthoringEditor(vscode, context, { getActiveDocument, 
       return;
     }
     const aiSettings = vscode.workspace.getConfiguration("connectionAgent.skillStudio.ai");
-    const gatewayBaseUrl = aiSettings.get("gatewayUrl", "");
-    const modelId = aiSettings.get("model", "deepseek-v4.1-flash");
+    const gatewayBaseUrl = aiSettings.get("gatewayUrl", DEFAULT_AI_GATEWAY_URL);
+    const modelId = aiSettings.get("model", DEFAULT_AI_MODEL_ID);
     if (typeof gatewayBaseUrl !== "string" || !gatewayBaseUrl.trim() ||
       typeof modelId !== "string" || !modelId.trim()) {
       post({ type: "error", message: "尚未配置 AI Gateway。请在应用设置中填写 connectionAgent.skillStudio.ai.gatewayUrl 和 connectionAgent.skillStudio.ai.model。" });
@@ -1092,6 +1200,7 @@ export function registerAiAuthoringEditor(vscode, context, { getActiveDocument, 
             disposed: false,
             generating: false,
             applying: false,
+            choosingModel: false,
             contextRequestId: 0,
           };
         }
@@ -1115,6 +1224,7 @@ export function registerAiAuthoringEditor(vscode, context, { getActiveDocument, 
         disposed: false,
         generating: false,
         applying: false,
+        choosingModel: false,
         contextRequestId: 0,
       };
       panel.webview.options = { enableScripts: true, localResourceRoots: [] };
@@ -1123,6 +1233,7 @@ export function registerAiAuthoringEditor(vscode, context, { getActiveDocument, 
         if (!message || typeof message.type !== "string") return;
         if (message.type === "ready" || message.type === "refresh") await refreshContext();
         else if (message.type === "generate") await handleGenerate(message);
+        else if (message.type === "chooseModel") await handleChooseModel();
         else if (message.type === "cancel") {
           session?.controller?.abort();
           post({ type: "status", message: "正在取消模型请求…" });

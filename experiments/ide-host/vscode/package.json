@@ -475,16 +475,16 @@
         },
         "connectionAgent.skillStudio.ai.gatewayUrl": {
           "type": "string",
-          "default": "",
+          "default": "http://127.0.0.1:8787/opencode-go/openai",
           "scope": "application",
-          "markdownDescription": "Base route URL for the Go ai-gateway, including the upstream label and optional upstream path prefix. Example: http://127.0.0.1:8787/opencode-go/openai. Studio appends /v1/chat/completions. HTTP is allowed only for loopback; use HTTPS for remote Gateways.",
-          "description": "Base route URL for the Go ai-gateway, including the upstream label and optional upstream path prefix. Example: http://127.0.0.1:8787/opencode-go/openai. Studio appends /v1/chat/completions. HTTP is allowed only for loopback; use HTTPS for remote Gateways."
+          "markdownDescription": "Defaults to a local-only Go ai-gateway at http://127.0.0.1:8787/opencode-go/openai. Start the Gateway yourself and approve your browser's local network access; Studio does not start a service or send a model request automatically. Customize the URL here for another route. HTTP is allowed only for loopback; remote Gateways require HTTPS.",
+          "description": "Local AI Gateway by default; customize this URL to use your own Gateway."
         },
         "connectionAgent.skillStudio.ai.model": {
           "type": "string",
           "default": "deepseek-v4.1-flash",
           "scope": "application",
-          "markdownDescription": "Model ID sent in the OpenAI-compatible Chat Completions request body. It must be supported by the selected Gateway upstream."
+          "markdownDescription": "Default model: deepseek-v4.1-flash. Use the AI Authoring Editor Tab's Select Model action to browse the configured Gateway catalog, or enter a custom Model ID here. Selection is saved in application settings."
         }
       }
     },

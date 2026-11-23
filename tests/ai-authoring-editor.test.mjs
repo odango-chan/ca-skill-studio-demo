@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { configureAiGatewayToken } from "../experiments/ide-host/vscode/src/ai-authoring-editor.mjs";
+import { configureAiGatewayToken, chooseAiAuthoringModel, DEFAULT_AI_GATEWAY_URL, DEFAULT_AI_MODEL_ID } from "../experiments/ide-host/vscode/src/ai-authoring-editor.mjs";
 import {
   buildAuthoringResourceInventory,
   createAuthoringCompilerRequest,
@@ -434,4 +434,102 @@ test("synthetic positive native Editor acceptance is CI-only and keeps trusted f
   assert.match(backend,/trusted-build-request\.json/);
   assert.match(backend,/THEIA_ACCEPTANCE_FIXTURES: "1"/);
   assert.doesNotMatch(pages,/authoring-trusted-build-request\.json/);
+});
+
+test("AI Editor defaults to personal loopback Gateway, renders one-click Host model picker", () => {
+  const packageJson=JSON.parse(readFileSync(
+    new URL("../experiments/ide-host/vscode/package.json",import.meta.url),"utf8"));
+  const properties=packageJson.contributes.configuration.properties;
+  assert.equal(properties["connectionAgent.skillStudio.ai.gatewayUrl"].default, DEFAULT_AI_GATEWAY_URL);
+  assert.equal(properties["connectionAgent.skillStudio.ai.model"].default, DEFAULT_AI_MODEL_ID);
+  const html=renderAiAuthoringHtml("b".repeat(48));
+  assert.match(html, /id="chooseModel"/);
+  assert.match(html, /id="modelLabel"/);
+  assert.match(html, /type:'chooseModel'/);
+  assert.match(html, /connect-src 'none'/);
+});
+
+test("AI model picker reads Gateway catalog in Host and stores explicit selection globally", async () => {
+  const writes=[], secretGets=[];
+  let picked;
+  const vscode={
+    ConfigurationTarget:{Global:1},
+    workspace:{getConfiguration(scope){
+      assert.equal(scope,"connectionAgent.skillStudio.ai");
+      return {
+        get(name,fallback){
+          return name==="gatewayUrl"?DEFAULT_AI_GATEWAY_URL:name==="model"?DEFAULT_AI_MODEL_ID:fallback;
+        },
+        async update(name,value,target){writes.push({name,value,target});}
+      };
+    }},
+    window:{
+      async showQuickPick(items,opts){
+        assert.equal(opts.title,"SKILL Studio · 选择 AI 模型");
+        assert.equal(items.some(item=>item.modelId===DEFAULT_AI_MODEL_ID),true);
+        picked=items.find(item=>item.modelId==="glm-5.3-flash");
+        return picked;
+      },
+      async showInputBox(){throw Error("Should choose catalog model without manual input");}
+    }
+  };
+  const secretStorage={get:async name=>{secretGets.push(name);return "secure-host-token";}};
+  let actual;
+  const updated=await chooseAiAuthoringModel(vscode,secretStorage,{
+    discover:async args=>{
+      actual=args;
+      return [{id:DEFAULT_AI_MODEL_ID,name:"DeepSeek V4.1 Flash"},{id:"glm-5.3-flash",name:"GLM 5.3 Flash"}];
+    }
+  });
+  assert.equal(updated,true);
+  assert.equal(actual.gatewayBaseUrl,DEFAULT_AI_GATEWAY_URL);
+  assert.equal(actual.gatewayToken,"secure-host-token");
+  assert.equal(secretGets.length,1);
+  assert.deepEqual(writes,[{name:"model",value:"glm-5.3-flash",target:1}]);
+  assert.equal(picked.label,"GLM 5.3 Flash");
+});
+
+test("offline Gateway still offers manual model selection without leaking errors", async () => {
+  const writes=[];
+  const vscode={
+    ConfigurationTarget:{Global:42},
+    workspace:{getConfiguration(){return {
+      get(name,fallback){
+        return name==="gatewayUrl"?DEFAULT_AI_GATEWAY_URL:name==="model"?DEFAULT_AI_MODEL_ID:fallback;
+      },
+      async update(name,value,target){writes.push([name,value,target]);}
+    };}},
+    window:{
+      async showQuickPick(items,opts){
+        assert.match(opts.placeHolder,/不可用/);
+        assert.equal(items.at(-1).manual,true);
+        return items.at(-1);
+      },
+      async showInputBox(opts){
+        assert.equal(opts.validateInput("../bad?model")===undefined,false);
+        assert.equal(opts.validateInput("qwen3.8-flash"),undefined);
+        return "qwen3.8-flash";
+      }
+    }
+  };
+  assert.equal(await chooseAiAuthoringModel(vscode,null,{
+    discover:async()=>{throw Error("secret provider data must not leak");}
+  }),true);
+  assert.deepEqual(writes,[["model","qwen3.8-flash",42]]);
+});
+
+test("canceling model picker does not write settings or trigger any model request", async () => {
+  let writes=0;
+  const vscode={
+    ConfigurationTarget:{Global:1},
+    workspace:{getConfiguration(){return {
+      get(name,fallback){return fallback;},
+      async update(){writes++;}
+    };}},
+    window:{async showQuickPick(){return undefined;},async showInputBox(){throw Error("unexpected input");}}
+  };
+  assert.equal(await chooseAiAuthoringModel(vscode,null,{
+    discover:async()=>[]
+  }),false);
+  assert.equal(writes,0);
 });
