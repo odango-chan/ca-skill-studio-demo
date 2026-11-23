@@ -1638,6 +1638,35 @@ try{
         throw Error("Actual React Flow before/after graph did not render in Chromium: "+
           JSON.stringify(diagnostic.result?.value));
       }
+      const toggledPath=await command("Runtime.evaluate",{
+        contextId:aiContextId,returnByValue:true,
+        expression:"(()=>{const label=[...document.querySelectorAll('#flowCompareCanvas label')]"+
+          ".find(x=>x.textContent.includes('正常路径'));"+
+          "const input=label?.querySelector('input');"+
+          "if(!input||input.checked)return false;input.click();return true;})()"
+      });
+      if(toggledPath.result?.value!==true)
+        throw Error("F2 normal-route collapse control was unavailable");
+      let collapsed=false;
+      for(let attempt=0;attempt<50&&!collapsed;attempt++){
+        const v=await command("Runtime.evaluate",{
+          contextId:aiContextId,returnByValue:true,
+          expression:"document.querySelector('#flowCompareCanvas [data-ai-flow-path-mode]')"+
+            "?.dataset.aiFlowPathMode"
+        });
+        collapsed=v.result?.value==="normal";
+        if(!collapsed)await sleep(100);
+      }
+      if(!collapsed)throw Error("F2 normal-path collapse did not switch the graph mode");
+      const restoredPath=await command("Runtime.evaluate",{
+        contextId:aiContextId,returnByValue:true,
+        expression:"(()=>{const label=[...document.querySelectorAll('#flowCompareCanvas label')]"+
+          ".find(x=>x.textContent.includes('正常路径'));"+
+          "const input=label?.querySelector('input');"+
+          "if(!input||!input.checked)return false;input.click();return true;})()"
+      });
+      if(restoredPath.result?.value!==true)
+        throw Error("F2 complete-route view could not be restored");
       const focused=await command("Runtime.evaluate",{
         contextId:aiContextId,returnByValue:true,
         expression:"(()=>{const card=[...document.querySelectorAll('.ai-flow-panel')][1]"+
@@ -1699,6 +1728,7 @@ try{
         reactFlowReadOnly:"PASS",
         sourceBackedChangedNode:"PASS",
         graphFocusChangeSet:"PASS",
+        normalPathBranchCollapse:"PASS",
         compilerCheck:"FAIL_AS_EXPECTED_FOR_UNQUALIFIED_5GC_EXAMPLE",
         applyBlocked:true
       };
