@@ -346,3 +346,10 @@ test("shared Gateway token setup fails closed without Host SecretStorage", async
   const vscode = { window: { async showInputBox() { return "token"; } } };
   await assert.rejects(configureAiGatewayToken(vscode, undefined), /SecretStorage/);
 });
+
+test("AI Authoring preserves the actual model failure instead of hiding it behind generic completion status",()=>{
+  const source=readFileSync(new URL("../experiments/ide-host/vscode/src/ai-authoring-editor.mjs",import.meta.url),"utf8");
+  assert.match(source,/post\(\{ type: "busy", busy: false \}\)/);
+  assert.match(source,/message\.type==='busy'/);
+  assert.doesNotMatch(source,/请求结束。Compiler Check:/);
+});
