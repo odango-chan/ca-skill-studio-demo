@@ -1597,6 +1597,72 @@ try{
             added:proposalView.diffAddedRows,removed:proposalView.diffRemovedRows,
             summary:proposalView.diffSummary,validation:proposalView.validationText}));
       }
+      // F3 must prove the bundled Monaco Diff actually initialized in the
+      // isolated Webview, not merely that its HTML/assets exist. The line
+      // review remains available only as a truthful fallback.
+      const diffSelected=await command("Runtime.evaluate",{
+        contextId:aiContextId,returnByValue:true,
+        expression:"(()=>{document.getElementById('tab-diff').click();"+
+          "return document.getElementById('tab-diff').getAttribute('aria-selected')==='true';})()"
+      });
+      if(diffSelected.result?.value!==true)
+        throw Error("F3 YAML Diff tab could not be opened");
+      let monacoEvidence=null;
+      for(let attempt=0;attempt<120&&!monacoEvidence;attempt++){
+        const evaluated=await command("Runtime.evaluate",{
+          contextId:aiContextId,returnByValue:true,
+          expression:"(()=>{const surface=document.getElementById('monacoDiffSurface');"+
+            "const editor=surface?.querySelector('.monaco-diff-editor');"+
+            "const r=surface?.getBoundingClientRect();"+
+            "return {initialized:!!editor,shown:surface?.hidden===false,"+
+            "width:r?.width||0,height:r?.height||0,changedNodeVisible:surface?.innerText.includes(\'ai-authoring-smoke-node\')===true,"+
+            "fallbackHidden:document.getElementById('diffRows')?.hidden===true,"+
+            "mainWorldAdapterNotObservable:true,"+
+            "notice:document.getElementById('monacoDiffNotice')?.textContent||''};})()"
+        });
+        const v=evaluated.result?.value;
+        if(v?.initialized&&v.shown&&v.width>0&&v.height>0&&
+           v.changedNodeVisible&&v.notice.includes("Monaco 只读 Diff"))monacoEvidence=v;
+        if(!monacoEvidence)await sleep(100);
+      }
+      if(!monacoEvidence){
+        const diagnostic=await command("Runtime.evaluate",{
+          contextId:aiContextId,returnByValue:true,
+          expression:"(()=>({notice:document.getElementById('monacoDiffNotice')?.textContent,"+
+            "scripts:[...document.querySelectorAll('script[src]')].map(x=>x.src),"+
+            "styles:[...document.querySelectorAll('link[rel=stylesheet]')].map(x=>x.href),"+
+            "surface:document.getElementById('monacoDiffSurface')?.innerText.slice(0,300),"+
+            "surfaceRect:(()=>{const r=document.getElementById('monacoDiffSurface')?.getBoundingClientRect();return {width:r?.width,height:r?.height}})(),"+
+            "identity:window.skillStudioAiYamlDiff?.identity,renderedEditorCount:document.getElementById('monacoDiffSurface')?.querySelectorAll('.monaco-diff-editor').length}))()"
+        });
+        throw Error("F3 Monaco Diff did not render with non-empty exact candidate in Chromium: "+
+          JSON.stringify(diagnostic.result?.value));
+      }
+      // CDP intentionally executes in an isolated world. Its window globals
+      // do NOT expose main-world adapter objects; validate shared DOM only.
+      let diffMode=null;
+      for(let attempt=0;attempt<40;attempt++){
+        diffMode=await command("Runtime.evaluate",{
+          contextId:aiContextId,returnByValue:true,
+          expression:"(()=>{try{const select=document.getElementById('monacoDiffMode');"+
+            "const controls=document.getElementById('monacoDiffControls');"+
+            "const surface=document.getElementById('monacoDiffSurface');"+
+            "if(!select||!surface||!controls)return {ok:false,selectPresent:!!select,"+
+              "controlsPresent:!!controls,surfacePresent:!!surface,title:document.title};"+
+            "select.value='inline';select.dispatchEvent(new Event('change',{bubbles:true}));"+
+            "document.getElementById('monacoDiffNext')?.click();"+
+            "document.getElementById('monacoDiffPrevious')?.click();"+
+            "select.value='side-by-side';select.dispatchEvent(new Event('change',{bubbles:true}));"+
+            "return {ok:select.value==='side-by-side'&&!surface.hidden,"+
+              "value:select.value,hidden:surface.hidden,controlsVisible:controls.hidden===false};"+
+            "}catch(error){return {ok:false,error:String(error?.stack||error)}}})()"
+        });
+        if(diffMode.result?.value?.ok===true)break;
+        await sleep(100);
+      }
+      if(diffMode?.result?.value?.ok!==true)
+        throw Error("F3 Monaco Diff controls failed in Chromium: "+
+          JSON.stringify({value:diffMode?.result?.value,exception:diffMode?.exceptionDetails}));
       // F2 must render actual React Flow canvases from the pinned v1alpha5
       // Source projection, not just the F1 text summary.
       const graphTab=await command("Runtime.evaluate",{
@@ -1722,6 +1788,8 @@ try{
         workbenchThreeRegion:"PASS",
         flowChangesSourceOutline:"PASS",
         lineDiffReview:"PASS",
+        monacoDiffReadOnlyChromium:"PASS",
+        monacoDiffModesAndNavigation:"PASS",
         compilerDiagnosticsReview:"PASS",
         keyboardReviewTabs:"PASS",
         reactFlowTwoSource:"PASS",
