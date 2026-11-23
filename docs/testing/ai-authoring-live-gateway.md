@@ -1,23 +1,91 @@
-# Live AI Gateway acceptance (WSL / Linux)
+# Live AI Gateway acceptance (Windows first)
 
-This is an **opt-in** provider smoke test for Skill Studio AI Authoring. It calls the configured Go `ai-gateway` using the same Authoring Core Model Client and Procedure Agent as the Editor Tab. It sends **only a synthetic Procedure**; it does not transmit the 5GC Example, read a workspace, run Compiler or modify a file. It does not certify Owner, Release, Runtime, or the positive Editor Tab Apply flow.
+This is an **opt-in** provider smoke test for Skill Studio AI Authoring.
+It calls the configured Go `ai-gateway` through the **same Authoring Core
+Gateway Model Client and Procedure Agent** as the Editor Tab. It sends **only
+a synthetic CA-SL v1alpha5 Procedure**, never the 5GC Example, and cannot
+edit files or qualify Owner, Tool, Runtime or Deployment.
 
-Requires Node.js 24+, an already running Go AI Gateway, a configured OpenAI-compatible upstream, and a model ID that the upstream accepts. On WSL, a loopback Gateway can usually be addressed using the listener configured in `ai-gateway`; if running on another machine, use its explicitly configured HTTPS route with the shared access token.
+## Preconditions
 
-Run from the Studio repository root:
+- Native Windows `ai-gateway` **v0.2.0** is running on
+  `127.0.0.1:8787` using `config.studio-pages.example.yaml`, with the
+  Provider API Key held **only by the Gateway process**.
+- The user has already verified in the real
+  [Studio Pages](https://odango-chan.github.io/ca-skill-studio-demo/)
+  browser that `GET /healthz` returns `200 ok` after approving local
+  network / loopback access, and that the real `deepseek-v4.1-flash`
+  chat completion returns HTTP 200. Those manual checks prove the browser
+  transport and upstream, **not** Authoring Core semantics.
+- Node.js **24+** is available only for this local smoke script; it is
+  **not** required to run the released Gateway or the published Pages site.
+- Use the Studio PR #208 checkout
+  (`feat/ai-authoring-editor-tab-v1alpha5-20261117`). The smoke is not
+  present on Studio `main` while #208 remains unmerged.
 
-```bash
+## Run on Windows PowerShell
+
+From the **Studio repository root**, not the Gateway executable directory:
+
+```powershell
+$env:STUDIO_AI_GATEWAY_URL = 'http://127.0.0.1:8787/opencode-go/openai'
+$env:STUDIO_AI_MODEL_ID = 'deepseek-v4.1-flash'
+try {
+    node experiments/ide-host/scripts/ai-authoring-live-gateway-smoke.mjs
+}
+finally {
+    Remove-Item Env:STUDIO_AI_GATEWAY_URL, Env:STUDIO_AI_MODEL_ID -ErrorAction SilentlyContinue
+}
+```
+
+This invokes `node` directly: no unsigned PowerShell script, policy bypass,
+PowerShell administrator privileges, WSL or Go installation is needed.
+For an explicitly authorized remote Gateway only, the optional
+`STUDIO_AI_GATEWAY_TOKEN` may be supplied outside the repository in the
+process environment. Never put that token or the Provider API Key in a file,
+command history, CI artifact, webview state or issue comment. The local
+loopback example does **not** require a shared Gateway token.
+
+The client appends `/v1/chat/completions` to the configured base URL.
+This script uses Node's HTTP client; **the browser's Local Network Access
+permission is a separate test**. The actual Studio Gateway Client now
+sets `targetAddressSpace: "loopback"` only for local Gateway origins;
+HTTPS remote gateways remain unchanged.
+
+## Interpreting results
+
+`STUDIO_AI_AUTHORING_LIVE_GATEWAY_SMOKE` with
+`providerRequest: PASS`, `responseEnvelope: PASS` and
+`modelProposalSchema: PASS` proves one real model completion passed the
+Authoring Core semantic proposal contract. If
+`sourcePatchPreview: PASS`, the returned semantic operations also
+produced a source-preserving candidate for the synthetic Procedure.
+A response with blockers is **not** a successful Apply. A bad JSON
+proposal or an HTTP error is a real failure of this smoke, not a signal
+to weaken validation.
+
+The script intentionally logs **no model response body, prompt, Provider
+Key or Gateway token**. Its output contains only aggregate counts,
+pass/fail classifications and sanitized error categories. Do not copy
+secrets or full model responses into GitHub.
+
+This smoke does **not** run the pinned Compiler or modify a file. Existing
+CI separately verifies the actual v2.0.2 Go/WASM Compiler's positive Check
+and native WorkspaceEdit/Undo with a trusted synthetic fixture.
+**Production Editor Tab model-generated Proposal → selected Patch →
+Compiler PASS → Apply → Undo remains a separate gate** for #208.
+The official 5GC Examples are not qualified and must remain Preview-Only
+when Compiler Check returns errors; Wait requires trusted IngressCatalog.
+
+## Other platforms
+
+On Linux/macOS, or when using a personally managed WSL installation,
+run the same script with environment exports:
+
+```sh
 export STUDIO_AI_GATEWAY_URL='http://127.0.0.1:8787/opencode-go/openai'
-export STUDIO_AI_MODEL_ID='YOUR_ACTUAL_MODEL_ID'
-# Only when your remote Gateway requires a shared access token:
-# read -r -s STUDIO_AI_GATEWAY_TOKEN; export STUDIO_AI_GATEWAY_TOKEN
+export STUDIO_AI_MODEL_ID='deepseek-v4.1-flash'
 node experiments/ide-host/scripts/ai-authoring-live-gateway-smoke.mjs
 ```
 
-The base URL includes the upstream name and path prefix; the client appends `/v1/chat/completions`. Do not place credentials in the URL. Provider API keys such as `OPENCODE_GO_API_KEY` remain on the Gateway host; `STUDIO_AI_GATEWAY_TOKEN` is only the optional shared Gateway access token. Keep both out of source, CI logs and issue comments.
-
-Passing output includes `STUDIO_AI_AUTHORING_LIVE_GATEWAY_SMOKE`, `providerRequest: PASS`, `responseEnvelope: PASS`, and `modelProposalSchema: PASS`. `sourcePatchPreview: PASS` additionally proves that the real model's semantic proposal can produce a source-preserving synthetic YAML candidate. A model may return blockers instead; that is distinct from a protocol error and must not be mislabeled as Apply success.
-
-This smoke deliberately does not use the Compiler trusted request or execute native WorkspaceEdit. Those are covered separately by the pinned real Go/WASM Compiler and backend Chromium native Apply/Undo acceptance. A production-shaped live-provider **Editor Tab** Apply still requires a qualified Package context and remains a separate merge gate.
-
-Never publish real provider credentials or full model responses in an issue or workflow artifact.
+These are alternatives, **not prerequisites** for the Windows release.
