@@ -442,10 +442,18 @@ function nonceValue() {
   return [...bytes].map((item) => item.toString(16).padStart(2, "0")).join("");
 }
 
-export function renderAiAuthoringHtml(nonce) {
+export function renderAiAuthoringHtml(nonce, assets = {}) {
   if (typeof nonce !== "string" || !/^[a-f0-9]{32,128}$/.test(nonce)) {
     throw new TypeError("A cryptographically random Webview nonce is required");
   }
+
+  const safeMediaUri = value => {
+    if (typeof value !== "string" ||
+        !/^(?:https?:|vscode-resource:|vscode-webview-resource:|theia-resource:)/.test(value)) return "";
+    return value.replace(/&/g,"&amp;").replace(/"/g,"&quot;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+  };
+  const flowScript = safeMediaUri(assets.scriptUri);
+  const flowCss = safeMediaUri(assets.styleUri);
   const css = [
     ":root{color-scheme:light dark;font-family:var(--vscode-font-family);color:var(--vscode-foreground);background:var(--vscode-editor-background)}",
     "*{box-sizing:border-box}",
@@ -513,6 +521,12 @@ export function renderAiAuthoringHtml(nonce) {
     ".changeset-panel textarea{min-height:145px}",
     ".changeset-panel .group-list{max-height:45vh}",
     ".review-placeholder{color:var(--vscode-descriptionForeground);font-size:12px;line-height:1.5}",
+    ".ai-flow-container{min-height:0;margin:10px 0 12px}",
+    ".ai-flow-fallback{font-size:12px;color:var(--vscode-descriptionForeground)}",
+    ".ai-flow-focus{font-size:11px;border-left:3px solid var(--vscode-focusBorder);padding:7px 10px;margin:8px 0;background:var(--vscode-editorWidget-background)}",
+    ".ai-flow-focus button{margin-left:10px;padding:4px 7px;font-size:11px}",
+    ".group.graph-focus-group{outline:2px solid var(--vscode-focusBorder);outline-offset:1px}",
+    ".flow-group.graph-focus-group{outline:2px solid var(--vscode-focusBorder);outline-offset:1px}",
     "@media(max-width:1180px){main{grid-template-columns:minmax(220px,.65fr) minmax(350px,1.4fr)}.changeset-panel{grid-column:1/-1}}",
     "@media(max-width:720px){main{grid-template-columns:1fr}.changeset-panel{grid-column:auto}.review-view{max-height:none}.context-panel .source-list{max-height:34vh}}",
   ].join("\n");
@@ -549,13 +563,16 @@ export function renderAiAuthoringHtml(nonce) {
     "<!doctype html><html lang=\"zh-CN\"><head><meta charset=\"utf-8\">",
     "<meta http-equiv=\"Content-Security-Policy\" content=\"default-src 'none'; img-src data:; style-src 'nonce-" + nonce + "'; script-src 'nonce-" + nonce + "'; connect-src 'none'; font-src 'none';\">",
     "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">",
-    "<title>AI Procedure Authoring</title><style nonce=\"" + nonce + "\">" + css + "</style></head><body>",
+    "<title>AI Procedure Authoring</title><style nonce=\"" + nonce + "\">" + css + "</style>" +
+    (flowCss ? "<link rel=\"stylesheet\" nonce=\"" + nonce + "\" href=\"" + flowCss + "\">" : "") +
+    "</head><body>",
     "<header class=\"topbar\"><div class=\"heading\"><strong>AI Procedure Authoring</strong><small id=\"packageInfo\">读取当前 Package…</small></div><div class=\"top-actions\"><span id=\"modelLabel\" class=\"compiler\">当前模型：读取中…</span><button id=\"chooseModel\" class=\"secondary\" title=\"从 Gateway 选择模型或手动输入模型 ID\">选择模型</button><span class=\"compiler\">CA-SL v1alpha5 · FROZEN / RELEASED</span><button id=\"refresh\" class=\"secondary\">刷新上下文</button></div></header>",
     "<main>",
     "<section class=\"card changeset-panel\" aria-label=\"修改请求与 Change Set\"><h2>修改请求</h2><textarea id=\"task\" maxlength=\"4000\" placeholder=\"描述希望如何修改当前 Procedure。模型只提出语义修改，不直接写文件或执行 Tool。\"></textarea><p class=\"note\"><strong>发送前确认：</strong>只有明确批准后，选中的上下文才发往 Gateway；模型密钥不会进入 Studio。</p><div class=\"actions\"><button id=\"generate\">生成修改提案</button><button id=\"cancel\" class=\"secondary\" disabled>取消请求</button></div><hr><div class=\"top-actions spread\"><h2>Change Set</h2><span id=\"revisionInfo\" class=\"kind\">尚未生成</span></div><div id=\"patchState\" class=\"kind\">尚未生成</div><div id=\"patchError\" class=\"note error\"></div><p class=\"note\">每组不可拆分；取消选中会重新生成候选并运行 Compiler Check。</p><div id=\"groups\" class=\"group-list\"></div><div class=\"actions\"><button id=\"apply\" disabled>应用选中修改</button><button id=\"discard\" class=\"secondary\" disabled>丢弃提案</button></div></section>",
     "<section class=\"card context-panel\" aria-label=\"上下文\"><details id=\"contextPanel\" open><summary>上下文来源 · 发送范围</summary><div id=\"contextMeta\" class=\"context-meta\">读取当前 Procedure…</div><div class=\"note\">当前 Procedure 是唯一写入目标；Contract、Predicate、Schema 和已验证依赖为只读参考。Script / Reference 须逐任务选择。以下列表仅决定将发送给模型的内容。</div><div id=\"gatewayNotice\" class=\"note warning\"></div><div id=\"sources\" class=\"source-list\"></div></details></section>",
-    "<section class=\"card review-panel\" aria-label=\"AI 修改审阅工作台\"><div class=\"top-actions spread\"><h2>修改工作区</h2><span class=\"compiler\">只读审阅 · Source 唯一真源</span></div><nav class=\"review-tabs\" role=\"tablist\" aria-label=\"审阅视图\"><button type=\"button\" id=\"tab-plan\" role=\"tab\" aria-controls=\"view-plan\" aria-selected=\"true\" tabindex=\"0\">Plan</button><button type=\"button\" id=\"tab-flow\" role=\"tab\" aria-controls=\"view-flow\" aria-selected=\"false\" tabindex=\"-1\">Flow Changes</button><button type=\"button\" id=\"tab-diff\" role=\"tab\" aria-controls=\"view-diff\" aria-selected=\"false\" tabindex=\"-1\">YAML Diff</button><button type=\"button\" id=\"tab-validation\" role=\"tab\" aria-controls=\"view-validation\" aria-selected=\"false\" tabindex=\"-1\">Validation</button></nav><section id=\"view-plan\" class=\"review-view\" role=\"tabpanel\" aria-labelledby=\"tab-plan\"><div id=\"proposalSummary\" class=\"summary\"></div><div class=\"subsection\"><h3>执行计划</h3><div id=\"plan\" class=\"review-placeholder\">先描述要修改的 Procedure。</div></div><div class=\"subsection\"><h3>假设</h3><div id=\"assumptions\"></div></div><div id=\"blockers\" class=\"subsection\" aria-label=\"阻塞项\"></div></section><section id=\"view-flow\" class=\"review-view\" role=\"tabpanel\" aria-labelledby=\"tab-flow\" hidden><p class=\"note\">基于 Patch Engine 已规划的原子组显示语义变化。首阶段是只读变化摘要，尚非完整 React Flow 双图对比；不表示 Runtime 资格。</p><div id=\"flowChanges\" class=\"review-placeholder\">生成提案后显示节点及路由变化。</div></section><section id=\"view-diff\" class=\"review-view\" role=\"tabpanel\" aria-labelledby=\"tab-diff\" hidden><p class=\"note\">Host 生成的 YAML 候选预览：逐行对比当前缓冲区与所选修改组生成的精确 YAML 候选。红色为移除、绿色为新增。模型不能直接提供替换 YAML。</p><div id=\"diffSummary\" class=\"diff-head\">尚未生成候选 Diff。</div><div id=\"diffRows\" class=\"diff-grid\" aria-label=\"源文件与候选文件逐行差异\"></div><details id=\"fullSourceDisclosure\"><summary class=\"note\">查看完整原文与候选文本</summary><div class=\"source-preview\"><div><h4>当前 YAML</h4><pre id=\"currentSource\"></pre></div><div><h4>候选 YAML</h4><pre id=\"candidateSource\"></pre></div></div></details></section><section id=\"view-validation\" class=\"review-view\" role=\"tabpanel\" aria-labelledby=\"tab-validation\" hidden><div id=\"compilerStatus\" class=\"compiler\">Compiler Check: NOT_RUN</div><div id=\"validationIdentity\" class=\"context-meta\"></div><div id=\"diagnostics\" class=\"review-placeholder\">等待对选中候选执行正式 Compiler Check。</div><p class=\"note\">Compiler 静态校验不代表 Owner、Runtime 或真实 5GC 资格；Wait 另需可信 IngressCatalog。</p></section></section>",
+    "<section class=\"card review-panel\" aria-label=\"AI 修改审阅工作台\"><div class=\"top-actions spread\"><h2>修改工作区</h2><span class=\"compiler\">只读审阅 · Source 唯一真源</span></div><nav class=\"review-tabs\" role=\"tablist\" aria-label=\"审阅视图\"><button type=\"button\" id=\"tab-plan\" role=\"tab\" aria-controls=\"view-plan\" aria-selected=\"true\" tabindex=\"0\">Plan</button><button type=\"button\" id=\"tab-flow\" role=\"tab\" aria-controls=\"view-flow\" aria-selected=\"false\" tabindex=\"-1\">Flow Changes</button><button type=\"button\" id=\"tab-diff\" role=\"tab\" aria-controls=\"view-diff\" aria-selected=\"false\" tabindex=\"-1\">YAML Diff</button><button type=\"button\" id=\"tab-validation\" role=\"tab\" aria-controls=\"view-validation\" aria-selected=\"false\" tabindex=\"-1\">Validation</button></nav><section id=\"view-plan\" class=\"review-view\" role=\"tabpanel\" aria-labelledby=\"tab-plan\"><div id=\"proposalSummary\" class=\"summary\"></div><div class=\"subsection\"><h3>执行计划</h3><div id=\"plan\" class=\"review-placeholder\">先描述要修改的 Procedure。</div></div><div class=\"subsection\"><h3>假设</h3><div id=\"assumptions\"></div></div><div id=\"blockers\" class=\"subsection\" aria-label=\"阻塞项\"></div></section><section id=\"view-flow\" class=\"review-view\" role=\"tabpanel\" aria-labelledby=\"tab-flow\" hidden><p class=\"note\">当前 Source 与所选 Change Set 候选均由 Studio 的同一 v1alpha5 源码投影和 ELK 构图；图形仅供审阅，不代表 Compiler / Runtime 资格。</p><div id=\"flowCompareNotice\" class=\"note ai-flow-fallback\">生成提案后显示 React Flow 对比。失败时保留下方语义摘要。</div><div id=\"flowCompareCanvas\" class=\"ai-flow-container\" aria-label=\"当前与候选 Procedure 只读流程图对比\"></div><div id=\"flowFocusInfo\" class=\"ai-flow-focus\" hidden role=\"status\"></div><h3>原子修改组 · 语义摘要</h3><div id=\"flowChanges\" class=\"review-placeholder\">生成提案后显示节点及路由变化。</div></section><section id=\"view-diff\" class=\"review-view\" role=\"tabpanel\" aria-labelledby=\"tab-diff\" hidden><p class=\"note\">Host 生成的 YAML 候选预览：逐行对比当前缓冲区与所选修改组生成的精确 YAML 候选。红色为移除、绿色为新增。模型不能直接提供替换 YAML。</p><div id=\"diffSummary\" class=\"diff-head\">尚未生成候选 Diff。</div><div id=\"diffRows\" class=\"diff-grid\" aria-label=\"源文件与候选文件逐行差异\"></div><details id=\"fullSourceDisclosure\"><summary class=\"note\">查看完整原文与候选文本</summary><div class=\"source-preview\"><div><h4>当前 YAML</h4><pre id=\"currentSource\"></pre></div><div><h4>候选 YAML</h4><pre id=\"candidateSource\"></pre></div></div></details></section><section id=\"view-validation\" class=\"review-view\" role=\"tabpanel\" aria-labelledby=\"tab-validation\" hidden><div id=\"compilerStatus\" class=\"compiler\">Compiler Check: NOT_RUN</div><div id=\"validationIdentity\" class=\"context-meta\"></div><div id=\"diagnostics\" class=\"review-placeholder\">等待对选中候选执行正式 Compiler Check。</div><p class=\"note\">Compiler 静态校验不代表 Owner、Runtime 或真实 5GC 资格；Wait 另需可信 IngressCatalog。</p></section></section>",
     "</main><footer class=\"status\"><span id=\"status\">正在初始化…</span><span>仅修改当前 Procedure 缓冲区 · 不自动保存 · 每个候选都必须通过 Compiler v2.0.2 Check；Wait 还需要可信 IngressCatalog 绑定</span></footer>",
+    (flowScript ? "<script nonce=\"" + nonce + "\" src=\"" + flowScript + "\"></script>" : "") +
     "<script nonce=\"" + nonce + "\">" + script + "</script></body></html>",
   ].join("\n");
 }
@@ -1310,8 +1327,17 @@ export function registerAiAuthoringEditor(vscode, context, { getActiveDocument, 
         choosingModel: false,
         contextRequestId: 0,
       };
-      panel.webview.options = { enableScripts: true, localResourceRoots: [] };
-      panel.webview.html = renderAiAuthoringHtml(nonceValue());
+      const reviewMediaRoot = vscode.Uri.joinPath(context.extensionUri, "media");
+      panel.webview.options = {
+        enableScripts:true,
+        localResourceRoots:[reviewMediaRoot],
+      };
+      panel.webview.html = renderAiAuthoringHtml(nonceValue(), {
+        scriptUri: panel.webview.asWebviewUri(
+          vscode.Uri.joinPath(reviewMediaRoot,"ai-flow-compare.js")).toString(),
+        styleUri: panel.webview.asWebviewUri(
+          vscode.Uri.joinPath(reviewMediaRoot,"ai-flow-compare.css")).toString(),
+      });
       context.subscriptions.push(panel.webview.onDidReceiveMessage(async (message) => {
         if (!message || typeof message.type !== "string") return;
         if (message.type === "ready" || message.type === "refresh") await refreshContext();
