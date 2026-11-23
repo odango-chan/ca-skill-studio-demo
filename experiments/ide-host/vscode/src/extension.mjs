@@ -19,6 +19,7 @@ import {registerProjectWelcome} from "./project-welcome.mjs";
 
 import {registerWorkbench} from "./workbench.mjs";
 import {registerAiAuthoringEditor} from "./ai-authoring-editor.mjs";
+import {registerSyntheticAuthoringAcceptance} from "./ai-authoring-acceptance.mjs";
 import {staticPreviewResourceUrl} from "./webview-resource-url.mjs";
 import {registerContractCommands,mountContractPreview} from "./contract-editor.mjs";
 import {registerPredicateCommands,mountPredicatePreview} from "./predicate-editor.mjs";
@@ -193,6 +194,7 @@ export function activate(context){
     getActiveDocument:()=>workbench?.getActiveDocument?.()??null,
     compilerIntegration
   }));
+  registerSafely("Synthetic AI Authoring acceptance",()=>registerSyntheticAuthoringAcceptance(vscode,context,compilerIntegration));
   registerSafely("Package diagnostic tests",()=>registerPackageDiagnosticTesting(vscode,context,{
     getActiveProcedure:()=>workbench?.getActiveDocument?.()??
       vscode.window.activeTextEditor?.document??null

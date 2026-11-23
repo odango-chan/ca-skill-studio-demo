@@ -1611,6 +1611,25 @@ try{
       }catch{/* The acceptance profile is ephemeral; never hide the primary failure. */}
       await new Promise(resolve=>mockGateway.close(resolve));
     }
+    // The backend CI host enables this fixture-only command explicitly.
+    // Unlike the unqualified 5GC mock proposal above, this verifies an exact
+    // Compiler-qualified candidate in the native VS Code/Theia editor.
+    const synthetic=await nativeCommand("skillStudio.internal.syntheticAuthoringApplyAcceptance");
+    if(synthetic?.compilerVersion!=="v2.0.2"||
+       synthetic?.qualification!=="SYNTHETIC_TEST_ONLY"||
+       synthetic?.compilerBaseline?.errors!==0||
+       synthetic?.compilerCandidate?.errors!==0||
+       synthetic?.atomicGroupCount!==1||
+       synthetic?.nativeWorkspaceEdit!=="PASS"||
+       synthetic?.nativeUndo!=="PASS"||
+       synthetic?.unsavedDiskUnchanged!==true||
+       synthetic?.autoSaved!==false||
+       synthetic?.restoredOriginal!==true){
+      throw Error("Synthetic Compiler-qualified native Editor Apply/Undo acceptance failed: "+
+        JSON.stringify(synthetic));
+    }
+    console.log("STUDIO_AI_AUTHORING_SYNTHETIC_NATIVE_EDIT_UNDO_CHROMIUM_PASS",
+      JSON.stringify(synthetic));
   }
   if(requireEditor)
     console.log("THEIA_BROWSER_HOST_V1ALPHA5_ACCEPTANCE_PASS");

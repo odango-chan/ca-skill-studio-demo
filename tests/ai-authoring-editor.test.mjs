@@ -415,3 +415,20 @@ test("Rejected WorkspaceEdit fails closed and never calls save",async()=>{
     {source:"old",documentVersion:1,candidateSource:"new"}),/Host rejected/);
   assert.equal(saveCount,0);
 });
+
+test("synthetic positive native Editor acceptance is CI-only and keeps trusted fixture off production Pages",()=>{
+  const extension=readFileSync(new URL("../experiments/ide-host/vscode/src/extension.mjs",import.meta.url),"utf8");
+  const acceptance=readFileSync(new URL("../experiments/ide-host/vscode/src/ai-authoring-acceptance.mjs",import.meta.url),"utf8");
+  const browser=readFileSync(new URL("../experiments/ide-host/scripts/theia-browser-smoke.mjs",import.meta.url),"utf8");
+  const backend=readFileSync(new URL("../.github/workflows/theia-browser-host-spike.yml",import.meta.url),"utf8");
+  const pages=readFileSync(new URL("../.github/workflows/pages.yml",import.meta.url),"utf8");
+  assert.match(extension,/registerSyntheticAuthoringAcceptance/);
+  assert.match(acceptance,/process\.env\.THEIA_ACCEPTANCE_FIXTURES!=="1"/);
+  assert.match(acceptance,/applyAuthoringCandidateToBuffer/);
+  assert.match(acceptance,/executeCommand\("undo"\)/);
+  assert.match(acceptance,/unsavedDiskUnchanged:true/);
+  assert.match(browser,/STUDIO_AI_AUTHORING_SYNTHETIC_NATIVE_EDIT_UNDO_CHROMIUM_PASS/);
+  assert.match(backend,/trusted-build-request\.json/);
+  assert.match(backend,/THEIA_ACCEPTANCE_FIXTURES: "1"/);
+  assert.doesNotMatch(pages,/authoring-trusted-build-request\.json/);
+});

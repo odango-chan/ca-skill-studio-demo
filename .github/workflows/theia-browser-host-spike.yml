@@ -95,6 +95,7 @@ jobs:
           cp "$(go env GOROOT)/lib/wasm/wasm_exec.js" dist/wasm_exec.js
           cp dist/skillc.wasm ../experiments/ide-host/vscode/dist/skillc.wasm
           cp dist/wasm_exec.js ../experiments/ide-host/vscode/dist/wasm_exec.js
+          cp web/parity-v1alpha5/trusted-build-request.json ../experiments/ide-host/vscode/dist/authoring-trusted-build-request.json
       - name: Stage same Web extension for Theia
         run: node experiments/ide-host/scripts/prepare-theia-online.mjs
       - name: Stage same Web extension for Theia
@@ -124,6 +125,8 @@ jobs:
           test -n "$markdown_manifest"
           cp -R "$(dirname "$markdown_manifest")" "$HOME/.theia/plugins/"
       - name: Start Theia backend for Webview endpoint
+        env:
+          THEIA_ACCEPTANCE_FIXTURES: "1"
         run: |
           npm run start --prefix experiments/ide-host/theia-browser > /tmp/theia-browser.log 2>&1 &
           echo $! > /tmp/theia-browser.pid

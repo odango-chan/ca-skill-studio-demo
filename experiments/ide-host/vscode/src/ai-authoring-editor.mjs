@@ -1085,7 +1085,8 @@ export function registerAiAuthoringEditor(vscode, context, { getActiveDocument, 
     }
   });
   const gatewayAcceptanceCommand =
-    typeof process !== "undefined" && Boolean(process.versions?.node)
+    typeof process !== "undefined" && Boolean(process.versions?.node) &&
+      process.env.THEIA_ACCEPTANCE_FIXTURES === "1"
       ? vscode.commands.registerCommand("skillStudio.internal.configureAiGatewayAcceptance",
         async ({ gatewayUrl = "", modelId = "deepseek-v4.1-flash" } = {}) => {
           if (typeof gatewayUrl !== "string" || typeof modelId !== "string" ||
