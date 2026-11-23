@@ -23,7 +23,35 @@ edit files or qualify Owner, Tool, Runtime or Deployment.
   (`feat/ai-authoring-editor-tab-v1alpha5-20261117`). The smoke is not
   present on Studio `main` while #208 remains unmerged.
 
-## Run on Windows PowerShell
+## Preferred: download the small Windows smoke package
+
+On [Studio PR #208](https://github.com/odango-chan/ca-skill-studio-demo/pull/208),
+open the latest successful **Verify Skill Studio pull requests** run. Under
+**Artifacts**, download `studio-ai-authoring-live-smoke-windows`, then unzip it
+into a directory under Windows Downloads. The archive contains:
+
+- `ai-authoring-live-gateway-smoke.mjs` — one bundled executable containing
+  the **real Studio Authoring Core / Procedure Agent / Patch Engine**, not a
+  handwritten imitation or a generic Gateway ping;
+- `run-live-gateway-smoke.cmd` — Windows CMD launcher with preconfigured local
+  Gateway URL and `deepseek-v4.1-flash`, an explicit yes/no consent prompt,
+  and no PowerShell execution-policy requirement;
+- `README.md` — this document.
+
+Open **Command Prompt** or PowerShell inside the extracted folder and run:
+
+```cmd
+.\\run-live-gateway-smoke.cmd
+```
+
+Node.js **24+** must be on `PATH` for this optional smoke. Git, a cloned
+Studio repository, project `npm install`, Go, WSL and changing PowerShell
+script policy are **not** required. The launcher does **not** read or embed
+your OpenCode Go API Key; the already-running Gateway holds it. The resulting
+status line can be shared, but never copy model response contents or secrets.
+The test only attempts a single synthetic model request after you approve it.
+
+## Alternative: run from the Studio PR checkout on Windows PowerShell
 
 From the **Studio repository root**, not the Gateway executable directory:
 
