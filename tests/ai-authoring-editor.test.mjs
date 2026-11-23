@@ -13,6 +13,7 @@ import {
   isLiveDocumentRevision,
   preferredProcedureDocument,
   isAuthoringApplyAllowed,
+  applyAuthoringCandidateToBuffer,
 } from "../experiments/ide-host/vscode/src/ai-authoring-editor.mjs";
 
 const base64 = (value) => Buffer.from(value, "utf8").toString("base64");
@@ -353,4 +354,64 @@ test("AI Authoring preserves the actual model failure instead of hiding it behin
   assert.match(source,/post\(\{ type: "busy", busy: false \}\)/);
   assert.match(source,/message\.type==='busy'/);
   assert.doesNotMatch(source,/请求结束。Compiler Check:/);
+});
+
+test("Compiler-approved candidate applies through native WorkspaceEdit without saving",async()=>{
+  const rootUri={path:"/workspace",scheme:"file",authority:"",toString(){return "file:///workspace";}};
+  const uri={path:"/workspace/skills/test/assurance/procedure.yaml",scheme:"file",authority:"",
+    toString(){return "file:///workspace/skills/test/assurance/procedure.yaml";}};
+  let source="start: old\\nnodes: {}\\n",version=3,applyCount=0,saveCount=0;
+  const original=source,candidate="start: new\\nnodes: {}\\n";
+  const document={uri,get version(){return version;},getText(){return source;},
+    positionAt(offset){return {offset};},async save(){saveCount++;return true;}};
+  class WorkspaceEdit{
+    edits=[];
+    replace(target,range,text){this.edits.push({target,range,text});}
+  }
+  class Range{constructor(start,end){this.start=start;this.end=end;}}
+  const vscode={
+    WorkspaceEdit,Range,
+    workspace:{
+      workspaceFolders:[{uri:rootUri}],
+      async applyEdit(edit){
+        applyCount++;
+        assert.equal(edit.edits.length,1);
+        assert.equal(edit.edits[0].target,uri);
+        assert.deepEqual([edit.edits[0].range.start.offset,edit.edits[0].range.end.offset],
+          [0,original.length]);
+        source=edit.edits[0].text;
+        version++;
+        return true;
+      },
+    }
+  };
+  const result=await applyAuthoringCandidateToBuffer(vscode,document,
+    {source:original,documentVersion:3,candidateSource:candidate});
+  assert.deepEqual(result,{applied:true,saved:false});
+  assert.equal(source,candidate);
+  assert.equal(applyCount,1);
+  assert.equal(saveCount,0);
+  await assert.rejects(applyAuthoringCandidateToBuffer(vscode,document,
+    {source:original,documentVersion:3,candidateSource:"stale"}),/revision changed/);
+  assert.equal(applyCount,1,"stale revision must not enter WorkspaceEdit");
+  const outside={...document,uri:{...uri,path:"/workspace/skills/test/SKILL.md"}};
+  await assert.rejects(applyAuthoringCandidateToBuffer(vscode,outside,
+    {source:candidate,documentVersion:version,candidateSource:"invalid"}),/current Procedure revision/);
+  assert.equal(applyCount,1);
+});
+
+test("Rejected WorkspaceEdit fails closed and never calls save",async()=>{
+  let saveCount=0;
+  const uri={path:"/workspace/skills/test/assurance/procedure.yaml",scheme:"file",authority:""};
+  const document={uri,version:1,getText(){return "old";},
+    positionAt(offset){return {offset};},save(){saveCount++;}};
+  const vscode={
+    WorkspaceEdit:class {replace(){}},
+    Range:class {constructor(){}},
+    workspace:{workspaceFolders:[{uri:{path:"/workspace",scheme:"file",authority:""}}],
+      applyEdit:async()=>false}
+  };
+  await assert.rejects(applyAuthoringCandidateToBuffer(vscode,document,
+    {source:"old",documentVersion:1,candidateSource:"new"}),/Host rejected/);
+  assert.equal(saveCount,0);
 });

@@ -277,6 +277,28 @@ export function isAuthoringApplyAllowed({
   );
 }
 
+export async function applyAuthoringCandidateToBuffer(vscode, document, {
+  source,
+  documentVersion,
+  candidateSource,
+} = {}) {
+  if (!document?.uri || !isProcedurePath(document.uri.path) ||
+      typeof candidateSource !== "string" ||
+      !isLiveDocumentRevision(document, { source, documentVersion })) {
+    throw new Error("The current Procedure revision changed; refusing a stale native WorkspaceEdit.");
+  }
+  assertStudioMutation(document.uri, vscode.workspace.workspaceFolders ?? [], "edit");
+  const edit = new vscode.WorkspaceEdit();
+  edit.replace(document.uri,
+    new vscode.Range(document.positionAt(0),document.positionAt(source.length)),
+    candidateSource);
+  const applied = await vscode.workspace.applyEdit(edit);
+  if (applied !== true) {
+    throw new Error("Host rejected the native WorkspaceEdit; no save was attempted.");
+  }
+  return Object.freeze({ applied:true, saved:false });
+}
+
 export function isCurrentAuthoringSession(current, expected) {
   return Boolean(current && current === expected && current.disposed !== true);
 }
@@ -951,15 +973,11 @@ export function registerAiAuthoringEditor(vscode, context, { getActiveDocument, 
           : "所选候选没有获得完整、精确匹配的 v2.0.2 Compiler PASS；仍保持 PREVIEW ONLY。" });
         return;
       }
-      assertStudioMutation(document.uri, vscode.workspace.workspaceFolders ?? [], "edit");
-      const edit = new vscode.WorkspaceEdit();
-      edit.replace(
-        document.uri,
-        new vscode.Range(document.positionAt(0), document.positionAt(document.getText().length)),
-        materialized.source,
-      );
-      const applied = await vscode.workspace.applyEdit(edit);
-      if (!applied) throw new Error("Host rejected the native WorkspaceEdit; no save was attempted.");
+      await applyAuthoringCandidateToBuffer(vscode, document, {
+        source: pending.source,
+        documentVersion: pending.documentVersion,
+        candidateSource: materialized.source,
+      });
       if (!isCurrent()) return;
       activeSession.pending = null;
       post({
@@ -976,7 +994,7 @@ export function registerAiAuthoringEditor(vscode, context, { getActiveDocument, 
     } finally {
       if (isCurrent()) {
         activeSession.applying = false;
-        post({ type: "status", message: "应用操作结束。Compiler Check: " + appliedCompilerState + "。", busy: false });
+        post({ type: "busy", busy: false });
       }
     }
   }
