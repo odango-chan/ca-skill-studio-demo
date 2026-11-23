@@ -170,9 +170,7 @@ export function registerSyntheticAuthoringAcceptance(vscode,context,compilerInte
         pendingUndo=null;
         try{
           if(state.document.getText()===state.original){
-            await vscode.window.showTextDocument(state.document,{
-              preview:false,preserveFocus:false,viewColumn:vscode.ViewColumn.One
-            });
+            await focusSyntheticSource(state);
             await vscode.commands.executeCommand("workbench.action.closeActiveEditor");
           }
         }finally{
@@ -238,6 +236,25 @@ export function registerSyntheticAuthoringAcceptance(vscode,context,compilerInte
         }
       }
     });
+  async function focusSyntheticSource(state) {
+    // Theia can transiently reject showTextDocument(TextDocument) while the
+    // standalone Webview switches focus after native WorkspaceEdit. Retry
+    // with the exact same prevalidated URI; never substitute another file.
+    let lastError;
+    for (const target of [state.document,state.uri,state.uri,state.document]) {
+      try {
+        await vscode.window.showTextDocument(target,{
+          preview:false,preserveFocus:false,viewColumn:vscode.ViewColumn.One
+        });
+        return;
+      } catch (error) {
+        lastError=error;
+        await new Promise(resolve=>setTimeout(resolve,120));
+      }
+    }
+    throw new Error("Unable to refocus the same synthetic Procedure for frontend Undo: "+
+      String(lastError?.message??"Theia editor unavailable"));
+  }
   const editorApplied=vscode.commands.registerCommand(
     "skillStudio.internal.verifySyntheticEditorTabApplied",async()=>{
       const state=editorFixture;
@@ -251,9 +268,7 @@ export function registerSyntheticAuthoringAcceptance(vscode,context,compilerInte
       const disk=new TextDecoder().decode(await vscode.workspace.fs.readFile(state.uri));
       if(disk!==state.original)
         throw Error("The production Editor Tab unexpectedly saved the synthetic source");
-      await vscode.window.showTextDocument(state.document,{
-        preview:false,preserveFocus:false,viewColumn:vscode.ViewColumn.One
-      });
+      await focusSyntheticSource(state);
       return {nativeWorkspaceEdit:"PASS",unsavedDiskUnchanged:true,
         autoSaved:false,pendingUndo:true};
     });

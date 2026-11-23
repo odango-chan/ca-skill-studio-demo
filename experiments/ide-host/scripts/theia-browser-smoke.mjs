@@ -1466,6 +1466,14 @@ try{
               "patchState:document.getElementById('patchState')?.textContent??'',"+
               "statusText:document.getElementById('status')?.textContent??'',"+
               "patchError:document.getElementById('patchError')?.textContent??'',"+
+              "reviewTabs:[...document.querySelectorAll('[role=tab]')].map(x=>x.textContent),"+
+              "flowGroups:document.querySelectorAll('[data-flow-group]').length,"+
+              "diffAddedRows:document.querySelectorAll('.diff-row.added').length,"+
+              "diffRemovedRows:document.querySelectorAll('.diff-row.removed').length,"+
+              "diffSummary:document.getElementById('diffSummary')?.textContent??'',"+
+              "validationText:document.getElementById('validationIdentity')?.textContent??'',"+
+              "contextVisible:document.getElementById('contextPanel')?.open===true,"+
+              "reviewPanelCount:document.querySelectorAll('.review-panel').length,"+
               "applyDisabled:document.getElementById('apply')?.disabled!==false"+
               "}))()"
           });
@@ -1579,6 +1587,31 @@ try{
             }:null
           }));
       }
+      if(proposalView.reviewPanelCount!==1||proposalView.contextVisible!==true||
+         JSON.stringify(proposalView.reviewTabs)!==JSON.stringify(["Plan","Flow Changes","YAML Diff","Validation"])||
+         proposalView.flowGroups<1||proposalView.diffAddedRows<1||
+         proposalView.diffRemovedRows<0||!proposalView.diffSummary.includes("新增")||
+         !proposalView.validationText.includes("FAIL")) {
+        throw Error("AI Workbench three-region semantic/Source/Compiler review did not render: "+
+          JSON.stringify({tabs:proposalView.reviewTabs,flowGroups:proposalView.flowGroups,
+            added:proposalView.diffAddedRows,removed:proposalView.diffRemovedRows,
+            summary:proposalView.diffSummary,validation:proposalView.validationText}));
+      }
+      const tabNavigation=await command("Runtime.evaluate",{
+        contextId:aiContextId,
+        returnByValue:true,
+        expression:"(()=>{const diff=document.getElementById('tab-diff');"+
+          "diff.click();const opened=diff.getAttribute('aria-selected')==='true'&&"+
+          "!document.getElementById('view-diff').hidden;"+
+          "diff.dispatchEvent(new KeyboardEvent('keydown',{key:'ArrowRight',bubbles:true}));"+
+          "const keyboard=document.getElementById('tab-validation').getAttribute('aria-selected')==='true'&&"+
+          "!document.getElementById('view-validation').hidden;"+
+          "document.getElementById('tab-plan').click();"+
+          "document.activeElement?.blur();"+
+          "return {opened,keyboard,restored:document.getElementById('tab-plan').getAttribute('aria-selected')==='true'};})()"
+      });
+      if(!tabNavigation.result?.value?.opened||!tabNavigation.result?.value?.keyboard||!tabNavigation.result?.value?.restored)
+        throw Error("AI Workbench keyboard-accessible review tabs failed in Chromium");
       if(!proposalView.compilerStatus.includes("Compiler v2.0.2 Check: FAIL")||
          !proposalView.patchState.includes("Compiler Check failed")||
          !proposalView.applyDisabled)
@@ -1599,6 +1632,11 @@ try{
         stableSessionHeader:"PASS",
         structuredModelProposal:"PASS",
         sourcePreservingPatchPreview:"PASS",
+        workbenchThreeRegion:"PASS",
+        flowChangesSourceOutline:"PASS",
+        lineDiffReview:"PASS",
+        compilerDiagnosticsReview:"PASS",
+        keyboardReviewTabs:"PASS",
         compilerCheck:"FAIL_AS_EXPECTED_FOR_UNQUALIFIED_5GC_EXAMPLE",
         applyBlocked:true
       };
