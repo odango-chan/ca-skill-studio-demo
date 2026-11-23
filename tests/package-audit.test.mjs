@@ -151,6 +151,48 @@ test("a complete inventory confirms a missing local Schema, partial inventory do
   assert.ok(codes(partial).includes("PACKAGE_SNAPSHOT_INCOMPLETE"));
 });
 
+test("local Schema documents report YAML syntax and unsupported dialect defects",()=>{
+  const valid=fixture("establish-pdu-session");
+  const validDiagnostics=auditPackage({files:valid,dependencyContext:{available:false}});
+  assert.ok(!validDiagnostics.some(item=>
+    ["SCHEMA_DOCUMENT_PARSE_ERROR","SCHEMA_DOCUMENT_ROOT_INVALID",
+      "SCHEMA_DIALECT_UNSUPPORTED","SCHEMA_DIALECT_INVALID"].includes(item.code)));
+
+  const unsupported=clone(valid);
+  const schema=unsupported.get("schemas/establishment-request.schema.yaml");
+  schema.text=schema.text.replace(
+    "https://json-schema.org/draft/2020-12/schema",
+    "https://json-schema.org/draft/2019-09/schema");
+  const unsupportedDiagnostic=find(auditPackage({files:unsupported,
+    dependencyContext:{available:false}}),"SCHEMA_DIALECT_UNSUPPORTED","2019-09");
+  assert.ok(unsupportedDiagnostic);
+  assert.equal(unsupportedDiagnostic.path,"schemas/establishment-request.schema.yaml");
+  assert.equal(unsupportedDiagnostic.status,"confirmed");
+  assert.equal(unsupportedDiagnostic.severity,"error");
+
+  const malformed=clone(valid);
+  malformed.get("schemas/establishment-request.schema.yaml").text=
+    "$schema: [unterminated\n";
+  const parseDiagnostic=find(auditPackage({files:malformed,
+    dependencyContext:{available:false}}),"SCHEMA_DOCUMENT_PARSE_ERROR");
+  assert.ok(parseDiagnostic);
+  assert.equal(parseDiagnostic.path,"schemas/establishment-request.schema.yaml");
+  assert.equal(parseDiagnostic.status,"confirmed");
+  assert.equal(parseDiagnostic.severity,"error");
+});
+
+test("local Schema $id collisions are reported at the duplicate declaration",()=>{
+  const files=fixture("establish-pdu-session");
+  const source=files.get("schemas/establishment-request.schema.yaml").text;
+  files.set("schemas/z-duplicate.schema.yaml",{text:source});
+  const diagnostic=find(auditPackage({files,dependencyContext:{available:false}}),
+    "SCHEMA_ID_DUPLICATE","establishment-request");
+  assert.ok(diagnostic);
+  assert.equal(diagnostic.path,"schemas/z-duplicate.schema.yaml");
+  assert.equal(diagnostic.status,"confirmed");
+  assert.equal(diagnostic.severity,"error");
+});
+
 test("project dependency state distinguishes unconfigured dependencies from unavailable locks",()=>{
   const files=fixture("establish-pdu-session");
   const unconfigured=auditPackage({files,
