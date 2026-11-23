@@ -607,6 +607,30 @@ test("F3 Monaco YAML Diff is local, read-only and preserves line-diff fallback",
   assert.ok(build.includes("media/ai-yaml-diff.js"));
 });
 
+test("F4 Workbench Refine + history is session-only, shows Context origin, and revokes old Apply",()=>{
+  const html=renderAiAuthoringHtml("a".repeat(48));
+  for(const id of ["refineTask","refine","revisionTimeline","sources","contextMeta"]) {
+    assert.ok(html.includes('id="'+id+'"'),"missing F4 element "+id);
+  }
+  assert.match(html,/function renderHistory/);
+  assert.match(html,/renderHistory\\(message.history\\)/);
+  assert.match(html,/message.readonly===true/);
+  assert.match(html,/input.disabled=historical/);
+  assert.match(html,/message.type==='historyInspect'/);
+  assert.match(html,/type:'refine'/);
+  assert.match(html,/writeOrigin/);
+  assert.match(html,/item.digest/);
+  const source=readFileSync(new URL("../experiments/ide-host/vscode/src/ai-authoring-editor.mjs",import.meta.url),"utf8");
+  assert.match(source,/createSessionProposalHistory/);
+  assert.match(source,/buildRefinementTask/);
+  assert.match(source,/history\\.record\\(/);
+  assert.match(source,/history\\.inspect\\(/);
+  assert.match(source,/activeSession\\.pending = null/);
+  assert.match(source,/contextStamp/);
+  assert.match(source,/isLiveDocumentRevision/);
+  assert.doesNotMatch(source,/localStorage\\.setItem|sessionStorage\\.setItem/);
+});
+
 test("F2 Source-backed React Flow graph stays embedded and offline with nonce assets",()=>{
   const uri="https://preview.example.invalid/webview/ai-flow-compare.js";
   const html=renderAiAuthoringHtml("a".repeat(48),{
