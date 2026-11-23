@@ -187,6 +187,10 @@ test("local Schema documents report YAML syntax and unsupported dialect defects"
   assert.equal(unsupportedDiagnostic.path,"schemas/establishment-request.schema.yaml");
   assert.equal(unsupportedDiagnostic.status,"confirmed");
   assert.equal(unsupportedDiagnostic.severity,"error");
+  assert.ok(unsupportedDiagnostic.sourceRange);
+  assert.equal(schema.text.slice(unsupportedDiagnostic.sourceRange.start,
+    unsupportedDiagnostic.sourceRange.end),
+    "https://json-schema.org/draft/2019-09/schema");
 
   const malformed=clone(valid);
   malformed.get("schemas/establishment-request.schema.yaml").text=
@@ -212,6 +216,8 @@ test("local Schema documents report YAML syntax and unsupported dialect defects"
 test("local Schema $id collisions are reported at the duplicate declaration",()=>{
   const files=fixture("establish-pdu-session");
   const source=files.get("schemas/establishment-request.schema.yaml").text;
+  const id=/^\$id:\s*(\S+)/m.exec(source)?.[1];
+  assert.ok(id);
   files.set("schemas/z-duplicate.schema.yaml",{text:source});
   const diagnostic=find(auditPackage({files,dependencyContext:{available:false}}),
     "SCHEMA_ID_DUPLICATE","establishment-request");
@@ -219,6 +225,9 @@ test("local Schema $id collisions are reported at the duplicate declaration",()=
   assert.equal(diagnostic.path,"schemas/z-duplicate.schema.yaml");
   assert.equal(diagnostic.status,"confirmed");
   assert.equal(diagnostic.severity,"error");
+  assert.ok(diagnostic.sourceRange);
+  assert.equal(files.get(diagnostic.path).text.slice(
+    diagnostic.sourceRange.start,diagnostic.sourceRange.end),id);
 });
 
 test("project dependency state distinguishes unconfigured dependencies from unavailable locks",()=>{
