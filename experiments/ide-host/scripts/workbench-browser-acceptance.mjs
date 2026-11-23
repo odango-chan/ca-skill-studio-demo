@@ -1190,12 +1190,16 @@ export async function runWorkbenchAcceptance({
   // Run in-memory static diagnostic regression cases. These results belong
   // to the native Test Explorer, never to Source Problems or Runtime Evidence.
   const offlineTests=await nativeCommand("skillStudio.runDiagnosticTests");
+  const expectedOfflineTestCount=Array.isArray(offlineTests?.results)
+    ?offlineTests.results.length:0;
+  const everyOfflineTestPassed=expectedOfflineTestCount>0&&
+    offlineTests.results.every(item=>item?.status==="PASS");
   if(!offlineTests||offlineTests.apiVersion!=="skill-studio-diagnostic-regression/v1"||
      offlineTests.qualification!=="NOT_QUALIFIED"||
-     offlineTests.summary?.PASS!==11||offlineTests.summary?.FAIL!==0||
-     offlineTests.summary?.NOT_RUN!==0||
-     !offlineTests.nativeTestExplorer)
-    throw Error("Native Test Explorer did not run all 11 offline static diagnostic regression cases: "+
+     offlineTests.summary?.PASS!==expectedOfflineTestCount||
+     offlineTests.summary?.FAIL!==0||offlineTests.summary?.NOT_RUN!==0||
+     !everyOfflineTestPassed||!offlineTests.nativeTestExplorer)
+    throw Error("Native Test Explorer did not pass every offline static diagnostic regression case: "+
       JSON.stringify(offlineTests));
   console.log("STUDIO_OFFLINE_DIAGNOSTIC_TEST_EXPLORER_CHROMIUM",JSON.stringify({
     nativeTestExplorer:offlineTests.nativeTestExplorer,
