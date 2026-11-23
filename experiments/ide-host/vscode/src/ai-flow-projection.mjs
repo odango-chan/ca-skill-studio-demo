@@ -1,4 +1,5 @@
 import { analyzeCurrentSource } from "../../../../language/core/source.ts";
+import { withProcedureTerminalViews } from "../../../../site/procedure-terminal-view.mjs";
 
 /**
  * Authoritative editor-time graph projection for AI review. Both snapshots
@@ -30,7 +31,7 @@ export function projectAiReviewProcedure(snapshot, source) {
       !procedure.nodes.length) {
     throw new Error("Procedure graph exceeds the read-only review limits.");
   }
-  return procedure;
+  return withProcedureTerminalViews(procedure);
 }
 
 const stages = node => JSON.stringify((node.stages ?? []).map(stage=>({
