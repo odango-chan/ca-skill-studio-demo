@@ -1617,7 +1617,7 @@ try{
             "return {initialized:!!editor,shown:surface?.hidden===false,"+
             "width:r?.width||0,height:r?.height||0,changedNodeVisible:surface?.innerText.includes(\'ai-authoring-smoke-node\')===true,"+
             "fallbackHidden:document.getElementById('diffRows')?.hidden===true,"+
-            "identity:window.skillStudioAiYamlDiff?.identity||'',"+
+            "mainWorldAdapterNotObservable:true,"+
             "notice:document.getElementById('monacoDiffNotice')?.textContent||''};})()"
         });
         const v=evaluated.result?.value;
@@ -1638,24 +1638,23 @@ try{
         throw Error("F3 Monaco Diff did not render with non-empty exact candidate in Chromium: "+
           JSON.stringify(diagnostic.result?.value));
       }
-      // Webview reveal can recreate the iframe between the render probe and
-      // the controls probe. Retry a bounded number of times and distinguish
-      // a missing select from an unloaded adapter, rather than assuming one.
+      // CDP intentionally executes in an isolated world. Its window globals
+      // do NOT expose main-world adapter objects; validate shared DOM only.
       let diffMode=null;
       for(let attempt=0;attempt<40;attempt++){
         diffMode=await command("Runtime.evaluate",{
           contextId:aiContextId,returnByValue:true,
           expression:"(()=>{try{const select=document.getElementById('monacoDiffMode');"+
-            "const api=window.skillStudioAiYamlDiff;"+
+            "const controls=document.getElementById('monacoDiffControls');"+
             "const surface=document.getElementById('monacoDiffSurface');"+
-            "if(!select||!api||!surface)return {ok:false,selectPresent:!!select,"+
-              "adapterPresent:!!api,surfacePresent:!!surface,title:document.title};"+
+            "if(!select||!surface||!controls)return {ok:false,selectPresent:!!select,"+
+              "controlsPresent:!!controls,surfacePresent:!!surface,title:document.title};"+
             "select.value='inline';select.dispatchEvent(new Event('change',{bubbles:true}));"+
             "document.getElementById('monacoDiffNext')?.click();"+
             "document.getElementById('monacoDiffPrevious')?.click();"+
             "select.value='side-by-side';select.dispatchEvent(new Event('change',{bubbles:true}));"+
             "return {ok:select.value==='side-by-side'&&!surface.hidden,"+
-              "value:select.value,hidden:surface.hidden,identity:api.identity};"+
+              "value:select.value,hidden:surface.hidden,controlsVisible:controls.hidden===false};"+
             "}catch(error){return {ok:false,error:String(error?.stack||error)}}})()"
         });
         if(diffMode.result?.value?.ok===true)break;
