@@ -124,16 +124,37 @@ function GraphScene({procedure,layout,change,side,filterChanged}) {
 
 function Compare({data,layouts}) {
   const [changedOnly,setChangedOnly]=useState(false);
+  const [pathMode,setPathMode]=useState("all");
+  const [shownLayouts,setShownLayouts]=useState(layouts);
   const {before,after,change}=data;
+  useEffect(()=>{
+    if(pathMode==="all"){setShownLayouts(layouts);return;}
+    let cancelled=false;
+    Promise.all([
+      layoutProcedureELK(before,{direction:"DOWN",pathFocus:{mode:"normal"}}),
+      layoutProcedureELK(after,{direction:"DOWN",pathFocus:{mode:"normal"}}),
+    ]).then(next=>{
+      if(!cancelled)setShownLayouts(next);
+    }).catch(()=>{
+      if(!cancelled){setPathMode("all");setShownLayouts(layouts);}
+    });
+    return ()=>{cancelled=true;};
+  },[pathMode,before,after,layouts]);
   return <div className="ai-flow-compare">
     <div className="ai-flow-compare-tools">
       <span>原流程 {change.counts.baseNodes} Nodes / {change.counts.baseRoutes} Routes</span>
       <span>候选流程 {change.counts.candidateNodes} Nodes / {change.counts.candidateRoutes} Routes</span>
       <label><input type="checkbox" checked={changedOnly}
         onChange={e=>setChangedOnly(e.target.checked)}/>淡化未受影响的节点和路由</label>
+      <label title="复用正式 Procedure Designer 的正常路径投影；失败与不确定分支可随时切回全部路径。">
+        <input type="checkbox" checked={pathMode==="normal"}
+          onChange={e=>setPathMode(e.target.checked?"normal":"all")}/>
+        只显示正常路径（折叠异常分支）
+      </label>
       <span className="ai-flow-not-qualified">SOURCE PROJECTION · NOT QUALIFIED</span>
     </div>
     <div className="ai-flow-compare-panes" data-ai-flow-ready="true"
+      data-ai-flow-path-mode={pathMode}
       data-ai-flow-before-nodes={change.counts.baseNodes}
       data-ai-flow-after-nodes={change.counts.candidateNodes}
       data-ai-flow-before-routes={change.counts.baseRoutes}
@@ -142,14 +163,14 @@ function Compare({data,layouts}) {
       <div className="ai-flow-panel">
         <strong>当前 Source</strong>
         <div className="ai-flow-canvas">
-          <GraphScene procedure={before} layout={layouts[0]}
+          <GraphScene procedure={before} layout={shownLayouts[0]}
             change={change} side="before" filterChanged={changedOnly}/>
         </div>
       </div>
       <div className="ai-flow-panel">
         <strong>候选 Source · 所选 Change Set</strong>
         <div className="ai-flow-canvas">
-          <GraphScene procedure={after} layout={layouts[1]}
+          <GraphScene procedure={after} layout={shownLayouts[1]}
             change={change} side="after" filterChanged={changedOnly}/>
         </div>
       </div>
