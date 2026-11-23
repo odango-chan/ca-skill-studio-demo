@@ -569,6 +569,43 @@ test("AI Workbench only displays Host review data and never changes Compiler App
   assert.doesNotMatch(source,/showTextDocument\(.*ViewColumn\.Three/);
 });
 
+test("F3 Monaco YAML Diff is local, read-only and preserves line-diff fallback",()=>{
+  const nonce="e".repeat(48);
+  const uri="https://preview.example.invalid/webview/ai-yaml-diff.js";
+  const html=renderAiAuthoringHtml(nonce,{
+    monacoScriptUri:uri,
+    monacoStyleUri:"https://preview.example.invalid/webview/ai-yaml-diff.css"
+  });
+  for(const id of ["monacoDiffSurface","monacoDiffNotice","monacoDiffControls",
+    "monacoDiffMode","monacoDiffPrevious","monacoDiffNext","diffRows",
+    "fullSourceDisclosure","currentSource","candidateSource"]) {
+    assert.ok(html.includes('id="'+id+'"'),"missing F3 component "+id);
+  }
+  assert.ok(html.includes('nonce="'+nonce+'" src="'+uri+'"'));
+  assert.ok(html.includes("ai-yaml-diff.css"));
+  assert.match(html,/connect-src 'none'/);
+  assert.match(html,/function renderMonacoDiff/);
+  assert.match(html,/skillStudioAiYamlDiff\\?\\.clear/);
+  assert.match(html,/renderLineDiff\\(message\\.diff\\)/);
+  assert.doesNotMatch(html,/ViewColumn\\.Three|unsafe-eval|unsafe-inline/);
+  const invalid=renderAiAuthoringHtml(nonce,{
+    monacoScriptUri:"javascript:alert(1)",
+    monacoStyleUri:"javascript:alert(1)"
+  });
+  assert.doesNotMatch(invalid,/javascript:alert/);
+
+  const code=readFileSync(new URL("../experiments/ide-host/vscode/src/ai-yaml-diff.mjs",import.meta.url),"utf8");
+  const build=readFileSync(new URL("../experiments/ide-host/scripts/build-ide-spike.mjs",import.meta.url),"utf8");
+  assert.match(code,/createDiffEditor/);
+  assert.match(code,/readOnly: true/);
+  assert.match(code,/originalEditable: false/);
+  assert.match(code,/MAX_DIFF_BYTES/);
+  assert.match(code,/hideUnchangedRegions/);
+  assert.doesNotMatch(code,/fetch\\(|workspace\\.applyEdit|localStorage|sessionStorage/);
+  assert.match(build,/src\\/ai-yaml-diff\\.mjs/);
+  assert.match(build,/media\\/ai-yaml-diff\\.js/);
+});
+
 test("F2 Source-backed React Flow graph stays embedded and offline with nonce assets",()=>{
   const uri="https://preview.example.invalid/webview/ai-flow-compare.js";
   const html=renderAiAuthoringHtml("a".repeat(48),{
