@@ -1646,6 +1646,165 @@ try{
     }
     console.log("STUDIO_AI_AUTHORING_SYNTHETIC_NATIVE_EDIT_UNDO_CHROMIUM_PASS",
       JSON.stringify({...synthetic,...undo,pendingUndo:false,undoCommand}));
+
+    // This additional PASS must be produced from the actual standalone
+    // AI Editor Tab, not from the independent native-edit acceptance command.
+    // The Node test host stages the official pinned Compiler v2.0.2 fixture
+    // under an isolated temporary directory, never a real 5GC Package.
+    const prepared=await nativeCommand("skillStudio.internal.prepareSyntheticEditorTabAcceptance");
+    if(prepared?.ready!==true||prepared?.syntheticOnly!==true)
+      throw Error("Trusted synthetic Editor Tab fixture did not prepare");
+    const positiveProposal={
+      schema:"ca-studio.ai-model-proposal/v1",
+      summary:"Synthetic Editor Tab proposal: adjust the final failure terminal.",
+      plan:["Preserve all stages and change only the final postcondition FAIL route."],
+      operations:[{
+        type:"stage.route.set",
+        target:{nodeId:"final",stage:"postcondition",outcome:"FAIL"},
+        payload:{targetNodeId:"FAILED"},
+        rationale:"Prove the exact model-shaped patch and Compiler-qualified UI Apply.",
+        references:["procedure-current"]
+      }],
+      assumptions:[],blockers:[]
+    };
+    const positiveRequests=[];
+    const positiveGateway=createServer((req,res)=>{
+      if(req.method!=="POST"||req.url!=="/opencode-go/openai/v1/chat/completions"){
+        res.writeHead(404).end();return;
+      }
+      const chunks=[];
+      req.on("data",chunk=>chunks.push(chunk));
+      req.on("end",()=>{
+        try{
+          const body=JSON.parse(Buffer.concat(chunks).toString("utf8"));
+          positiveRequests.push({model:body.model,session:req.headers["x-opencode-session"]});
+          res.writeHead(200,{"Content-Type":"application/json"});
+          res.end(JSON.stringify({
+            id:"synthetic-editor-tab-compiler-pass",
+            object:"chat.completion",
+            model:body.model,
+            choices:[{
+              index:0,
+              message:{role:"assistant",content:JSON.stringify(positiveProposal)},
+              finish_reason:"stop"
+            }]
+          }));
+        }catch{
+          res.writeHead(400).end("Invalid synthetic Gateway request");
+        }
+      });
+    });
+    await new Promise(resolve=>positiveGateway.listen(0,"127.0.0.1",resolve));
+    try{
+      const syntheticGatewayUrl="http://127.0.0.1:"+
+        positiveGateway.address().port+"/opencode-go/openai";
+      await nativeCommand("skillStudio.internal.configureAiGatewayAcceptance",{
+        gatewayUrl:syntheticGatewayUrl,modelId:"deepseek-v4.1-flash"
+      });
+      const opened=await nativeCommand("skillStudio.openAiAuthoring");
+      if(opened!==true)throw Error("Synthetic production Editor Tab did not open");
+      let positiveReady=false;
+      for(let attempt=0;attempt<100;attempt++){
+        const view=await readAiView();
+        if(view?.gatewayConfigured&&view.bodyText.includes("example")&&
+           view.bodyText.includes("上下文来源")){
+          positiveReady=true;break;
+        }
+        await sleep(100);
+      }
+      if(!positiveReady)
+        throw Error("Synthetic production Editor Tab context is not ready");
+      const task="Change only the synthetic final postcondition FAIL route from SAFE_STOPPED to FAILED. Keep every other route and all nodes unchanged.";
+      const clicked=await command("Runtime.evaluate",{
+        contextId:aiContextId,
+        returnByValue:true,
+        expression:"(()=>{const task=document.getElementById('task');"+
+          "const button=document.getElementById('generate');"+
+          "if(!task||!button||button.disabled)return false;"+
+          "task.value="+JSON.stringify(task)+";"+
+          "task.dispatchEvent(new Event('input',{bubbles:true}));"+
+          "button.click();return true;})()"
+      });
+      if(clicked.result?.value!==true)
+        throw Error("Synthetic Editor Tab Generate control is disabled");
+      let approval=null;
+      for(let attempt=0;attempt<100&&!approval;attempt++){
+        approval=await evalJS(
+          "(()=>{const button=[...document.querySelectorAll('button,[role=\\\"button\\\"]')]"+
+          ".find(item=>item.innerText.trim()==='发送并生成提案'&&"+
+          "item.getBoundingClientRect().width>0);"+
+          "if(!button)return null;const r=button.getBoundingClientRect();"+
+          "return {x:r.left+r.width/2,y:r.top+r.height/2}})()");
+        if(!approval)await sleep(100);
+      }
+      if(!approval)throw Error("Synthetic Editor Tab disclosure approval was missing");
+      await command("Input.dispatchMouseEvent",{type:"mouseMoved",x:approval.x,y:approval.y});
+      await command("Input.dispatchMouseEvent",{type:"mousePressed",x:approval.x,y:approval.y,button:"left",clickCount:1});
+      await command("Input.dispatchMouseEvent",{type:"mouseReleased",x:approval.x,y:approval.y,button:"left",clickCount:1});
+      let readyView=null;
+      for(let attempt=0;attempt<200&&!readyView;attempt++){
+        const view=await readAiView();
+        if(view?.candidateSource.includes("FAIL: FAILED")&&
+           view.compilerStatus.includes("Compiler v2.0.2 Check: PASS")&&
+           view.applyDisabled===false)readyView=view;
+        if(!readyView)await sleep(100);
+      }
+      if(!readyView){
+        const view=await readAiView();
+        throw Error("Production Editor Tab did not yield qualified synthetic Apply: "+
+          JSON.stringify({requests:positiveRequests.length,
+            compilerStatus:view?.compilerStatus,patchState:view?.patchState,
+            patchError:view?.patchError,applyDisabled:view?.applyDisabled,
+            status:view?.statusText}));
+      }
+      if(positiveRequests.length!==1||
+         positiveRequests[0].model!=="deepseek-v4.1-flash"||
+         !positiveRequests[0].session)
+        throw Error("Expected one Host-owned model request for synthetic Editor Tab");
+      const applied=await command("Runtime.evaluate",{
+        contextId:aiContextId,
+        returnByValue:true,
+        expression:"(()=>{const button=document.getElementById('apply');"+
+          "if(!button||button.disabled)return false;button.click();return true;})()"
+      });
+      if(applied.result?.value!==true)
+        throw Error("Compiler-qualified Editor Tab Apply button was not clickable");
+      const verified=await nativeCommand("skillStudio.internal.verifySyntheticEditorTabApplied");
+      if(verified?.nativeWorkspaceEdit!=="PASS"||
+         verified?.unsavedDiskUnchanged!==true||verified?.autoSaved!==false)
+        throw Error("Editor Tab did not apply only to the native unsaved buffer");
+      const undoCommandForTab=await evalJS(
+        "(async()=>{const c=window.theia.container;"+
+        "const key=[...c._bindingDictionary._map.keys()].find(k=>"+
+        "typeof k==='function'&&k.prototype?.executeCommand&&"+
+        "k.prototype?.registerCommand&&k.prototype?.getCommand);"+
+        "const commands=c.get(key);"+
+        "const enabled=['undo','core.undo'].find(id=>"+
+        "commands.getCommand(id)&&commands.isEnabled(id));"+
+        "if(!enabled)throw Error('Frontend Undo unavailable');"+
+        "await commands.executeCommand(enabled);return enabled;})()");
+      const restored=await nativeCommand("skillStudio.internal.verifySyntheticEditorTabUndo");
+      if(restored?.nativeUndo!=="PASS"||restored?.restoredOriginal!==true||
+         restored?.unsavedDiskUnchanged!==true)
+        throw Error("Production Editor Tab frontend Undo did not restore synthetic source");
+      console.log("STUDIO_AI_EDITOR_TAB_SYNTHETIC_PROPOSAL_COMPILER_APPLY_UNDO_PASS",
+        JSON.stringify({
+          qualification:"SYNTHETIC_TEST_ONLY",modelSource:"MOCK_GATEWAY",
+          modelProposalSchema:"PASS",selectedPatch:"PASS",
+          compilerVersion:"v2.0.2",compilerCheck:"PASS",
+          nativeWorkspaceEdit:"PASS",frontendUndo:"PASS",
+          unsavedDiskUnchanged:true,autoSaved:false,
+          undoCommand:undoCommandForTab,
+          realProvider:"NOT_CLAIMED",real5gcQualification:"NOT_CLAIMED"
+        }));
+    }finally{
+      try{
+        await nativeCommand("skillStudio.internal.configureAiGatewayAcceptance",{
+          gatewayUrl:"",modelId:"deepseek-v4.1-flash"
+        });
+      }catch{}
+      await new Promise(resolve=>positiveGateway.close(resolve));
+    }
   }
   if(requireEditor)
     console.log("THEIA_BROWSER_HOST_V1ALPHA5_ACCEPTANCE_PASS");
