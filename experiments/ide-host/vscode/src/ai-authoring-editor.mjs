@@ -723,6 +723,7 @@ export function registerAiAuthoringEditor(vscode, context, { getActiveDocument, 
     activeSession.controller = null;
     activeSession.generating = false;
     activeSession.pending = null;
+    activeSession.latest = null;
     post({ type: "status", message: "正在读取当前 Procedure、Package 文件和锁定依赖…", busy: true });
     try {
       const state = await collectAuthoringState(document);
@@ -819,7 +820,7 @@ export function registerAiAuthoringEditor(vscode, context, { getActiveDocument, 
       return;
     }
     const refining = message.type === "refine";
-    const prior = refining ? activeSession.pending : null;
+    const prior = refining ? activeSession.latest : null;
     if (refining && (!prior || !isLiveDocumentRevision(activeSession.document, prior) ||
         prior.packageGeneration !== activeSession.context.generation)) {
       post({ type:"error", message:"上一版提案已失效或不在当前会话；请重新生成。" });
@@ -860,6 +861,7 @@ export function registerAiAuthoringEditor(vscode, context, { getActiveDocument, 
 
     activeSession.generating = true;
     activeSession.pending = null;
+    activeSession.latest = null;
     const document = activeSession.document;
     const initial = activeSession.context;
     const selectedResources = initial.resources.map((item) => ({
@@ -1230,6 +1232,7 @@ export function registerAiAuthoringEditor(vscode, context, { getActiveDocument, 
     // Inspection revokes the active proposal capability even if the historical
     // revision was once Compiler PASS. No reactivation without regeneration.
     activeSession.pending = null;
+    activeSession.latest = null;
     activeSession.previewRequestId = (activeSession.previewRequestId ?? 0) + 1;
     post(historical);
   }
@@ -1372,6 +1375,7 @@ export function registerAiAuthoringEditor(vscode, context, { getActiveDocument, 
             context: null,
             history: createSessionProposalHistory(),
             pending: null,
+            latest: null,
             controller: null,
             disposed: false,
             generating: false,
@@ -1397,6 +1401,7 @@ export function registerAiAuthoringEditor(vscode, context, { getActiveDocument, 
         context: null,
         history: createSessionProposalHistory(),
         pending: null,
+        latest: null,
         controller: null,
         disposed: false,
         generating: false,
@@ -1431,7 +1436,7 @@ export function registerAiAuthoringEditor(vscode, context, { getActiveDocument, 
         } else if (message.type === "preview") await handlePreview(message);
         else if (message.type === "apply") await handleApply(message);
         else if (message.type === "discard") {
-          if (session) session.pending = null;
+          if (session) { session.pending = null; session.latest = null; }
           post({ type: "discarded" });
         }
       }));
