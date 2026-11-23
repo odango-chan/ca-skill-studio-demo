@@ -106,11 +106,17 @@ Apply path without relying on nondeterministic model output.
 
 These are complementary acceptance results, **not** a claim that one
 single run used a live model and then applied that same model response.
-That combined live-provider-to-Apply run remains optional further evidence,
-not a blocker to the shipped P1 development integration. Neither test
-qualifies real 5GC Owner, Tool, Runtime, Wait/Ingress or Deployment behavior.
-The official 5GC Examples remain Preview-Only when Compiler Check returns
-errors; Wait requires trusted IngressCatalog.
+The live-provider smoke was run by the user on native Windows on 2026-11-23
+against the local Go Gateway v0.2.0 / OpenCode Go `deepseek-v4.1-flash` and
+returned `providerRequest`, `responseEnvelope`, `modelProposalSchema` and
+`sourcePatchPreview` PASS (one operation, zero blockers). The integrated
+Editor Tab Chromium path used a controlled mock-model proposal and a trusted
+synthetic Package for deterministic Compiler PASS / Apply / Undo.
+The one-run live-model-through-Editor-Tab-to-Apply scenario remains optional
+additional evidence, not a blocker to the shipped P1 development integration.
+Neither test qualifies real 5GC Owner, Tool, Runtime, Wait/Ingress or
+Deployment behavior. The official 5GC Examples remain Preview-Only when
+Compiler Check returns errors; Wait requires trusted IngressCatalog.
 
 ## Other platforms
 
