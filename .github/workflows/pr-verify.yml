@@ -29,6 +29,8 @@ jobs:
           node-version: '24'
       - run: npm ci --no-audit --no-fund
       - run: npm test
+      - name: Syntax-check opt-in live Gateway smoke without credentials
+        run: node --check experiments/ide-host/scripts/ai-authoring-live-gateway-smoke.mjs
       - name: Plugin-managed project and Package Explorer tests
         run: npm run test:plugin-managed
       - run: npm run typecheck
