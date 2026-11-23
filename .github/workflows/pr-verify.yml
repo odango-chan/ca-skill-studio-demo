@@ -31,6 +31,26 @@ jobs:
       - run: npm test
       - name: Syntax-check opt-in live Gateway smoke without credentials
         run: node --check experiments/ide-host/scripts/ai-authoring-live-gateway-smoke.mjs
+      - name: Package self-contained Windows Authoring Core live-model smoke
+        run: |
+          mkdir -p dist/ai-authoring-live-smoke-windows
+          ./node_modules/.bin/esbuild experiments/ide-host/scripts/ai-authoring-live-gateway-smoke.mjs \
+            --bundle --platform=node --format=esm --target=node24 \
+            --outfile=dist/ai-authoring-live-smoke-windows/ai-authoring-live-gateway-smoke.mjs
+          cp experiments/ide-host/scripts/run-ai-authoring-live-gateway-windows.cmd \
+            dist/ai-authoring-live-smoke-windows/run-live-gateway-smoke.cmd
+          cp docs/testing/ai-authoring-live-gateway.md \
+            dist/ai-authoring-live-smoke-windows/README.md
+          node --check dist/ai-authoring-live-smoke-windows/ai-authoring-live-gateway-smoke.mjs
+      - name: Prove portable smoke against synthetic Gateway with real Authoring Core
+        run: node --test experiments/ide-host/tests/ai-authoring-live-bundle.test.mjs
+      - name: Upload opt-in Windows Authoring Core smoke without credentials
+        uses: actions/upload-artifact@v4
+        with:
+          name: studio-ai-authoring-live-smoke-windows
+          path: dist/ai-authoring-live-smoke-windows/
+          retention-days: 7
+          if-no-files-found: error
       - name: Plugin-managed project and Package Explorer tests
         run: npm run test:plugin-managed
       - run: npm run typecheck
