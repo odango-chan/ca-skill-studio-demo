@@ -36,6 +36,7 @@ jobs:
           mkdir -p dist/ai-authoring-live-smoke-windows
           ./node_modules/.bin/esbuild experiments/ide-host/scripts/ai-authoring-live-gateway-smoke.mjs \
             --bundle --platform=node --format=esm --target=node24 \
+            --banner:js="import { createRequire } from 'node:module'; const require = createRequire(import.meta.url);" \
             --outfile=dist/ai-authoring-live-smoke-windows/ai-authoring-live-gateway-smoke.mjs
           cp experiments/ide-host/scripts/run-ai-authoring-live-gateway-windows.cmd \
             dist/ai-authoring-live-smoke-windows/run-live-gateway-smoke.cmd
