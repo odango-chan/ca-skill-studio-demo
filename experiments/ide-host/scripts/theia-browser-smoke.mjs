@@ -1640,16 +1640,19 @@ try{
       }
       const diffMode=await command("Runtime.evaluate",{
         contextId:aiContextId,returnByValue:true,
-        expression:"(()=>{const select=document.getElementById('monacoDiffMode');"+
-          "if(!select||!window.skillStudioAiYamlDiff)return false;"+
+        expression:"(()=>{try{const select=document.getElementById('monacoDiffMode');"+
+          "if(!select||!window.skillStudioAiYamlDiff)return {ok:false,reason:'missing control or adapter'};"+
           "select.value='inline';select.dispatchEvent(new Event('change',{bubbles:true}));"+
           "document.getElementById('monacoDiffNext').click();"+
           "document.getElementById('monacoDiffPrevious').click();"+
           "select.value='side-by-side';select.dispatchEvent(new Event('change',{bubbles:true}));"+
-          "return select.value==='side-by-side'&&!document.getElementById('monacoDiffSurface').hidden;})()"
+          "return {ok:select.value==='side-by-side'&&!document.getElementById('monacoDiffSurface').hidden,"+
+          "value:select.value,hidden:document.getElementById('monacoDiffSurface').hidden};"+
+          "}catch(error){return {ok:false,reason:String(error?.stack||error)}}})()"
       });
-      if(diffMode.result?.value!==true)
-        throw Error("F3 side-by-side/inline diff and navigation controls failed");
+      if(diffMode.result?.value?.ok!==true)
+        throw Error("F3 side-by-side/inline diff navigation failed: "+
+          JSON.stringify({value:diffMode.result?.value,exception:diffMode.exceptionDetails}));
       // F2 must render actual React Flow canvases from the pinned v1alpha5
       // Source projection, not just the F1 text summary.
       const graphTab=await command("Runtime.evaluate",{
