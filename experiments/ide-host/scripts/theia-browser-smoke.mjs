@@ -1622,7 +1622,7 @@ try{
         });
         const v=evaluated.result?.value;
         if(v?.initialized&&v.shown&&v.width>0&&v.height>0&&
-           v.fallbackHidden&&v.changedNodeVisible&&v.identity.length>0)monacoEvidence=v;
+           v.changedNodeVisible&&v.notice.includes("Monaco 只读 Diff"))monacoEvidence=v;
         if(!monacoEvidence)await sleep(100);
       }
       if(!monacoEvidence){
