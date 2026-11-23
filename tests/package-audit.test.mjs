@@ -158,6 +158,24 @@ test("local Schema documents report YAML syntax and unsupported dialect defects"
     ["SCHEMA_DOCUMENT_PARSE_ERROR","SCHEMA_DOCUMENT_ROOT_INVALID",
       "SCHEMA_DIALECT_UNSUPPORTED","SCHEMA_DIALECT_INVALID"].includes(item.code)));
 
+  const booleanSchema=clone(valid);
+  booleanSchema.set("schemas/always-true.schema.yaml",{text:"true\\n"});
+  const booleanDiagnostics=auditPackage({files:booleanSchema,
+    dependencyContext:{available:false}});
+  assert.ok(!booleanDiagnostics.some(item=>
+    item.path==="schemas/always-true.schema.yaml"&&
+    ["SCHEMA_DOCUMENT_ROOT_INVALID","SCHEMA_DIALECT_NOT_CHECKED"].includes(item.code)),
+    "JSON Schema boolean roots are valid standalone schemas");
+
+  const missingDialect=clone(valid);
+  missingDialect.get("schemas/establishment-request.schema.yaml").text=
+    missingDialect.get("schemas/establishment-request.schema.yaml").text.replace(
+      "$schema: https://json-schema.org/draft/2020-12/schema\\n","");
+  const dialectDiagnostic=find(auditPackage({files:missingDialect,
+    dependencyContext:{available:false}}),"SCHEMA_DIALECT_NOT_CHECKED");
+  assert.equal(dialectDiagnostic?.status,"not_checked");
+  assert.equal(dialectDiagnostic?.severity,"warning");
+
   const unsupported=clone(valid);
   const schema=unsupported.get("schemas/establishment-request.schema.yaml");
   schema.text=schema.text.replace(
