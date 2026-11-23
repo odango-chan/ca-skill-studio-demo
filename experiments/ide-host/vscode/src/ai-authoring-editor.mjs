@@ -6,6 +6,7 @@ import { createProcedureAgent } from "../../../../authoring/core/procedure-agent
 import { createGatewayModelClient, listGatewayModels, validateModelId } from "../../../../authoring/core/gateway-client.mjs";
 import { createChangeSet } from "../../../../authoring/core/change-set.mjs";
 import { createAuthoringLineDiff, createAuthoringFlowChanges, createAuthoringValidationView } from "../../../../authoring/core/review-presentation.mjs";
+import { buildAiFlowGraphReview } from "./ai-flow-projection.mjs";
 import {
   planV1Alpha5Patch,
   materializeAcceptedPatchGroups,
@@ -243,6 +244,21 @@ export async function buildAuthoringResourceInventory(snapshot, dependencyResolu
       " eligible context items. Narrow the Package before sending context.");
   }
   return Object.freeze(resources.map((item) => Object.freeze(item)));
+}
+
+/**
+ * Graph projection never changes the Authoring approval state. A malformed,
+ * incomplete or unsupported Procedure falls back to the source-backed
+ * semantic outline + YAML Diff, without fabricating graph topology.
+ */
+export function createAiFlowReviewOrFallback(state,baseSource,candidateSource,flowGroups) {
+  try {
+    return buildAiFlowGraphReview({
+      snapshot:state?.snapshot,baseSource,candidateSource,flowGroups
+    });
+  } catch {
+    return null;
+  }
 }
 
 export function containsWaitMutation(operations) {
@@ -923,6 +939,10 @@ export function registerAiAuthoringEditor(vscode, context, { getActiveDocument, 
         }
       }
       if (!isCurrent()) return;
+      const flowChanges = createAuthoringFlowChanges(changeSet,patchPlan);
+      const flowGraph = patchPlan && candidateSource !== null
+        ? createAiFlowReviewOrFallback(initial,document.getText(),candidateSource,flowChanges)
+        : null;
       const waitGate = containsWaitMutation(changeSet.operations);
       let compilerCheck = null;
       let compilerCheckError = null;
@@ -990,7 +1010,8 @@ export function registerAiAuthoringEditor(vscode, context, { getActiveDocument, 
         revision: changeSet.revision,
         sourceDigest: changeSet.base.sourceDigest,
         candidateDigest: candidateDigest ?? "",
-        flowChanges: createAuthoringFlowChanges(changeSet, patchPlan),
+        flowChanges,
+        flowGraph,
         diff: patchPlan && candidateSource !== null
           ? createAuthoringLineDiff(document.getText(), candidateSource) : null,
         validation: createAuthoringValidationView(compilerCheck, candidateDigest),
@@ -1088,9 +1109,14 @@ export function registerAiAuthoringEditor(vscode, context, { getActiveDocument, 
       pending.candidateDigest = preview.digest;
       pending.compilerCheck = compilerCheck;
       pending.canApply = canApply;
+      const flowGroups = createAuthoringFlowChanges(pending.changeSet,pending.patchPlan);
+      const flowGraph = createAiFlowReviewOrFallback(
+        pending.state,pending.source,preview.source,flowGroups
+      );
       post({
         type: "preview",
         requestId: message.requestId,
+        flowGraph,
         candidateSource: preview.source,
         diff: createAuthoringLineDiff(pending.source, preview.source),
         validation: createAuthoringValidationView(compilerCheck, preview.digest),
