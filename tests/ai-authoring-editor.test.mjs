@@ -601,7 +601,8 @@ test("F3 Monaco YAML Diff is local, read-only and preserves line-diff fallback",
   assert.match(code,/originalEditable: false/);
   assert.match(code,/MAX_DIFF_BYTES/);
   assert.match(code,/hideUnchangedRegions/);
-  assert.doesNotMatch(code,/fetch\\(|workspace\\.applyEdit|localStorage|sessionStorage/);
+  for(const forbidden of ["fetch(", "workspace.applyEdit", "localStorage", "sessionStorage"])
+    assert.equal(code.includes(forbidden),false,"forbidden Monaco behavior: "+forbidden);
   assert.match(build,/src\\/ai-yaml-diff\\.mjs/);
   assert.match(build,/media\\/ai-yaml-diff\\.js/);
 });
