@@ -5,6 +5,7 @@ import {
 import { createProcedureAgent } from "../../../../authoring/core/procedure-agent.mjs";
 import { createGatewayModelClient, listGatewayModels, validateModelId } from "../../../../authoring/core/gateway-client.mjs";
 import { createChangeSet } from "../../../../authoring/core/change-set.mjs";
+import { createAuthoringLineDiff, createAuthoringFlowChanges, createAuthoringValidationView } from "../../../../authoring/core/review-presentation.mjs";
 import {
   planV1Alpha5Patch,
   materializeAcceptedPatchGroups,
@@ -639,6 +640,8 @@ export function registerAiAuthoringEditor(vscode, context, { getActiveDocument, 
         packageName: state.snapshot.packageName,
         documentVersion: document.version,
         packageGeneration: state.generation,
+        sourceDigest: "sha256:" + await sha256Hex(document.getText()),
+        writeTarget: "assurance/procedure.yaml",
         gatewayConfigured,
         gatewayUrl: typeof gatewayBaseUrl === "string" ? gatewayBaseUrl.trim() : "",
         modelId: typeof modelId === "string" ? modelId.trim() : "",
@@ -940,6 +943,13 @@ export function registerAiAuthoringEditor(vscode, context, { getActiveDocument, 
                 patchPlan ? "Compiler v2.0.2 Check is unavailable; no AI-generated change can be applied."
                   : patchError),
         canApply,
+        revision: changeSet.revision,
+        sourceDigest: changeSet.base.sourceDigest,
+        candidateDigest: candidateDigest ?? "",
+        flowChanges: createAuthoringFlowChanges(changeSet, patchPlan),
+        diff: patchPlan && candidateSource !== null
+          ? createAuthoringLineDiff(document.getText(), candidateSource) : null,
+        validation: createAuthoringValidationView(compilerCheck, candidateDigest),
         currentSource: patchPlan ? document.getText() : "",
         candidateSource: candidateSource ?? "",
         groups: patchPlan ? patchPlan.groups.map((group) => ({
@@ -1038,6 +1048,9 @@ export function registerAiAuthoringEditor(vscode, context, { getActiveDocument, 
         type: "preview",
         requestId: message.requestId,
         candidateSource: preview.source,
+        diff: createAuthoringLineDiff(pending.source, preview.source),
+        validation: createAuthoringValidationView(compilerCheck, preview.digest),
+        candidateDigest: preview.digest,
         compilerVersion: compilerCheck?.compilerVersion ?? COMPILER_VERSION,
         compilerState: compilerCheck?.state ?? "UNAVAILABLE",
         canApply,
