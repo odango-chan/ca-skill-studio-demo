@@ -5,7 +5,7 @@ import {
   projectAiReviewProcedure,compareAiReviewProcedures,buildAiFlowGraphReview
 } from "../vscode/src/ai-flow-projection.mjs";
 
-const root="../../site/samples/v1alpha5/establish-pdu-session-mas/assurance/";
+const root="../../../site/samples/v1alpha5/establish-pdu-session-mas/assurance/";
 function read(name){return readFileSync(new URL(root+name,import.meta.url),"utf8");}
 const source=read("procedure.yaml");
 const docs=[
