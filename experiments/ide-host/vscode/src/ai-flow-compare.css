@@ -1,0 +1,45 @@
+/* Scoped to the AI Authoring Editor Tab, never the global Procedure workbench. */
+.ai-flow-compare{width:100%;min-width:0;display:flex;flex-direction:column;gap:8px}
+.ai-flow-compare-tools{display:flex;gap:8px;flex-wrap:wrap;align-items:center;
+  font:11px/1.4 var(--vscode-font-family,system-ui);
+  color:var(--vscode-descriptionForeground,#718093)}
+.ai-flow-compare-tools>span,.ai-flow-compare-tools>label{
+  border:1px solid var(--vscode-panel-border,#dce4ed);border-radius:4px;padding:3px 5px}
+.ai-flow-compare-tools>label{display:flex;align-items:center;gap:4px;cursor:pointer}
+.ai-flow-not-qualified{letter-spacing:.04em}
+.ai-flow-compare-panes{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.ai-flow-panel{border:1px solid var(--vscode-panel-border,#dce4ed);
+  border-radius:5px;min-width:0;overflow:hidden;background:var(--vscode-editor-background,#fff)}
+.ai-flow-panel>strong{display:block;font-size:11px;padding:7px 9px;
+  color:var(--vscode-descriptionForeground,#718093);
+  background:var(--vscode-sideBar-background,#f7fafc)}
+.ai-flow-canvas{width:100%;height:380px;position:relative;overflow:hidden}
+.ai-flow-canvas .react-flow{width:100%;height:100%;
+  --xy-controls-button-background-color:var(--vscode-editorWidget-background,#fff);
+  --xy-controls-button-color:var(--vscode-foreground,#26394e);
+  --xy-node-background-color:var(--vscode-editorWidget-background,#fff)}
+.ai-flow-canvas .react-flow__node{font-family:var(--vscode-font-family,system-ui)}
+.ai-flow-canvas .react-flow__edge-text{font-size:9px}
+.ai-flow-node{width:238px;min-height:80px;display:flex;flex-direction:column;
+  gap:4px;padding:9px 12px;border-radius:8px;line-height:1.3;
+  color:var(--vscode-foreground,#26394e);
+  border:1.7px solid var(--vscode-panel-border,#c9d6e3);
+  background:var(--vscode-editorWidget-background,#fff);
+  box-shadow:0 1px 4px #22394a16}
+.ai-flow-node-kind{font-size:10px;color:var(--vscode-descriptionForeground,#688097);
+  display:flex;gap:8px;justify-content:space-between}
+.ai-flow-node-id{font-size:12px;overflow-wrap:anywhere}
+.ai-flow-node-stages{color:var(--vscode-descriptionForeground,#688097);
+  font-size:10px;overflow-wrap:anywhere}
+.ai-flow-node.status-added{border-color:#158a71;background:color-mix(in srgb,#c3f2df 25%,var(--vscode-editorWidget-background,#fff))}
+.ai-flow-node.status-removed{border-color:#bd6059;background:color-mix(in srgb,#f4d5d2 25%,var(--vscode-editorWidget-background,#fff))}
+.ai-flow-node.status-changed,.ai-flow-node.status-affected{border-color:#c4882d}
+.ai-flow-node.status-changed{background:color-mix(in srgb,#ffe4b2 30%,var(--vscode-editorWidget-background,#fff))}
+.ai-flow-node.is-terminal{opacity:.85}
+.ai-flow-delta{font-size:9px;text-transform:uppercase;letter-spacing:.04em;color:#158a71}
+.ai-flow-node.status-removed .ai-flow-delta{color:#bd6059}
+.ai-flow-node.status-changed .ai-flow-delta{color:#c4882d}
+.ai-flow-canvas .react-flow__controls{box-shadow:none;border:1px solid var(--vscode-panel-border,#dce4ed)}
+.ai-flow-canvas .react-flow__node:focus-visible{outline:3px solid var(--vscode-focusBorder,#158a71)}
+@media(max-width:900px){.ai-flow-compare-panes{grid-template-columns:1fr}
+  .ai-flow-canvas{height:320px}}
