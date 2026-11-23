@@ -1772,6 +1772,92 @@ try{
           compilerStatus:proposalView.compilerStatus,patchState:proposalView.patchState,
           applyDisabled:proposalView.applyDisabled
         }));
+      // F4: real production Editor Tab -> Gateway, two disclosed model
+      // rounds and read-only session history. No real 5GC qualification.
+      const firstHistory=await command("Runtime.evaluate",{
+        contextId:aiContextId,returnByValue:true,
+        expression:"(()=>({count:document.querySelectorAll('#revisionTimeline .revision-entry').length,"+
+          "refineEnabled:document.getElementById('refine')?.disabled===false}))()"
+      });
+      if(firstHistory.result?.value?.count!==1||
+         firstHistory.result?.value?.refineEnabled!==true)
+        throw Error("F4 initial proposal missing an active session revision: "+
+          JSON.stringify(firstHistory.result?.value));
+      const refineClicked=await command("Runtime.evaluate",{
+        contextId:aiContextId,returnByValue:true,
+        expression:"(()=>{const task=document.getElementById('refineTask');"+
+          "const button=document.getElementById('refine');"+
+          "if(!task||!button||button.disabled)return false;"+
+          "task.value='Keep the temporary Node but clarify the final outcome explanation.';"+
+          "task.dispatchEvent(new Event('input',{bubbles:true}));"+
+          "button.click();return true;})()"
+      });
+      if(refineClicked.result?.value!==true)
+        throw Error("F4 Refine action was not available after initial proposal");
+      const refineApproval=await waitForDialogButton(["发送并生成提案"]);
+      await command("Input.dispatchMouseEvent",{type:"mouseMoved",x:refineApproval.x,y:refineApproval.y});
+      await command("Input.dispatchMouseEvent",{type:"mousePressed",x:refineApproval.x,y:refineApproval.y,button:"left",clickCount:1});
+      await command("Input.dispatchMouseEvent",{type:"mouseReleased",x:refineApproval.x,y:refineApproval.y,button:"left",clickCount:1});
+      let historyRendered=false;
+      for(let attempt=0;attempt<120&&!historyRendered;attempt++){
+        const result=await command("Runtime.evaluate",{
+          contextId:aiContextId,returnByValue:true,
+          expression:"(()=>({count:document.querySelectorAll('#revisionTimeline .revision-entry').length,"+
+            "refineEnabled:document.getElementById('refine')?.disabled===false,"+
+            "candidate:document.getElementById('candidateSource')?.textContent.includes('ai-authoring-smoke-node')}))()"
+        });
+        const value=result.result?.value;
+        historyRendered=value?.count===2&&value.refineEnabled&&value.candidate;
+        if(!historyRendered)await sleep(100);
+      }
+      if(!historyRendered||gatewayRequests.length!==2||
+         !gatewayRequests[1].body.messages[1].content.includes("REFINE THE PREVIOUS SEMANTIC PROPOSAL")||
+         !gatewayRequests[1].body.messages[1].content.includes("node.add"))
+        throw Error("F4 expected two disclosed proposals and Host session revisions; calls="+
+          gatewayRequests.length);
+      const clickedHistory=await command("Runtime.evaluate",{
+        contextId:aiContextId,returnByValue:true,
+        expression:"(()=>{const buttons=[...document.querySelectorAll('#revisionTimeline .revision-entry button')];"+
+          "if(buttons.length!==2)return false;buttons[1].click();return true;})()"
+      });
+      if(clickedHistory.result?.value!==true)
+        throw Error("F4 historical inspection control unavailable");
+      let historicalReadOnly=false;
+      for(let attempt=0;attempt<80&&!historicalReadOnly;attempt++){
+        const result=await command("Runtime.evaluate",{
+          contextId:aiContextId,returnByValue:true,
+          expression:"(()=>({patch:document.getElementById('patchState')?.textContent||''," +
+            "applyDisabled:document.getElementById('apply')?.disabled===true,"+
+            "refineDisabled:document.getElementById('refine')?.disabled===true,"+
+            "groupsDisabled:[...document.querySelectorAll('#groups input')].every(x=>x.disabled)}))()"
+        });
+        const value=result.result?.value;
+        historicalReadOnly=value?.patch.includes("HISTORY · READ ONLY")&&
+          value.applyDisabled&&value.refineDisabled&&value.groupsDisabled;
+        if(!historicalReadOnly)await sleep(100);
+      }
+      if(!historicalReadOnly)
+        throw Error("F4 historical inspection did not revoke Compiler Apply authority");
+      // F4 disposal gate: close the specific AI Editor Tab in Theia's
+      // actual main shell. A history inspection must not leave the Webview
+      // focused while the subsequent independent native Undo fixture runs.
+      const closedAiTab=await evalJS(
+        "(async()=>{const c=window.theia.container;"+
+        "const key=[...c._bindingDictionary._map.keys()].find(k=>"+
+        "typeof k==='function'&&k.prototype?.activateWidget&&k.prototype?.addWidget);"+
+        "if(!key)throw Error('Theia application shell not found');"+
+        "const shell=c.get(key);"+
+        "const widget=shell.getWidgets('main').find(w=>w.title?.label==='AI Procedure Authoring');"+
+        "if(!widget)return {closed:false,reason:'AI Editor Tab missing before disposal'};"+
+        "await shell.closeWidget(widget.id);"+
+        "return {closed:!shell.getWidgets('main').some(w=>w.id===widget.id),id:widget.id};})()"
+      );
+      if(closedAiTab?.closed!==true)
+        throw Error("F4 session Editor Tab did not dispose cleanly: "+JSON.stringify(closedAiTab));
+      console.log("STUDIO_AI_AUTHORING_REFINEMENT_HISTORY_CHROMIUM_PASS",JSON.stringify({
+        modelRequests:2,sessionRevisions:2,repeatedDisclosure:true,
+        refinementUsesSemanticHistory:true,historicalApplyBlocked:true
+      }));
       aiAuthoringEvidence={
         title:initialView.title,
         packageContext:["assurance/contract.yaml","assurance/predicates.yaml",
