@@ -16,10 +16,12 @@ export function buildRefinementTask(previousChangeSet, instruction) {
       type, target, payload,
     })),
   };
-  // Preserve semantic payload where it fits; never disclose Host-owned
-  // operation IDs, source spans, digests, file paths or approval state.
-  while (JSON.stringify(prior).length > 2000 && prior.operations.length) prior.operations.pop();
-  prior.omittedOperations = prior.totalOperations - prior.operations.length;
+  // A partial semantic history could silently delete prior operations
+  // after Refine. Refuse rather than truncate and misrepresent the proposal.
+  // Host-owned IDs, source spans, digests and approval remain excluded.
+  if (JSON.stringify(prior).length > 2000) {
+    throw new RangeError("Previous semantic proposal exceeds the lossless Refine budget; start a new bounded proposal.");
+  }
   const task = [
     "REFINE THE PREVIOUS SEMANTIC PROPOSAL (not the Source).",
     "Produce a complete replacement ModelProposal for the exact current live Procedure.",
