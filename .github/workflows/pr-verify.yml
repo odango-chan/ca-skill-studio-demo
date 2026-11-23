@@ -44,7 +44,7 @@ jobs:
             dist/ai-authoring-live-smoke-windows/README.md
           node --check dist/ai-authoring-live-smoke-windows/ai-authoring-live-gateway-smoke.mjs
       - name: Prove portable smoke against synthetic Gateway with real Authoring Core
-        run: node --test experiments/ide-host/tests/ai-authoring-live-bundle.test.mjs
+        run: node --test experiments/ide-host/acceptance/ai-authoring-live-bundle.test.mjs
       - name: Upload opt-in Windows Authoring Core smoke without credentials
         uses: actions/upload-artifact@v4
         with:
