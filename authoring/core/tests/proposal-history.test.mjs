@@ -42,5 +42,12 @@ test("F4 refinement sends semantic context but never Host-owned IDs or source of
   assert.match(result,/Keep the same terminal/);
   assert.doesNotMatch(result,/host-generated-id|sourceDigest|documentVersion|workspaceEdit/);
   assert.throws(()=>buildRefinementTask(changeSet(1),"x".repeat(1601)),/1600/);
+  const huge = changeSet(1);
+  huge.operations = Array.from({length:15},(_,index)=>({
+    id:"host-"+index,type:"node.add",target:{nodeId:"node-"+index},
+    payload:{definition:{notes:"semantic-".repeat(50)}},
+  }));
+  assert.throws(()=>buildRefinementTask(huge,"Keep every operation."),
+    /lossless Refine budget/, "Refine must not silently drop older semantic operations");
   assert.throws(()=>createSessionProposalHistory({limit:13}),/limit/);
 });
