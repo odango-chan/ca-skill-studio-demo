@@ -585,9 +585,9 @@ test("F3 Monaco YAML Diff is local, read-only and preserves line-diff fallback",
   assert.ok(html.includes("ai-yaml-diff.css"));
   assert.match(html,/connect-src 'none'/);
   assert.match(html,/function renderMonacoDiff/);
-  assert.match(html,/skillStudioAiYamlDiff\\?\\.clear/);
-  assert.match(html,/renderLineDiff\\(message\\.diff\\)/);
-  assert.doesNotMatch(html,/ViewColumn\\.Three|unsafe-eval|unsafe-inline/);
+  assert.ok(html.includes("skillStudioAiYamlDiff?.clear"));
+  assert.ok(html.includes("renderLineDiff(message.diff)"));
+  for(const forbidden of ["ViewColumn.Three","unsafe-eval","unsafe-inline"]) assert.equal(html.includes(forbidden),false);
   const invalid=renderAiAuthoringHtml(nonce,{
     monacoScriptUri:"javascript:alert(1)",
     monacoStyleUri:"javascript:alert(1)"
@@ -603,8 +603,8 @@ test("F3 Monaco YAML Diff is local, read-only and preserves line-diff fallback",
   assert.match(code,/hideUnchangedRegions/);
   for(const forbidden of ["fetch(", "workspace.applyEdit", "localStorage", "sessionStorage"])
     assert.equal(code.includes(forbidden),false,"forbidden Monaco behavior: "+forbidden);
-  assert.match(build,/src\\/ai-yaml-diff\\.mjs/);
-  assert.match(build,/media\\/ai-yaml-diff\\.js/);
+  assert.ok(build.includes("src/ai-yaml-diff.mjs"));
+  assert.ok(build.includes("media/ai-yaml-diff.js"));
 });
 
 test("F2 Source-backed React Flow graph stays embedded and offline with nonce assets",()=>{
