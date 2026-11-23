@@ -1615,14 +1615,14 @@ try{
             "const editor=surface?.querySelector('.monaco-diff-editor');"+
             "const r=surface?.getBoundingClientRect();"+
             "return {initialized:!!editor,shown:surface?.hidden===false,"+
-            "width:r?.width||0,height:r?.height||0,"+
+            "width:r?.width||0,height:r?.height||0,changedNodeVisible:surface?.innerText.includes(\'ai-authoring-smoke-node\')===true,"+
             "fallbackHidden:document.getElementById('diffRows')?.hidden===true,"+
-            "identity:window.skillStudioAiYamlDiff?.identity||'',"+
+            "mainWorldAdapterNotObservable:true,"+
             "notice:document.getElementById('monacoDiffNotice')?.textContent||''};})()"
         });
         const v=evaluated.result?.value;
         if(v?.initialized&&v.shown&&v.width>0&&v.height>0&&
-           v.notice.includes("Monaco 只读 Diff"))monacoEvidence=v;
+           v.changedNodeVisible&&v.notice.includes("Monaco 只读 Diff"))monacoEvidence=v;
         if(!monacoEvidence)await sleep(100);
       }
       if(!monacoEvidence){
@@ -1631,23 +1631,38 @@ try{
           expression:"(()=>({notice:document.getElementById('monacoDiffNotice')?.textContent,"+
             "scripts:[...document.querySelectorAll('script[src]')].map(x=>x.src),"+
             "styles:[...document.querySelectorAll('link[rel=stylesheet]')].map(x=>x.href),"+
-            "surface:document.getElementById('monacoDiffSurface')?.innerText.slice(0,300)}))()"
+            "surface:document.getElementById('monacoDiffSurface')?.innerText.slice(0,300),"+
+            "surfaceRect:(()=>{const r=document.getElementById('monacoDiffSurface')?.getBoundingClientRect();return {width:r?.width,height:r?.height}})(),"+
+            "identity:window.skillStudioAiYamlDiff?.identity,renderedEditorCount:document.getElementById('monacoDiffSurface')?.querySelectorAll('.monaco-diff-editor').length}))()"
         });
         throw Error("F3 Monaco Diff did not render with non-empty exact candidate in Chromium: "+
           JSON.stringify(diagnostic.result?.value));
       }
-      const diffMode=await command("Runtime.evaluate",{
-        contextId:aiContextId,returnByValue:true,
-        expression:"(()=>{const select=document.getElementById('monacoDiffMode');"+
-          "if(!select||!document.getElementById('monacoDiffSurface'))return false;"+
-          "select.value='inline';select.dispatchEvent(new Event('change',{bubbles:true}));"+
-          "document.getElementById('monacoDiffNext').click();"+
-          "document.getElementById('monacoDiffPrevious').click();"+
-          "select.value='side-by-side';select.dispatchEvent(new Event('change',{bubbles:true}));"+
-          "return select.value==='side-by-side'&&!document.getElementById('monacoDiffSurface').hidden;})()"
-      });
-      if(diffMode.result?.value!==true)
-        throw Error("F3 side-by-side/inline diff and navigation controls failed");
+      // CDP intentionally executes in an isolated world. Its window globals
+      // do NOT expose main-world adapter objects; validate shared DOM only.
+      let diffMode=null;
+      for(let attempt=0;attempt<40;attempt++){
+        diffMode=await command("Runtime.evaluate",{
+          contextId:aiContextId,returnByValue:true,
+          expression:"(()=>{try{const select=document.getElementById('monacoDiffMode');"+
+            "const controls=document.getElementById('monacoDiffControls');"+
+            "const surface=document.getElementById('monacoDiffSurface');"+
+            "if(!select||!surface||!controls)return {ok:false,selectPresent:!!select,"+
+              "controlsPresent:!!controls,surfacePresent:!!surface,title:document.title};"+
+            "select.value='inline';select.dispatchEvent(new Event('change',{bubbles:true}));"+
+            "document.getElementById('monacoDiffNext')?.click();"+
+            "document.getElementById('monacoDiffPrevious')?.click();"+
+            "select.value='side-by-side';select.dispatchEvent(new Event('change',{bubbles:true}));"+
+            "return {ok:select.value==='side-by-side'&&!surface.hidden,"+
+              "value:select.value,hidden:surface.hidden,controlsVisible:controls.hidden===false};"+
+            "}catch(error){return {ok:false,error:String(error?.stack||error)}}})()"
+        });
+        if(diffMode.result?.value?.ok===true)break;
+        await sleep(100);
+      }
+      if(diffMode?.result?.value?.ok!==true)
+        throw Error("F3 Monaco Diff controls failed in Chromium: "+
+          JSON.stringify({value:diffMode?.result?.value,exception:diffMode?.exceptionDetails}));
       // F2 must render actual React Flow canvases from the pinned v1alpha5
       // Source projection, not just the F1 text summary.
       const graphTab=await command("Runtime.evaluate",{
