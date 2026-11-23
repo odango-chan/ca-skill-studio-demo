@@ -735,6 +735,24 @@ export function registerAiAuthoringEditor(vscode, context, { getActiveDocument, 
       const modelId = aiSettings.get("model", DEFAULT_AI_MODEL_ID);
       const gatewayConfigured = typeof gatewayBaseUrl === "string" && gatewayBaseUrl.trim().length > 0 &&
         typeof modelId === "string" && modelId.trim().length > 0;
+      // Provenance is computed from the very same Package snapshot as the
+      // disclosed Context Pack. An open buffer overrides persisted bytes.
+      const paths = new Map(state.snapshot.documents.map(item => [item.relativePath,item.uri]));
+      const openByUri = new Map((vscode.workspace.textDocuments ?? [])
+        .map(item => [item.uri.toString(),item]));
+      const sources = await Promise.all(state.resources.map(async item => {
+        const open = item.kind === "dependency" ? null : openByUri.get(paths.get(item.path));
+        const origin = item.kind === "dependency" ? "verified locked dependency" :
+          open ? (open.isDirty === true ? "open unsaved buffer" : "open saved buffer") :
+          "persisted Package content";
+        return {
+          id:item.id,kind:item.kind,label:item.label,bytes:item.bytes,
+          digest:await sha256Hex(item.content),origin,selected:item.selected,
+          explicitOptIn:item.kind === "reference" || item.kind === "script",
+        };
+      }));
+      if (!isCurrentAuthoringSession(session, activeSession) ||
+        activeSession.contextRequestId !== requestId) return;
       post({
         type: "context",
         languageTarget: LANGUAGE_TARGET,
@@ -743,17 +761,12 @@ export function registerAiAuthoringEditor(vscode, context, { getActiveDocument, 
         packageGeneration: state.generation,
         sourceDigest: "sha256:" + await sha256Hex(document.getText()),
         writeTarget: "assurance/procedure.yaml",
+        writeOrigin: document.isDirty === true ? "open unsaved buffer" : "open saved buffer",
         gatewayConfigured,
         gatewayUrl: typeof gatewayBaseUrl === "string" ? gatewayBaseUrl.trim() : "",
         modelId: typeof modelId === "string" ? modelId.trim() : "",
-        sources: state.resources.map((item) => ({
-          id: item.id,
-          kind: item.kind,
-          label: item.label,
-          bytes: item.bytes,
-          selected: item.selected,
-          explicitOptIn: item.kind === "reference" || item.kind === "script",
-        })),
+        sources,
+        history: activeSession.history.list(),
       });
     } catch (error) {
       if (!isCurrentAuthoringSession(session, activeSession) ||
