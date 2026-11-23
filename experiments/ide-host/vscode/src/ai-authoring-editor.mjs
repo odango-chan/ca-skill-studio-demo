@@ -217,7 +217,31 @@ export async function createAuthoringCompilerCheck({
     !changeSet?.base || typeof candidateDigest !== "string") {
     throw new Error("The exact live document and Change Set identity are required for Compiler Check.");
   }
-  const request = createAuthoringCompilerRequest(state, candidateSource);
+  let request;
+  if (state.syntheticTrustedRequest) {
+    // The fixture is staged by backend Chromium CI only and is unreachable
+    // from browser-only or production extension activation. No user-provided
+    // document may create or override Compiler Owner trust.
+    if (typeof process === "undefined" || !process.versions?.node ||
+        process.env.THEIA_ACCEPTANCE_FIXTURES !== "1") {
+      throw new Error("Synthetic Compiler trust is forbidden outside isolated acceptance.");
+    }
+    const fixture = state.syntheticTrustedRequest;
+    const sourcePath = "skills/example/assurance/procedure.yaml";
+    const sourceFile = fixture.files?.find(item => item.path === sourcePath);
+    if (!fixture.trustedBuildContext || !sourceFile ||
+        Buffer.from(sourceFile.bytes, "base64").toString("utf8") !== state.procedure.text) {
+      throw new Error("Synthetic compiler fixture is absent, altered or no longer current.");
+    }
+    request = {
+      ...fixture,
+      files: fixture.files.map(item => item.path === sourcePath
+        ? { ...item, bytes: Buffer.from(candidateSource, "utf8").toString("base64") }
+        : item),
+    };
+  } else {
+    request = createAuthoringCompilerRequest(state, candidateSource);
+  }
   const diagnostics = await compilerIntegration.checkRequest(request);
   if (!Array.isArray(diagnostics)) {
     throw new Error("Compiler Check did not return a complete Diagnostic array.");
@@ -401,6 +425,35 @@ export function registerAiAuthoringEditor(vscode, context, { getActiveDocument, 
   const revisionFor = createPackageRevisionTracker();
   let panel = null;
   let session = null;
+  let syntheticFixture = null;
+  let syntheticFingerprint = null;
+  let syntheticGeneration = 0;
+
+  function installSyntheticFixture({documentUri, original, trusted} = {}) {
+    if (typeof process === "undefined" || !process.versions?.node ||
+        process.env.THEIA_ACCEPTANCE_FIXTURES !== "1") {
+      throw new Error("Synthetic Editor Tab fixture is available only in isolated backend CI.");
+    }
+    if (typeof documentUri !== "string" ||
+        !documentUri.includes("/.studio-ai-acceptance/skills/example/assurance/procedure.yaml") ||
+        typeof original !== "string" || !original.includes("FAIL: SAFE_STOPPED") ||
+        !trusted?.trustedBuildContext || !Array.isArray(trusted.files)) {
+      throw new TypeError("Only an isolated pinned synthetic acceptance fixture is allowed.");
+    }
+    const file = trusted.files.find(item => item.path === "skills/example/assurance/procedure.yaml");
+    if (!file || Buffer.from(file.bytes, "base64").toString("utf8") !== original) {
+      throw new Error("Synthetic Editor Tab fixture and trusted Compiler source differ.");
+    }
+    syntheticFixture = { documentUri, original, trusted };
+    syntheticFingerprint = null;
+    syntheticGeneration = 0;
+  }
+
+  function clearSyntheticFixture() {
+    syntheticFixture = null;
+    syntheticFingerprint = null;
+    syntheticGeneration = 0;
+  }
 
   function post(message) {
     if (panel && session && !session.disposed) void panel.webview.postMessage(message);
@@ -438,6 +491,28 @@ export function registerAiAuthoringEditor(vscode, context, { getActiveDocument, 
     }
     if (!Number.isSafeInteger(document.version) || document.version < 1) {
       throw new Error("当前 Procedure 没有可用的 TextDocument revision。");
+    }
+    if (syntheticFixture?.documentUri === document.uri.toString()) {
+      const text = document.getText();
+      if (syntheticFingerprint !== text) {
+        syntheticFingerprint = text;
+        syntheticGeneration += 1;
+      }
+      const procedure = { relativePath: "assurance/procedure.yaml", text,
+        version: document.version };
+      const snapshot = {
+        completeness: "complete", rootUri: syntheticFixture.documentUri,
+        packageName: "example", generation: syntheticGeneration,
+        documents: [procedure],
+      };
+      return {
+        snapshot, dependencies: { status: "READY", snapshots: [] },
+        generation: syntheticGeneration, procedure, resources: [],
+        // After an Apply this becomes normal read-only preview; no second
+        // Compiler trust is silently conferred to a mutated fixture.
+        ...(text === syntheticFixture.original
+          ? { syntheticTrustedRequest: syntheticFixture.trusted } : {}),
+      };
     }
     const snapshot = await collectPackageSnapshot(vscode, document, 1);
     if (snapshot.completeness !== "complete") {
@@ -1117,5 +1192,12 @@ export function registerAiAuthoringEditor(vscode, context, { getActiveDocument, 
       : null;
   context.subscriptions.push(command, gatewayTokenCommand);
   if (gatewayAcceptanceCommand) context.subscriptions.push(gatewayAcceptanceCommand);
-  return Object.freeze({ open, configureAiGatewayToken: () => configureAiGatewayToken(vscode, context.secrets) });
+  return Object.freeze({
+    open,
+    configureAiGatewayToken: () => configureAiGatewayToken(vscode, context.secrets),
+    ...(typeof process !== "undefined" && process.versions?.node &&
+        process.env.THEIA_ACCEPTANCE_FIXTURES === "1"
+      ? { installSyntheticFixture, clearSyntheticFixture }
+      : {}),
+  });
 }
