@@ -99,24 +99,6 @@ const SUPPORTED_SCHEMA_DIALECT="https://json-schema.org/draft/2020-12/schema";
  */
 function auditLocalSchema(path,file,diagnostics,ids){
   if(typeof file?.text!=="string")return;
-  // JSON files must be valid JSON, not merely YAML-compatible flow mappings.
-  if(/\.json$/i.test(path)){
-    try{JSON.parse(file.text);}
-    catch(error){
-      const message=String(error?.message??error);
-      const positionMatch=/position\s+(\d+)/i.exec(message);
-      const counter=new LineCounter();
-      const parsed={counter,text:file.text};
-      const node=positionMatch
-        ?{range:[Number(positionMatch[1]),Math.min(file.text.length,Number(positionMatch[1])+1)]}
-        :null;
-      add(diagnostics,path,parsed,node,
-        "SCHEMA_DOCUMENT_PARSE_ERROR",
-        "Cannot parse local JSON Schema "+path+": "+message,
-        {domain:"schemas",category:"syntax"});
-      return;
-    }
-  }
   const counter=new LineCounter();
   let document;
   try{
@@ -131,6 +113,25 @@ function auditLocalSchema(path,file,diagnostics,ids){
       "Cannot parse local Schema "+path+": "+String(error?.message??error),
       {domain:"schemas",category:"syntax"});
     return;
+  }
+  // JSON files must be valid JSON, not merely YAML-compatible flow mappings.
+  // The YAML parser above populates LineCounter so JSON parser offsets retain
+  // exact line/column information when the JSON grammar rejects a file.
+  if(/\.json$/i.test(path)){
+    try{JSON.parse(file.text);}
+    catch(error){
+      const message=String(error?.message??error);
+      const positionMatch=/position\s+(\d+)/i.exec(message);
+      const parsed={counter,text:file.text};
+      const node=positionMatch
+        ?{range:[Number(positionMatch[1]),Math.min(file.text.length,Number(positionMatch[1])+1)]}
+        :null;
+      add(diagnostics,path,parsed,node,
+        "SCHEMA_DOCUMENT_PARSE_ERROR",
+        "Cannot parse local JSON Schema "+path+": "+message,
+        {domain:"schemas",category:"syntax"});
+      return;
+    }
   }
   const parsed={root:isMap(document.contents)?document.contents:null,counter,text:file.text};
   for(const error of document.errors??[]){
