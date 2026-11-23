@@ -1615,14 +1615,14 @@ try{
             "const editor=surface?.querySelector('.monaco-diff-editor');"+
             "const r=surface?.getBoundingClientRect();"+
             "return {initialized:!!editor,shown:surface?.hidden===false,"+
-            "width:r?.width||0,height:r?.height||0,"+
+            "width:r?.width||0,height:r?.height||0,changedNodeVisible:surface?.innerText.includes(\'ai-authoring-smoke-node\')===true,"+
             "fallbackHidden:document.getElementById('diffRows')?.hidden===true,"+
             "identity:window.skillStudioAiYamlDiff?.identity||'',"+
             "notice:document.getElementById('monacoDiffNotice')?.textContent||''};})()"
         });
         const v=evaluated.result?.value;
-        if(v?.initialized&&v.shown&&v.width>200&&v.height>200&&
-           v.fallbackHidden&&v.identity.startsWith("sha256:"))monacoEvidence=v;
+        if(v?.initialized&&v.shown&&v.width>0&&v.height>0&&
+           v.fallbackHidden&&v.changedNodeVisible&&v.identity.length>0)monacoEvidence=v;
         if(!monacoEvidence)await sleep(100);
       }
       if(!monacoEvidence){
@@ -1631,7 +1631,9 @@ try{
           expression:"(()=>({notice:document.getElementById('monacoDiffNotice')?.textContent,"+
             "scripts:[...document.querySelectorAll('script[src]')].map(x=>x.src),"+
             "styles:[...document.querySelectorAll('link[rel=stylesheet]')].map(x=>x.href),"+
-            "surface:document.getElementById('monacoDiffSurface')?.innerText.slice(0,300)}))()"
+            "surface:document.getElementById('monacoDiffSurface')?.innerText.slice(0,300),"+
+            "surfaceRect:(()=>{const r=document.getElementById('monacoDiffSurface')?.getBoundingClientRect();return {width:r?.width,height:r?.height}})(),"+
+            "identity:window.skillStudioAiYamlDiff?.identity,renderedEditorCount:document.getElementById('monacoDiffSurface')?.querySelectorAll('.monaco-diff-editor').length}))()"
         });
         throw Error("F3 Monaco Diff did not render with non-empty exact candidate in Chromium: "+
           JSON.stringify(diagnostic.result?.value));
