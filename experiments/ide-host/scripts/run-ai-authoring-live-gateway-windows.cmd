@@ -29,10 +29,5 @@ echo No workspace files, provider keys, or model responses will be logged.
 echo.
 choice /C YN /N /M "Run one model request? [Y/N] "
 if errorlevel 2 exit /b 0
-if errorlevel 1 (
-  node "%~dp0ai-authoring-live-gateway-smoke.mjs"
-  set "SMOKE_RESULT=%errorlevel%"
-  if "%SMOKE_RESULT%"=="" set "SMOKE_RESULT=1"
-  exit /b %SMOKE_RESULT%
-)
-exit /b 2
+node "%~dp0ai-authoring-live-gateway-smoke.mjs"
+exit /b %errorlevel%
