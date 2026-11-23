@@ -99,6 +99,22 @@ const SUPPORTED_SCHEMA_DIALECT="https://json-schema.org/draft/2020-12/schema";
  */
 function auditLocalSchema(path,file,diagnostics,ids){
   if(typeof file?.text!=="string")return;
+  // JSON files must be valid JSON, not merely YAML-compatible flow mappings.
+  if(/\.json$/i.test(path)){
+    try{JSON.parse(file.text);}
+    catch(error){
+      const message=String(error?.message??error);
+      const position=Number(/position\s+(\d+)/i.exec(message)?.[1]??0);
+      const counter=new LineCounter();
+      const parsed={counter,text:file.text};
+      add(diagnostics,path,parsed,
+        {range:[position,Math.min(file.text.length,position+1)]},
+        "SCHEMA_DOCUMENT_PARSE_ERROR",
+        "Cannot parse local JSON Schema "+path+": "+message,
+        {domain:"schemas",category:"syntax"});
+      return;
+    }
+  }
   const counter=new LineCounter();
   let document;
   try{
