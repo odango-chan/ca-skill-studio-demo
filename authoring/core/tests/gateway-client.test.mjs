@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { createGatewayModelClient, GatewayRequestError } from "../gateway-client.mjs";
+import { createGatewayModelClient, gatewayModelCatalogEndpoint, listGatewayModels, GatewayRequestError } from "../gateway-client.mjs";
 
 const base = { gatewayBaseUrl: "http://127.0.0.1:8787/opencode-go/openai", modelId: "deepseek-v4.1-flash", sessionId: "editor-session-123" };
 const messages = [{ role: "user", content: "Return a JSON proposal." }];
@@ -110,4 +110,79 @@ test("declares loopback targetAddressSpace only for local Gateway hosts", async 
   });
   await client.complete({ messages, contextDisclosureAccepted: true });
   assert.equal(Object.hasOwn(remote, "targetAddressSpace"), false);
+});
+
+test("model catalog uses the OpenCode Go root route, not the completion's /openai subpath", () => {
+  assert.equal(gatewayModelCatalogEndpoint(base.gatewayBaseUrl),
+    "http://127.0.0.1:8787/opencode-go/v1/models");
+  assert.equal(gatewayModelCatalogEndpoint("https://gateway.example/local-models"),
+    "https://gateway.example/local-models/v1/models");
+  assert.throws(() => gatewayModelCatalogEndpoint("http://gateway.example/opencode-go/openai"),
+    /HTTPS for non-loopback/);
+  assert.throws(() => gatewayModelCatalogEndpoint("http://127.0.0.1:8787/opencode-go/openai?key=secret"),
+    /credentials, query parameters or fragments/);
+});
+
+test("Host-owned model GET returns bounded, sanitized Chat models without a provider key", async () => {
+  let request;
+  const catalog = { object: "list", data: [
+    { id: "deepseek-v4.1-flash", name: "DeepSeek V4.1 Flash", type: "chat" },
+    { id: "glm-5.3-flash", name: "GLM-5.3 Flash", type: "chat" },
+    { id: "glm-5.3-flash", name: "Duplicate", type: "chat" },
+    { id: "image-gen", name: "An image model", type: "image" },
+    { id: "../bad?token", name: "Bad", type: "chat" }
+  ] };
+  const models = await listGatewayModels({
+    gatewayBaseUrl: base.gatewayBaseUrl, gatewayToken: "shared-token",
+    fetchImpl: async (url, init) => {
+      request = { url, init };
+      return new Response(JSON.stringify(catalog), { status: 200 });
+    }
+  });
+  assert.equal(request.url, "http://127.0.0.1:8787/opencode-go/v1/models");
+  assert.equal(request.init.method, "GET");
+  assert.equal(request.init.targetAddressSpace, "loopback");
+  assert.equal(request.init.credentials, "omit");
+  assert.equal(request.init.headers["x-gateway-token"], "shared-token");
+  assert.equal(request.init.headers.authorization, undefined);
+  assert.equal(request.init.body, undefined);
+  assert.deepEqual(models, [
+    { id: "deepseek-v4.1-flash", name: "DeepSeek V4.1 Flash" },
+    { id: "glm-5.3-flash", name: "GLM-5.3 Flash" },
+  ]);
+  assert.equal(Object.isFrozen(models), true);
+});
+
+test("model catalog over remote HTTPS never requests local-network permission", async () => {
+  let request;
+  const models = await listGatewayModels({
+    gatewayBaseUrl: "https://gateway.example/other/openai",
+    fetchImpl: async (url, init) => { request = { url, init }; return new Response(
+      JSON.stringify({ data: [{ id: "custom-1" }] }), { status: 200 }
+    ); }
+  });
+  assert.equal(request.url, "https://gateway.example/other/v1/models");
+  assert.equal(Object.hasOwn(request.init, "targetAddressSpace"), false);
+  assert.deepEqual(models, [{ id: "custom-1", name: "custom-1" }]);
+});
+
+test("catalog failure is sanitized and oversized content is rejected before parsing", async () => {
+  const token = "super-secret-provider-token";
+  await assert.rejects(listGatewayModels({
+    gatewayBaseUrl: base.gatewayBaseUrl, gatewayToken: token,
+    fetchImpl: async () => { throw Error("upstream " + token); }
+  }), err => err instanceof GatewayRequestError && !err.message.includes(token));
+  await assert.rejects(listGatewayModels({
+    gatewayBaseUrl: base.gatewayBaseUrl,
+    fetchImpl: async () => new Response("sensitive upstream error", { status: 503 })
+  }), err => err instanceof GatewayRequestError &&
+     err.status === 503 && !err.message.includes("sensitive"));
+  await assert.rejects(listGatewayModels({
+    gatewayBaseUrl: base.gatewayBaseUrl,
+    fetchImpl: async () => new Response("x".repeat(1048577), { status: 200 })
+  }), /invalid or oversized model catalog/);
+  await assert.rejects(listGatewayModels({
+    gatewayBaseUrl: base.gatewayBaseUrl,
+    fetchImpl: async () => new Response(JSON.stringify({ models: [] }), { status: 200 })
+  }), /OpenAI-compatible data list/);
 });
