@@ -24,7 +24,7 @@ test("the pinned 5GC Example exercises all static diagnostics domains without mo
   assert.equal(results.apiVersion,DIAGNOSTIC_TEST_SUITE_VERSION);
   assert.equal(results.scope,"STUDIO_DIAGNOSTIC_REGRESSION_ONLY");
   assert.equal(results.qualification,"NOT_QUALIFIED");
-  assert.deepEqual(results.summary,{PASS:12,FAIL:0,NOT_RUN:0});
+  assert.deepEqual(results.summary,{PASS:DIAGNOSTIC_TEST_CASES.length,FAIL:0,NOT_RUN:0});
   assert.equal(results.results.length,DIAGNOSTIC_TEST_CASES.length);
   assert.deepEqual([...files].map(([path,file])=>[path,file.text]),original);
   for(const item of results.results){
