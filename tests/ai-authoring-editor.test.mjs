@@ -427,7 +427,8 @@ test("synthetic positive native Editor acceptance is CI-only and keeps trusted f
   assert.match(acceptance,/applyAuthoringCandidateToBuffer/);
   assert.ok(acceptance.includes("authoring-trusted-build-request.json"));
   assert.ok(backend.includes("authoring-trusted-build-request.json"));
-  assert.match(acceptance,/executeCommand\("undo"\)/);
+  assert.ok(acceptance.includes("syntheticAuthoringVerifyUndo"));
+  assert.match(browser,/commands\.executeCommand\(enabled\)/);
   assert.match(acceptance,/unsavedDiskUnchanged:true/);
   assert.match(browser,/STUDIO_AI_AUTHORING_SYNTHETIC_NATIVE_EDIT_UNDO_CHROMIUM_PASS/);
   assert.match(backend,/trusted-build-request\.json/);

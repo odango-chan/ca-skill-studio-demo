@@ -1621,15 +1621,31 @@ try{
        synthetic?.compilerCandidate?.errors!==0||
        synthetic?.atomicGroupCount!==1||
        synthetic?.nativeWorkspaceEdit!=="PASS"||
-       synthetic?.nativeUndo!=="PASS"||
+       synthetic?.pendingUndo!==true||
        synthetic?.unsavedDiskUnchanged!==true||
-       synthetic?.autoSaved!==false||
-       synthetic?.restoredOriginal!==true){
-      throw Error("Synthetic Compiler-qualified native Editor Apply/Undo acceptance failed: "+
+       synthetic?.autoSaved!==false){
+      throw Error("Synthetic Compiler-qualified native Editor Apply acceptance failed: "+
         JSON.stringify(synthetic));
     }
+    const undoCommand=await evalJS(
+      "(async()=>{const c=window.theia.container;"+
+      "const key=[...c._bindingDictionary._map.keys()].find(k=>"+
+      "typeof k==='function'&&k.prototype?.executeCommand&&"+
+      "k.prototype?.registerCommand&&k.prototype?.getCommand);"+
+      "if(!key)throw Error('Native Theia CommandRegistry missing for Undo');"+
+      "const commands=c.get(key);"+
+      "const available=['undo','core.undo'].filter(id=>commands.getCommand(id));"+
+      "const enabled=available.find(id=>commands.isEnabled(id));"+
+      "if(!enabled)throw Error('No enabled frontend Monaco Undo command: '+available);"+
+      "await commands.executeCommand(enabled);return enabled;})()");
+    const undo=await nativeCommand("skillStudio.internal.syntheticAuthoringVerifyUndo");
+    if(undo?.nativeUndo!=="PASS"||undo?.restoredOriginal!==true||
+       undo?.unsavedDiskUnchanged!==true||undo?.autoSaved!==false){
+      throw Error("Theia frontend Undo did not restore the synthetic editor buffer: "+
+        JSON.stringify({undoCommand,undo}));
+    }
     console.log("STUDIO_AI_AUTHORING_SYNTHETIC_NATIVE_EDIT_UNDO_CHROMIUM_PASS",
-      JSON.stringify(synthetic));
+      JSON.stringify({...synthetic,...undo,pendingUndo:false,undoCommand}));
   }
   if(requireEditor)
     console.log("THEIA_BROWSER_HOST_V1ALPHA5_ACCEPTANCE_PASS");

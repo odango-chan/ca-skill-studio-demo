@@ -21,7 +21,9 @@ export function registerSyntheticAuthoringAcceptance(vscode,context,compilerInte
   // A source-level flag alone is insufficient: this requires an explicit
   // acceptance-enabled Node host and a separately staged immutable fixture.
   if(typeof process==="undefined"||!process.versions?.node)return null;
+  let pendingUndo=null;
   const command=vscode.commands.registerCommand(acceptanceCommand,async()=>{
+    if(pendingUndo)throw Error("Previous synthetic acceptance Undo has not been verified");
     if(typeof compilerIntegration?.checkRequest!=="function"){
       throw Error("The pinned Compiler v2.0.2 Check client is unavailable");
     }
@@ -121,30 +123,22 @@ export function registerSyntheticAuthoringAcceptance(vscode,context,compilerInte
       await vscode.window.showTextDocument(document,{
         preview:false,preserveFocus:false,viewColumn:vscode.ViewColumn.One
       });
-      await vscode.commands.executeCommand("undo");
-      if(document.getText()!==original)
-        throw Error("Native editor Undo did not restore the original Procedure");
-      const diskAfterUndo=new TextDecoder().decode(await vscode.workspace.fs.readFile(uri));
-      if(diskAfterUndo!==original)
-        throw Error("Undo changed the source file on disk unexpectedly");
+      // Undo belongs to the active frontend Monaco editor, not the backend
+      // plugin command registry. The Chromium harness invokes real Theia Undo,
+      // then a separate host command verifies the buffer and disk identities.
+      pendingUndo={document,original,temporary,uri};
+      created=false; // ownership transfers to verify/cleanup command
       return {
         compilerVersion:"v2.0.2",languageTarget:"connectionagent.io/v1alpha5",
         qualification:"SYNTHETIC_TEST_ONLY",real5gcQualification:"NOT_CLAIMED",
         compilerBaseline:sourceCheck,compilerCandidate:candidateCheck,
         candidateDigest:candidate.digest,atomicGroupCount:patch.groups.length,
         nativeWorkspaceEdit:"PASS",bufferChangedBeforeUndo:true,
-        unsavedDiskUnchanged:true,nativeUndo:"PASS",
-        restoredOriginal:true,autoSaved:false
+        unsavedDiskUnchanged:true,pendingUndo:true,autoSaved:false
       };
     }finally{
       if(created){
         try{
-          if(document&&document.getText()!==original){
-            await vscode.window.showTextDocument(document,{
-              preview:false,preserveFocus:false,viewColumn:vscode.ViewColumn.One
-            });
-            await vscode.commands.executeCommand("undo");
-          }
           if(document?.getText()===original){
             await vscode.commands.executeCommand("workbench.action.closeActiveEditor");
           }
@@ -154,6 +148,38 @@ export function registerSyntheticAuthoringAcceptance(vscode,context,compilerInte
       }
     }
   });
-  context.subscriptions.push(command);
+  const verify=vscode.commands.registerCommand(
+    "skillStudio.internal.syntheticAuthoringVerifyUndo",async()=>{
+      const state=pendingUndo;
+      if(!state)throw Error("No synthetic native-editor Undo is pending");
+      try{
+        // Native Monaco changes may need a frontend/backend document event tick.
+        for(let attempt=0;attempt<40 && state.document.getText()!==state.original;attempt++){
+          await new Promise(resolve=>setTimeout(resolve,100));
+        }
+        if(state.document.getText()!==state.original)
+          throw Error("Theia native editor Undo did not restore the synthetic Procedure");
+        const bytes=await vscode.workspace.fs.readFile(state.uri);
+        if(new TextDecoder().decode(bytes)!==state.original)
+          throw Error("Native Undo unexpectedly changed the synthetic file on disk");
+        return {
+          nativeUndo:"PASS",restoredOriginal:true,
+          unsavedDiskUnchanged:true,autoSaved:false
+        };
+      }finally{
+        pendingUndo=null;
+        try{
+          if(state.document.getText()===state.original){
+            await vscode.window.showTextDocument(state.document,{
+              preview:false,preserveFocus:false,viewColumn:vscode.ViewColumn.One
+            });
+            await vscode.commands.executeCommand("workbench.action.closeActiveEditor");
+          }
+        }finally{
+          await vscode.workspace.fs.delete(state.temporary,{recursive:true,useTrash:false});
+        }
+      }
+    });
+  context.subscriptions.push(command,verify);
   return command;
 }
