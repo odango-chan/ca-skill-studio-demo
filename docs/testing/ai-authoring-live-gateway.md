@@ -19,41 +19,35 @@ edit files or qualify Owner, Tool, Runtime or Deployment.
   transport and upstream, **not** Authoring Core semantics.
 - Node.js **24+** is available only for this local smoke script; it is
   **not** required to run the released Gateway or the published Pages site.
-- Use the Studio PR #208 checkout
-  (`feat/ai-authoring-editor-tab-v1alpha5-20261117`). The smoke is not
-  present on Studio `main` while #208 remains unmerged.
+- Use the current Studio `main` checkout. PR #208 has been merged, and the
+  smoke is now part of the released source at
+  `experiments/ide-host/scripts/ai-authoring-live-gateway-smoke.mjs`.
 
-## Preferred: download the small Windows smoke package
+## Preferred: run from the current Studio main checkout
 
-On [Studio PR #208](https://github.com/odango-chan/ca-skill-studio-demo/pull/208),
-open the latest successful **Verify Skill Studio pull requests** run. Under
-**Artifacts**, download `studio-ai-authoring-live-smoke-windows`, then unzip it
-into a directory under Windows Downloads. The archive contains:
-
-- `ai-authoring-live-gateway-smoke.mjs` — one bundled executable containing
-  the **real Studio Authoring Core / Procedure Agent / Patch Engine**, not a
-  handwritten imitation or a generic Gateway ping;
-- `run-live-gateway-smoke.cmd` — Windows CMD launcher with preconfigured local
-  Gateway URL and `deepseek-v4.1-flash`, an explicit yes/no consent prompt,
-  and no PowerShell execution-policy requirement;
-- `README.md` — this document.
-
-Open **Command Prompt** or PowerShell inside the extracted folder and run:
+From the Studio repository root, on the current `main` branch, open
+Command Prompt or PowerShell and run:
 
 ```cmd
-.\\run-live-gateway-smoke.cmd
+set STUDIO_AI_GATEWAY_URL=http://127.0.0.1:8787/opencode-go/openai
+set STUDIO_AI_MODEL_ID=deepseek-v4.1-flash
+node experiments/ide-host/scripts/ai-authoring-live-gateway-smoke.mjs
 ```
 
-Node.js **24+** must be on `PATH` for this optional smoke. Git, a cloned
-Studio repository, project `npm install`, Go, WSL and changing PowerShell
-script policy are **not** required. The launcher does **not** read or embed
-your OpenCode Go API Key; the already-running Gateway holds it. The resulting
-status line can be shared, but never copy model response contents or secrets.
-The test only attempts a single synthetic model request after you approve it.
+Node.js **24+** must be on `PATH`. The command sends one explicitly
+authorized synthetic request through the same Authoring Core Gateway Model
+Client and Procedure Agent used by the Editor Tab. It does not require Go,
+WSL, PowerShell execution-policy changes, or any provider key in the Studio
+repository. The already-running Gateway holds the OpenCode Go credential.
 
-## Alternative: run from the Studio PR checkout on Windows PowerShell
+If you do not have a Studio checkout, the portable Windows smoke artifact
+from the successful PR #208 verification run may still be downloaded from
+that run's Actions artifacts; the source script on `main` is the canonical
+version and should be preferred for future runs.
 
-From the **Studio repository root**, not the Gateway executable directory:
+## Alternative: run from Windows PowerShell with explicit environment cleanup
+
+From the **current Studio main repository root**, not the Gateway executable directory:
 
 ```powershell
 $env:STUDIO_AI_GATEWAY_URL = 'http://127.0.0.1:8787/opencode-go/openai'
@@ -97,13 +91,26 @@ Key or Gateway token**. Its output contains only aggregate counts,
 pass/fail classifications and sanitized error categories. Do not copy
 secrets or full model responses into GitHub.
 
-This smoke does **not** run the pinned Compiler or modify a file. Existing
-CI separately verifies the actual v2.0.2 Go/WASM Compiler's positive Check
-and native WorkspaceEdit/Undo with a trusted synthetic fixture.
-**Production Editor Tab model-generated Proposal → selected Patch →
-Compiler PASS → Apply → Undo remains a separate gate** for #208.
-The official 5GC Examples are not qualified and must remain Preview-Only
-when Compiler Check returns errors; Wait requires trusted IngressCatalog.
+## How this evidence fits the shipped Editor Tab
+
+The live-provider smoke proves one real OpenCode Go completion passed the
+Authoring Core ModelProposal contract and produced a source-preserving
+candidate for a synthetic Procedure. It deliberately does **not** run the
+Compiler or modify an editor buffer.
+
+Separately, the merged AI Editor Tab has passed real Theia Chromium
+acceptance using a controlled mock-model proposal and a trusted synthetic
+Package: selected Change Set group → exact pinned Compiler v2.0.2 Check
+PASS → native WorkspaceEdit → Undo. This proves the Editor Tab's positive
+Apply path without relying on nondeterministic model output.
+
+These are complementary acceptance results, **not** a claim that one
+single run used a live model and then applied that same model response.
+That combined live-provider-to-Apply run remains optional further evidence,
+not a blocker to the shipped P1 development integration. Neither test
+qualifies real 5GC Owner, Tool, Runtime, Wait/Ingress or Deployment behavior.
+The official 5GC Examples remain Preview-Only when Compiler Check returns
+errors; Wait requires trusted IngressCatalog.
 
 ## Other platforms
 
