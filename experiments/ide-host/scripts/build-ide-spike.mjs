@@ -113,6 +113,18 @@ await build({
   loader:{".tsx":"tsx",".ttf":"file",".woff":"file",".woff2":"file",".svg":"file"},
   assetNames:"assets/[name]-[hash]",logLevel:"info"
 });
+// The AI review graph is an embedded, read-only React Flow + ELK adapter.
+// It consumes the SAME v1alpha5 Source projection and graph element/layout
+// primitives as Procedure Preview; separate Webview assets keep the editor
+// extension Host free of React and prevent any third native editor group.
+await build({
+  entryPoints:[join(root,"src/ai-flow-compare.tsx")],
+  outfile:join(root,"media/ai-flow-compare.js"),
+  bundle:true,format:"iife",platform:"browser",target:"es2022",
+  minify:true,
+  loader:{".tsx":"tsx",".css":"css"},
+  logLevel:"info"
+});
 // Bundle only the pinned CA-SL v1alpha5 released Example. v1alpha4 remains
 // an immutable historical language baseline and is not shipped as an active Example.
 // Remove all previously staged active/legacy sample directories before copying the

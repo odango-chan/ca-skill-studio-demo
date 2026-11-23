@@ -6,6 +6,7 @@ import { createProcedureAgent } from "../../../../authoring/core/procedure-agent
 import { createGatewayModelClient, listGatewayModels, validateModelId } from "../../../../authoring/core/gateway-client.mjs";
 import { createChangeSet } from "../../../../authoring/core/change-set.mjs";
 import { createAuthoringLineDiff, createAuthoringFlowChanges, createAuthoringValidationView } from "../../../../authoring/core/review-presentation.mjs";
+import { buildAiFlowGraphReview } from "./ai-flow-projection.mjs";
 import {
   planV1Alpha5Patch,
   materializeAcceptedPatchGroups,
@@ -245,6 +246,21 @@ export async function buildAuthoringResourceInventory(snapshot, dependencyResolu
   return Object.freeze(resources.map((item) => Object.freeze(item)));
 }
 
+/**
+ * Graph projection never changes the Authoring approval state. A malformed,
+ * incomplete or unsupported Procedure falls back to the source-backed
+ * semantic outline + YAML Diff, without fabricating graph topology.
+ */
+export function createAiFlowReviewOrFallback(state,baseSource,candidateSource,flowGroups) {
+  try {
+    return buildAiFlowGraphReview({
+      snapshot:state?.snapshot,baseSource,candidateSource,flowGroups
+    });
+  } catch {
+    return null;
+  }
+}
+
 export function containsWaitMutation(operations) {
   if (!Array.isArray(operations)) return false;
   return operations.some((operation) =>
@@ -426,10 +442,18 @@ function nonceValue() {
   return [...bytes].map((item) => item.toString(16).padStart(2, "0")).join("");
 }
 
-export function renderAiAuthoringHtml(nonce) {
+export function renderAiAuthoringHtml(nonce, assets = {}) {
   if (typeof nonce !== "string" || !/^[a-f0-9]{32,128}$/.test(nonce)) {
     throw new TypeError("A cryptographically random Webview nonce is required");
   }
+
+  const safeMediaUri = value => {
+    if (typeof value !== "string" ||
+        !/^(?:https?:|vscode-resource:|vscode-webview-resource:|theia-resource:)/.test(value)) return "";
+    return value.replace(/&/g,"&amp;").replace(/"/g,"&quot;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+  };
+  const flowScript = safeMediaUri(assets.scriptUri);
+  const flowCss = safeMediaUri(assets.styleUri);
   const css = [
     ":root{color-scheme:light dark;font-family:var(--vscode-font-family);color:var(--vscode-foreground);background:var(--vscode-editor-background)}",
     "*{box-sizing:border-box}",
@@ -497,6 +521,12 @@ export function renderAiAuthoringHtml(nonce) {
     ".changeset-panel textarea{min-height:145px}",
     ".changeset-panel .group-list{max-height:45vh}",
     ".review-placeholder{color:var(--vscode-descriptionForeground);font-size:12px;line-height:1.5}",
+    ".ai-flow-container{min-height:0;margin:10px 0 12px}",
+    ".ai-flow-fallback{font-size:12px;color:var(--vscode-descriptionForeground)}",
+    ".ai-flow-focus{font-size:11px;border-left:3px solid var(--vscode-focusBorder);padding:7px 10px;margin:8px 0;background:var(--vscode-editorWidget-background)}",
+    ".ai-flow-focus button{margin-left:10px;padding:4px 7px;font-size:11px}",
+    ".group.graph-focus-group{outline:2px solid var(--vscode-focusBorder);outline-offset:1px}",
+    ".flow-group.graph-focus-group{outline:2px solid var(--vscode-focusBorder);outline-offset:1px}",
     "@media(max-width:1180px){main{grid-template-columns:minmax(220px,.65fr) minmax(350px,1.4fr)}.changeset-panel{grid-column:1/-1}}",
     "@media(max-width:720px){main{grid-template-columns:1fr}.changeset-panel{grid-column:auto}.review-view{max-height:none}.context-panel .source-list{max-height:34vh}}",
   ].join("\n");
@@ -507,17 +537,19 @@ export function renderAiAuthoringHtml(nonce) {
     "function status(text,kind){const el=byId('status');el.textContent=text||'';el.className='status '+(kind||'');}",
     "function setBusy(value){busy=value;byId('generate').disabled=value||!window.gatewayConfigured||!contextReady;byId('cancel').disabled=!value;byId('refresh').disabled=value;byId('chooseModel').disabled=value;byId('apply').disabled=value||!canApply;}",
     "function clear(el){while(el.firstChild)el.removeChild(el.firstChild);}",
-    "function clearProposal(){canApply=false;previewSequence++;clear(byId('plan'));clear(byId('assumptions'));clear(byId('blockers'));clear(byId('groups'));byId('proposalSummary').textContent='';byId('currentSource').textContent='';byId('candidateSource').textContent='';byId('patchState').textContent='尚未生成';byId('patchError').textContent='';byId('compilerStatus').textContent='Compiler Check: NOT_RUN';byId('apply').disabled=true;byId('discard').disabled=true;clear(byId('flowChanges'));clear(byId('diffRows'));clear(byId('diagnostics'));byId('diffSummary').textContent='尚未生成候选 Diff。';byId('validationIdentity').textContent='';byId('revisionInfo').textContent='尚未生成';}",
+    "function clearProposal(){canApply=false;previewSequence++;clear(byId('plan'));clear(byId('assumptions'));clear(byId('blockers'));clear(byId('groups'));byId('proposalSummary').textContent='';byId('currentSource').textContent='';byId('candidateSource').textContent='';byId('patchState').textContent='尚未生成';byId('patchError').textContent='';byId('compilerStatus').textContent='Compiler Check: NOT_RUN';byId('apply').disabled=true;byId('discard').disabled=true;clear(byId('flowChanges'));clear(byId('diffRows'));clear(byId('diagnostics'));byId('diffSummary').textContent='尚未生成候选 Diff。';byId('validationIdentity').textContent='';byId('revisionInfo').textContent='尚未生成';window.skillStudioAiFlowCompare?.clear();byId('flowCompareNotice').textContent='生成提案后显示真实 React Flow 对比。';byId('flowFocusInfo').hidden=true;}",
     "function addList(id,items){const root=byId(id);clear(root);if(!items||!items.length)return;const ul=document.createElement('ul');for(const value of items){const li=document.createElement('li');li.textContent=value;ul.appendChild(li);}root.appendChild(ul);}",
     "const reviewTabs=['plan','flow','diff','validation'];",
-    "function selectReviewTab(name,moveFocus=false){if(!reviewTabs.includes(name))return;for(const key of reviewTabs){const button=byId('tab-'+key);const view=byId('view-'+key);const active=key===name;button.setAttribute('aria-selected',String(active));button.tabIndex=active?0:-1;view.hidden=!active;}if(moveFocus)byId('tab-'+name).focus();}",
+    "function selectReviewTab(name,moveFocus=false){if(!reviewTabs.includes(name))return;for(const key of reviewTabs){const button=byId('tab-'+key);const view=byId('view-'+key);const active=key===name;button.setAttribute('aria-selected',String(active));button.tabIndex=active?0:-1;view.hidden=!active;}if(name==='flow')requestAnimationFrame(()=>window.dispatchEvent(new Event('resize')));if(moveFocus)byId('tab-'+name).focus();}",
     "for(const name of reviewTabs){const button=byId('tab-'+name);button.addEventListener('click',()=>selectReviewTab(name));button.addEventListener('keydown',event=>{if(!['ArrowLeft','ArrowRight','Home','End'].includes(event.key))return;event.preventDefault();const i=reviewTabs.indexOf(name);const next=event.key==='Home'?0:event.key==='End'?reviewTabs.length-1:event.key==='ArrowRight'?(i+1)%reviewTabs.length:(i+reviewTabs.length-1)%reviewTabs.length;selectReviewTab(reviewTabs[next],true);});}",
     "function markFlowSelection(){const selected=new Set([...document.querySelectorAll('[data-group-id]:checked')].map(item=>item.dataset.groupId));for(const item of byId('flowChanges').querySelectorAll('[data-flow-group]'))item.classList.toggle('excluded',!selected.has(item.dataset.flowGroup));}",
     "function renderFlowChanges(groups){const root=byId('flowChanges');clear(root);if(!Array.isArray(groups)||groups.length===0){root.textContent='暂无经 Patch Engine 规划的语义修改。';return;}for(const group of groups){const section=document.createElement('section');section.className='flow-group';section.dataset.flowGroup=group.id;const head=document.createElement('h3');head.className='flow-title';head.textContent=group.label+' · '+(group.operations||[]).length+' 项';section.appendChild(head);for(const op of group.operations||[]){const line=document.createElement('div');line.className='flow-op';const path=document.createElement('div');path.className='flow-path';for(const value of [op.nodeId||'Procedure',op.stage,op.outcome]){if(!value)continue;const span=document.createElement('span');span.className='flow-tag';span.textContent=value;path.appendChild(span);}const type=document.createElement('span');type.className='kind';type.textContent=op.type;path.appendChild(type);if(op.toNodeId){const arrow=document.createElement('span');arrow.textContent='→';path.appendChild(arrow);const target=document.createElement('span');target.className='flow-tag flow-outcome';target.textContent=op.toNodeId;path.appendChild(target);}line.appendChild(path);const detail=document.createElement('div');detail.className='flow-rationale';detail.textContent=op.rationale||'无附加说明';line.appendChild(detail);if(op.references?.length){const refs=document.createElement('div');refs.className='flow-rationale';refs.textContent='提案引用（非独立验证证据）：'+op.references.join('、');line.appendChild(refs);}section.appendChild(line);}root.appendChild(section);}markFlowSelection();}",
+    "function focusAiFlowElement(info){if(!info||!['node','route'].includes(info.kind))return;const groupIds=new Set(Array.isArray(info.groupIds)?info.groupIds:[]);for(const label of document.querySelectorAll('.group')){const box=label.querySelector('[data-group-id]');label.classList.toggle('graph-focus-group',Boolean(box&&groupIds.has(box.dataset.groupId)));}for(const item of document.querySelectorAll('.flow-group'))item.classList.toggle('graph-focus-group',groupIds.has(item.dataset.flowGroup));const root=byId('flowFocusInfo');clear(root);const label=document.createElement('strong');label.textContent=info.kind==='route'?'Route · '+info.nodeId+' · '+info.routeSource+'.'+info.outcome:'Node · '+info.nodeId;const details=document.createElement('span');details.textContent=' · 当前 L'+(info.baseLine??'—')+' → 候选 L'+(info.candidateLine??'—')+' · 对应原子组 '+(groupIds.size?[...groupIds].join('、'):'未关联');const button=document.createElement('button');button.type='button';button.className='secondary';button.textContent='查看 YAML Diff';button.addEventListener('click',()=>selectReviewTab('diff',true));root.append(label,details,button);root.hidden=false;const group=[...document.querySelectorAll('.group.graph-focus-group')][0];if(group)group.scrollIntoView({block:'nearest'});}",
+    "window.addEventListener('studio-ai-flow-focus',event=>focusAiFlowElement(event.detail));",
     "function renderLineDiff(diff){const root=byId('diffRows');clear(root);const note=byId('diffSummary');if(!diff||!Array.isArray(diff.rows)){note.textContent='没有可显示的 Host 候选 Diff。';return;}note.textContent='新增 '+diff.added+' 行 · 删除 '+diff.removed+' 行'+(diff.lineEndingsOnly?' · 检测到换行符变化':'')+(diff.truncated?' · 仅显示部分差异；请展开完整源文本核对':'');for(const row of diff.rows){if(row.kind==='omitted'){const el=document.createElement('div');el.className='diff-omitted';el.textContent=row.truncated?'审阅显示已截断；请查看完整源文本':'…省略 '+row.count+' 行未变化内容…';root.appendChild(el);continue;}if(!['context','added','removed'].includes(row.kind))continue;const element=document.createElement('div');element.className='diff-row '+row.kind;for(const side of ['before','after']){const cell=document.createElement('div');cell.className='diff-cell';const no=document.createElement('span');no.className='line-no';const valid=side==='before'?row.kind!=='added':row.kind!=='removed';no.textContent=valid?String(side==='before'?row.beforeLine:row.afterLine):'';const text=document.createElement('span');text.className='line-text';text.textContent=valid?(row.text||''):'';cell.append(no,text);element.appendChild(cell);}root.appendChild(element);}}",
     "function renderValidationView(data){const root=byId('diagnostics');clear(root);if(!data){root.textContent='尚未获得完整 Compiler Check。';byId('validationIdentity').textContent='';return;}const hash=typeof data.candidateDigest==='string'?data.candidateDigest:'';byId('validationIdentity').textContent='Check: '+(data.state||'NOT_RUN')+' · 错误 '+(data.errorCount||0)+' · 警告 '+(data.warningCount||0)+(hash?' · Candidate '+hash.slice(0,23)+'…':'');const diagnostics=Array.isArray(data.diagnostics)?data.diagnostics:[];if(!diagnostics.length){root.textContent=data.state==='PASS'?'该候选的 Compiler Check 未返回诊断。':'没有可显示的 Compiler 诊断。';return;}for(const item of diagnostics){const row=document.createElement('div');row.className='diagnostic '+(['error','warning'].includes(item.severity)?item.severity:'');const title=document.createElement('strong');title.textContent=(item.severity||'unknown').toUpperCase()+(item.code?' · '+item.code:'');const detail=document.createElement('div');detail.textContent=item.message||'';row.append(title,detail);if(item.path){const location=document.createElement('small');location.textContent=item.path+(Number.isSafeInteger(item.line)?':'+item.line:'');row.appendChild(location);}root.appendChild(row);}if(data.diagnosticsTruncated){const note=document.createElement('div');note.className='note warning';note.textContent='这里只列出前 100 条诊断，完整结果以 Compiler Problems 为准。';root.appendChild(note);}}",
-    "function renderReviewData(message){if(Object.prototype.hasOwnProperty.call(message,'flowChanges'))renderFlowChanges(message.flowChanges);if(Object.prototype.hasOwnProperty.call(message,'diff'))renderLineDiff(message.diff);if(Object.prototype.hasOwnProperty.call(message,'validation'))renderValidationView(message.validation);if(Number.isSafeInteger(message.revision))byId('revisionInfo').textContent='提案修订 #'+message.revision;}",
-    "function requestSourcePreview(){const requestId=++previewSequence;const groupIds=[...document.querySelectorAll('[data-group-id]:checked')].map(item=>item.dataset.groupId);canApply=false;byId('apply').disabled=true;byId('compilerStatus').textContent='Compiler Check: CHECKING';byId('validationIdentity').textContent='等待精确候选的 Compiler Check…';markFlowSelection();vscode.postMessage({type:'preview',requestId,groupIds});}",
+    "function renderReviewData(message){if(Object.prototype.hasOwnProperty.call(message,'flowChanges'))renderFlowChanges(message.flowChanges);if(Object.prototype.hasOwnProperty.call(message,'diff'))renderLineDiff(message.diff);if(Object.prototype.hasOwnProperty.call(message,'validation'))renderValidationView(message.validation);if(Object.prototype.hasOwnProperty.call(message,'flowGraph')){const ready=message.flowGraph?.available===true&&Boolean(window.skillStudioAiFlowCompare);if(ready){window.skillStudioAiFlowCompare.render(message.flowGraph);byId('flowCompareNotice').textContent='当前与候选流程由相同的 v1alpha5 Source Projection 与 ELK 生成 · 只读';}else{window.skillStudioAiFlowCompare?.clear();byId('flowCompareNotice').textContent='图形投影不可用，保留源语义摘要与 YAML Diff（不影响原有 Compiler 门禁）。';}byId('flowFocusInfo').hidden=true;}if(Number.isSafeInteger(message.revision))byId('revisionInfo').textContent='提案修订 #'+message.revision;}",
+    "function requestSourcePreview(){const requestId=++previewSequence;const groupIds=[...document.querySelectorAll('[data-group-id]:checked')].map(item=>item.dataset.groupId);canApply=false;byId('apply').disabled=true;byId('compilerStatus').textContent='Compiler Check: CHECKING';byId('validationIdentity').textContent='等待精确候选的 Compiler Check…';markFlowSelection();window.skillStudioAiFlowCompare?.clear();byId('flowCompareNotice').textContent='所选修改组正在重新生成候选图及 Compiler Check…';byId('flowFocusInfo').hidden=true;vscode.postMessage({type:'preview',requestId,groupIds});}",
     "function renderContext(message){contextReady=true;clearProposal();window.gatewayConfigured=message.gatewayConfigured===true;byId('modelLabel').textContent='当前模型：'+(message.modelId||'未配置');byId('packageInfo').textContent=message.packageName+' · '+message.documentVersion+' · Package revision '+message.packageGeneration;byId('gatewayNotice').textContent=window.gatewayConfigured?'Gateway 已配置：'+(message.gatewayUrl||'当前地址')+'；默认仅连接本机，选择模型会获取该 Gateway 的公开模型目录。Provider API Key 保留在 Gateway 主机。':'请检查 Gateway 和模型设置；本机默认 Gateway 为 127.0.0.1:8787，可以使用「选择模型」。';byId('contextMeta').textContent='写入目标：'+(message.writeTarget||'assurance/procedure.yaml')+' · TextDocument v'+message.documentVersion+' · Package revision '+message.packageGeneration+' · SHA-256 '+(message.sourceDigest||'').slice(7,23)+'…';const list=byId('sources');clear(list);for(const item of message.sources||[]){const label=document.createElement('label');label.className='source';const input=document.createElement('input');input.type='checkbox';input.checked=item.selected===true;input.value=item.id;input.disabled=busy;const body=document.createElement('span');body.className='source-main';const kind=document.createElement('span');kind.className='kind';kind.textContent=item.kind;const name=document.createElement('span');name.className='source-label';name.textContent=item.label;const size=document.createElement('span');size.className='source-bytes';size.textContent=item.bytes+' bytes'+(item.explicitOptIn?' · 每次任务需显式选择':'');const access=document.createElement('span');access.className='kind';access.textContent='只读上下文';body.append(kind,name,access,size);label.append(input,body);list.appendChild(label);}status('上下文已就绪。发送前会再次显示明确的数据披露确认。');setBusy(false);}",
     "function renderProposal(message){previewSequence++;canApply=message.canApply===true;byId('proposalSummary').textContent=message.summary||'';byId('currentSource').textContent=message.currentSource||'';byId('candidateSource').textContent=message.candidateSource||'';addList('plan',message.plan||[]);addList('assumptions',message.assumptions||[]);addList('blockers',message.blockers||[]);byId('blockers').className=(message.blockers&&message.blockers.length)?'subsection warning':'subsection';byId('patchState').textContent=message.patchState||'NOT_RUN';byId('patchError').textContent=message.patchError||'';byId('compilerStatus').textContent='Compiler '+(message.compilerVersion||'v2.0.2')+' Check: '+(message.compilerState||'NOT_RUN');const list=byId('groups');clear(list);for(const group of message.groups||[]){const label=document.createElement('label');label.className='group';const input=document.createElement('input');input.type='checkbox';input.checked=true;input.value=group.id;input.dataset.groupId=group.id;input.addEventListener('change',requestSourcePreview);const body=document.createElement('span');body.className='group-main';const title=document.createElement('span');title.className='group-title';title.textContent=group.label+' · '+group.operationIds.length+' 项';const details=document.createElement('details');const summary=document.createElement('summary');summary.textContent='查看操作与理由';const ul=document.createElement('ul');for(const operation of group.operations||[]){const li=document.createElement('li');li.textContent=operation.type+' — '+operation.rationale;ul.appendChild(li);}details.append(summary,ul);body.append(title,details);label.append(input,body);list.appendChild(label);}renderReviewData(message);byId('apply').disabled=!canApply||busy;byId('discard').disabled=false;status(canApply?'Compiler v2.0.2 对精确候选返回 PASS；可应用选中修改。':'提案已返回；请检查 Compiler Check 与阻塞项。',canApply?'':'warning');}",
     "byId('generate').addEventListener('click',()=>{const task=byId('task').value.trim();const selectedIds=[...document.querySelectorAll('#sources input:checked')].map(item=>item.value);clearProposal();vscode.postMessage({type:'generate',task,selectedIds});});",
@@ -533,13 +565,16 @@ export function renderAiAuthoringHtml(nonce) {
     "<!doctype html><html lang=\"zh-CN\"><head><meta charset=\"utf-8\">",
     "<meta http-equiv=\"Content-Security-Policy\" content=\"default-src 'none'; img-src data:; style-src 'nonce-" + nonce + "'; script-src 'nonce-" + nonce + "'; connect-src 'none'; font-src 'none';\">",
     "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">",
-    "<title>AI Procedure Authoring</title><style nonce=\"" + nonce + "\">" + css + "</style></head><body>",
+    "<title>AI Procedure Authoring</title><style nonce=\"" + nonce + "\">" + css + "</style>" +
+    (flowCss ? "<link rel=\"stylesheet\" nonce=\"" + nonce + "\" href=\"" + flowCss + "\">" : "") +
+    "</head><body>",
     "<header class=\"topbar\"><div class=\"heading\"><strong>AI Procedure Authoring</strong><small id=\"packageInfo\">读取当前 Package…</small></div><div class=\"top-actions\"><span id=\"modelLabel\" class=\"compiler\">当前模型：读取中…</span><button id=\"chooseModel\" class=\"secondary\" title=\"从 Gateway 选择模型或手动输入模型 ID\">选择模型</button><span class=\"compiler\">CA-SL v1alpha5 · FROZEN / RELEASED</span><button id=\"refresh\" class=\"secondary\">刷新上下文</button></div></header>",
     "<main>",
     "<section class=\"card changeset-panel\" aria-label=\"修改请求与 Change Set\"><h2>修改请求</h2><textarea id=\"task\" maxlength=\"4000\" placeholder=\"描述希望如何修改当前 Procedure。模型只提出语义修改，不直接写文件或执行 Tool。\"></textarea><p class=\"note\"><strong>发送前确认：</strong>只有明确批准后，选中的上下文才发往 Gateway；模型密钥不会进入 Studio。</p><div class=\"actions\"><button id=\"generate\">生成修改提案</button><button id=\"cancel\" class=\"secondary\" disabled>取消请求</button></div><hr><div class=\"top-actions spread\"><h2>Change Set</h2><span id=\"revisionInfo\" class=\"kind\">尚未生成</span></div><div id=\"patchState\" class=\"kind\">尚未生成</div><div id=\"patchError\" class=\"note error\"></div><p class=\"note\">每组不可拆分；取消选中会重新生成候选并运行 Compiler Check。</p><div id=\"groups\" class=\"group-list\"></div><div class=\"actions\"><button id=\"apply\" disabled>应用选中修改</button><button id=\"discard\" class=\"secondary\" disabled>丢弃提案</button></div></section>",
     "<section class=\"card context-panel\" aria-label=\"上下文\"><details id=\"contextPanel\" open><summary>上下文来源 · 发送范围</summary><div id=\"contextMeta\" class=\"context-meta\">读取当前 Procedure…</div><div class=\"note\">当前 Procedure 是唯一写入目标；Contract、Predicate、Schema 和已验证依赖为只读参考。Script / Reference 须逐任务选择。以下列表仅决定将发送给模型的内容。</div><div id=\"gatewayNotice\" class=\"note warning\"></div><div id=\"sources\" class=\"source-list\"></div></details></section>",
-    "<section class=\"card review-panel\" aria-label=\"AI 修改审阅工作台\"><div class=\"top-actions spread\"><h2>修改工作区</h2><span class=\"compiler\">只读审阅 · Source 唯一真源</span></div><nav class=\"review-tabs\" role=\"tablist\" aria-label=\"审阅视图\"><button type=\"button\" id=\"tab-plan\" role=\"tab\" aria-controls=\"view-plan\" aria-selected=\"true\" tabindex=\"0\">Plan</button><button type=\"button\" id=\"tab-flow\" role=\"tab\" aria-controls=\"view-flow\" aria-selected=\"false\" tabindex=\"-1\">Flow Changes</button><button type=\"button\" id=\"tab-diff\" role=\"tab\" aria-controls=\"view-diff\" aria-selected=\"false\" tabindex=\"-1\">YAML Diff</button><button type=\"button\" id=\"tab-validation\" role=\"tab\" aria-controls=\"view-validation\" aria-selected=\"false\" tabindex=\"-1\">Validation</button></nav><section id=\"view-plan\" class=\"review-view\" role=\"tabpanel\" aria-labelledby=\"tab-plan\"><div id=\"proposalSummary\" class=\"summary\"></div><div class=\"subsection\"><h3>执行计划</h3><div id=\"plan\" class=\"review-placeholder\">先描述要修改的 Procedure。</div></div><div class=\"subsection\"><h3>假设</h3><div id=\"assumptions\"></div></div><div id=\"blockers\" class=\"subsection\" aria-label=\"阻塞项\"></div></section><section id=\"view-flow\" class=\"review-view\" role=\"tabpanel\" aria-labelledby=\"tab-flow\" hidden><p class=\"note\">基于 Patch Engine 已规划的原子组显示语义变化。首阶段是只读变化摘要，尚非完整 React Flow 双图对比；不表示 Runtime 资格。</p><div id=\"flowChanges\" class=\"review-placeholder\">生成提案后显示节点及路由变化。</div></section><section id=\"view-diff\" class=\"review-view\" role=\"tabpanel\" aria-labelledby=\"tab-diff\" hidden><p class=\"note\">Host 生成的 YAML 候选预览：逐行对比当前缓冲区与所选修改组生成的精确 YAML 候选。红色为移除、绿色为新增。模型不能直接提供替换 YAML。</p><div id=\"diffSummary\" class=\"diff-head\">尚未生成候选 Diff。</div><div id=\"diffRows\" class=\"diff-grid\" aria-label=\"源文件与候选文件逐行差异\"></div><details id=\"fullSourceDisclosure\"><summary class=\"note\">查看完整原文与候选文本</summary><div class=\"source-preview\"><div><h4>当前 YAML</h4><pre id=\"currentSource\"></pre></div><div><h4>候选 YAML</h4><pre id=\"candidateSource\"></pre></div></div></details></section><section id=\"view-validation\" class=\"review-view\" role=\"tabpanel\" aria-labelledby=\"tab-validation\" hidden><div id=\"compilerStatus\" class=\"compiler\">Compiler Check: NOT_RUN</div><div id=\"validationIdentity\" class=\"context-meta\"></div><div id=\"diagnostics\" class=\"review-placeholder\">等待对选中候选执行正式 Compiler Check。</div><p class=\"note\">Compiler 静态校验不代表 Owner、Runtime 或真实 5GC 资格；Wait 另需可信 IngressCatalog。</p></section></section>",
+    "<section class=\"card review-panel\" aria-label=\"AI 修改审阅工作台\"><div class=\"top-actions spread\"><h2>修改工作区</h2><span class=\"compiler\">只读审阅 · Source 唯一真源</span></div><nav class=\"review-tabs\" role=\"tablist\" aria-label=\"审阅视图\"><button type=\"button\" id=\"tab-plan\" role=\"tab\" aria-controls=\"view-plan\" aria-selected=\"true\" tabindex=\"0\">Plan</button><button type=\"button\" id=\"tab-flow\" role=\"tab\" aria-controls=\"view-flow\" aria-selected=\"false\" tabindex=\"-1\">Flow Changes</button><button type=\"button\" id=\"tab-diff\" role=\"tab\" aria-controls=\"view-diff\" aria-selected=\"false\" tabindex=\"-1\">YAML Diff</button><button type=\"button\" id=\"tab-validation\" role=\"tab\" aria-controls=\"view-validation\" aria-selected=\"false\" tabindex=\"-1\">Validation</button></nav><section id=\"view-plan\" class=\"review-view\" role=\"tabpanel\" aria-labelledby=\"tab-plan\"><div id=\"proposalSummary\" class=\"summary\"></div><div class=\"subsection\"><h3>执行计划</h3><div id=\"plan\" class=\"review-placeholder\">先描述要修改的 Procedure。</div></div><div class=\"subsection\"><h3>假设</h3><div id=\"assumptions\"></div></div><div id=\"blockers\" class=\"subsection\" aria-label=\"阻塞项\"></div></section><section id=\"view-flow\" class=\"review-view\" role=\"tabpanel\" aria-labelledby=\"tab-flow\" hidden><p class=\"note\">当前 Source 与所选 Change Set 候选均由 Studio 的同一 v1alpha5 源码投影和 ELK 构图；图形仅供审阅，不代表 Compiler / Runtime 资格。</p><div id=\"flowCompareNotice\" class=\"note ai-flow-fallback\">生成提案后显示 React Flow 对比。失败时保留下方语义摘要。</div><div id=\"flowCompareCanvas\" class=\"ai-flow-container\" aria-label=\"当前与候选 Procedure 只读流程图对比\"></div><div id=\"flowFocusInfo\" class=\"ai-flow-focus\" hidden role=\"status\"></div><h3>原子修改组 · 语义摘要</h3><div id=\"flowChanges\" class=\"review-placeholder\">生成提案后显示节点及路由变化。</div></section><section id=\"view-diff\" class=\"review-view\" role=\"tabpanel\" aria-labelledby=\"tab-diff\" hidden><p class=\"note\">Host 生成的 YAML 候选预览：逐行对比当前缓冲区与所选修改组生成的精确 YAML 候选。红色为移除、绿色为新增。模型不能直接提供替换 YAML。</p><div id=\"diffSummary\" class=\"diff-head\">尚未生成候选 Diff。</div><div id=\"diffRows\" class=\"diff-grid\" aria-label=\"源文件与候选文件逐行差异\"></div><details id=\"fullSourceDisclosure\"><summary class=\"note\">查看完整原文与候选文本</summary><div class=\"source-preview\"><div><h4>当前 YAML</h4><pre id=\"currentSource\"></pre></div><div><h4>候选 YAML</h4><pre id=\"candidateSource\"></pre></div></div></details></section><section id=\"view-validation\" class=\"review-view\" role=\"tabpanel\" aria-labelledby=\"tab-validation\" hidden><div id=\"compilerStatus\" class=\"compiler\">Compiler Check: NOT_RUN</div><div id=\"validationIdentity\" class=\"context-meta\"></div><div id=\"diagnostics\" class=\"review-placeholder\">等待对选中候选执行正式 Compiler Check。</div><p class=\"note\">Compiler 静态校验不代表 Owner、Runtime 或真实 5GC 资格；Wait 另需可信 IngressCatalog。</p></section></section>",
     "</main><footer class=\"status\"><span id=\"status\">正在初始化…</span><span>仅修改当前 Procedure 缓冲区 · 不自动保存 · 每个候选都必须通过 Compiler v2.0.2 Check；Wait 还需要可信 IngressCatalog 绑定</span></footer>",
+    (flowScript ? "<script nonce=\"" + nonce + "\" src=\"" + flowScript + "\"></script>" : "") +
     "<script nonce=\"" + nonce + "\">" + script + "</script></body></html>",
   ].join("\n");
 }
@@ -923,6 +958,10 @@ export function registerAiAuthoringEditor(vscode, context, { getActiveDocument, 
         }
       }
       if (!isCurrent()) return;
+      const flowChanges = createAuthoringFlowChanges(changeSet,patchPlan);
+      const flowGraph = patchPlan && candidateSource !== null
+        ? createAiFlowReviewOrFallback(initial,document.getText(),candidateSource,flowChanges)
+        : null;
       const waitGate = containsWaitMutation(changeSet.operations);
       let compilerCheck = null;
       let compilerCheckError = null;
@@ -990,7 +1029,8 @@ export function registerAiAuthoringEditor(vscode, context, { getActiveDocument, 
         revision: changeSet.revision,
         sourceDigest: changeSet.base.sourceDigest,
         candidateDigest: candidateDigest ?? "",
-        flowChanges: createAuthoringFlowChanges(changeSet, patchPlan),
+        flowChanges,
+        flowGraph,
         diff: patchPlan && candidateSource !== null
           ? createAuthoringLineDiff(document.getText(), candidateSource) : null,
         validation: createAuthoringValidationView(compilerCheck, candidateDigest),
@@ -1088,9 +1128,14 @@ export function registerAiAuthoringEditor(vscode, context, { getActiveDocument, 
       pending.candidateDigest = preview.digest;
       pending.compilerCheck = compilerCheck;
       pending.canApply = canApply;
+      const flowGroups = createAuthoringFlowChanges(pending.changeSet,pending.patchPlan);
+      const flowGraph = createAiFlowReviewOrFallback(
+        pending.state,pending.source,preview.source,flowGroups
+      );
       post({
         type: "preview",
         requestId: message.requestId,
+        flowGraph,
         candidateSource: preview.source,
         diff: createAuthoringLineDiff(pending.source, preview.source),
         validation: createAuthoringValidationView(compilerCheck, preview.digest),
@@ -1284,8 +1329,17 @@ export function registerAiAuthoringEditor(vscode, context, { getActiveDocument, 
         choosingModel: false,
         contextRequestId: 0,
       };
-      panel.webview.options = { enableScripts: true, localResourceRoots: [] };
-      panel.webview.html = renderAiAuthoringHtml(nonceValue());
+      const reviewMediaRoot = vscode.Uri.joinPath(context.extensionUri, "media");
+      panel.webview.options = {
+        enableScripts:true,
+        localResourceRoots:[reviewMediaRoot],
+      };
+      panel.webview.html = renderAiAuthoringHtml(nonceValue(), {
+        scriptUri: panel.webview.asWebviewUri(
+          vscode.Uri.joinPath(reviewMediaRoot,"ai-flow-compare.js")).toString(),
+        styleUri: panel.webview.asWebviewUri(
+          vscode.Uri.joinPath(reviewMediaRoot,"ai-flow-compare.css")).toString(),
+      });
       context.subscriptions.push(panel.webview.onDidReceiveMessage(async (message) => {
         if (!message || typeof message.type !== "string") return;
         if (message.type === "ready" || message.type === "refresh") await refreshContext();

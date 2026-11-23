@@ -568,3 +568,40 @@ test("AI Workbench only displays Host review data and never changes Compiler App
   assert.match(source,/sourceDigest: "sha256:" \+ await sha256Hex/);
   assert.doesNotMatch(source,/showTextDocument\(.*ViewColumn\.Three/);
 });
+
+test("F2 Source-backed React Flow graph stays embedded and offline with nonce assets",()=>{
+  const uri="https://preview.example.invalid/webview/ai-flow-compare.js";
+  const html=renderAiAuthoringHtml("a".repeat(48),{
+    scriptUri:uri,
+    styleUri:"https://preview.example.invalid/webview/ai-flow-compare.css"
+  });
+  assert.match(html,/id="flowCompareCanvas"/);
+  assert.match(html,/id="flowFocusInfo"/);
+  assert.match(html,/id="flowCompareNotice"/);
+  assert.ok(html.includes('nonce="'+"a".repeat(48)+'" src="'+uri+'"'));
+  assert.ok(html.includes("ai-flow-compare.css"));
+  assert.match(html,/connect-src 'none'/);
+  assert.match(html,/function focusAiFlowElement/);
+  assert.match(html,/studio-ai-flow-focus/);
+  assert.match(html,/flowGraph/);
+  const forbidden=renderAiAuthoringHtml("a".repeat(48),{
+    scriptUri:'javascript:alert("unsafe")',
+    styleUri:'javascript:alert("unsafe")'
+  });
+  assert.doesNotMatch(forbidden,/javascript:alert/);
+  assert.doesNotMatch(html,/onload=/);
+});
+
+test("F2 AI Host builds exact-source projections and does not weaken Compiler Apply",()=>{
+  const code=readFileSync(new URL("../experiments/ide-host/vscode/src/ai-authoring-editor.mjs",import.meta.url),"utf8");
+  const build=readFileSync(new URL("../experiments/ide-host/scripts/build-ide-spike.mjs",import.meta.url),"utf8");
+  assert.match(code,/buildAiFlowGraphReview/);
+  assert.match(code,/createAiFlowReviewOrFallback/);
+  assert.match(code,/flowGraph:?\b/);
+  assert.match(code,/localResourceRoots:\[reviewMediaRoot\]/);
+  assert.match(code,/asWebviewUri/);
+  assert.match(code,/isAuthoringApplyAllowed/);
+  assert.match(code,/compilerCheck\?\.state === "PASS"/);
+  assert.match(build,/src\/ai-flow-compare\.tsx/);
+  assert.match(build,/media\/ai-flow-compare\.js/);
+});
