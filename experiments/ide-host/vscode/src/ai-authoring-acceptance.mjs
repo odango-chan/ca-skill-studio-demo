@@ -66,7 +66,7 @@ export function registerSyntheticAuthoringAcceptance(vscode,context,compilerInte
     const uri=vscode.Uri.joinPath(assurance,"procedure.yaml");
     let existed=false;
     try{await vscode.workspace.fs.stat(temporary);existed=true;}
-    catch(e){if(!/not found|ENOENT|FileNotFound/i.test(String(e?.message??e)))throw e;}
+    catch(e){if(!/not found|ENOENT|FileNotFound|EntryNotFound|nonexistent file/i.test(String(e?.message??e)))throw e;}
     if(existed)throw Error("Synthetic acceptance directory already exists; refusing to modify it");
     let created=false,document=null;
     try{
