@@ -1597,6 +1597,64 @@ try{
             added:proposalView.diffAddedRows,removed:proposalView.diffRemovedRows,
             summary:proposalView.diffSummary,validation:proposalView.validationText}));
       }
+      // F2 must render actual React Flow canvases from the pinned v1alpha5
+      // Source projection, not just the F1 text summary.
+      const graphTab=await command("Runtime.evaluate",{
+        contextId:aiContextId,returnByValue:true,
+        expression:"(()=>{const tab=document.getElementById('tab-flow');"+
+          "if(!tab)return false;tab.click();return "+
+          "tab.getAttribute('aria-selected')==='true';})()"
+      });
+      if(graphTab.result?.value!==true)
+        throw Error("F2 Flow Changes tab could not be opened");
+      let graphView=null;
+      for(let attempt=0;attempt<120&&!graphView;attempt++){
+        const evaluated=await command("Runtime.evaluate",{
+          contextId:aiContextId,returnByValue:true,
+          expression:"(()=>{const c=document.querySelector('#flowCompareCanvas .ai-flow-compare-panes');"+
+            "const panes=[...document.querySelectorAll('#flowCompareCanvas .ai-flow-panel')];"+
+            "return {ready:!!c,panes:panes.length,"+
+            "nodeCounts:panes.map(p=>p.querySelectorAll('.react-flow__node').length),"+
+            "edgeCounts:panes.map(p=>p.querySelectorAll('.react-flow__edge').length),"+
+            "changedRoutes:Number(c?.dataset.aiFlowChangedRoutes||0),"+
+            "candidateAdded:panes[1]?.querySelectorAll('.ai-flow-node.status-added').length||0,"+
+            "nodeIdPresent:panes[1]?.innerText.includes('ai-authoring-smoke-node')===true,"+
+            "notice:document.getElementById('flowCompareNotice')?.textContent||''};})()"
+        });
+        const v=evaluated.result?.value;
+        if(v?.ready&&v.panes===2&&v.nodeCounts.every(x=>x>=4)&&
+           v.edgeCounts.every(x=>x>=1)&&v.candidateAdded>=1&&
+           v.nodeIdPresent)graphView=v;
+        if(!graphView)await sleep(100);
+      }
+      if(!graphView){
+        const diagnostic=await command("Runtime.evaluate",{
+          contextId:aiContextId,returnByValue:true,
+          expression:"(()=>({html:document.getElementById('flowCompareCanvas')?.innerText.slice(0,500),"+
+            "panes:document.querySelectorAll('.ai-flow-panel').length,"+
+            "resourceScripts:[...document.querySelectorAll('script[src]')].map(x=>x.src),"+
+            "css:[...document.querySelectorAll('link[rel=stylesheet]')].map(x=>x.href)}))()"
+        });
+        throw Error("Actual React Flow before/after graph did not render in Chromium: "+
+          JSON.stringify(diagnostic.result?.value));
+      }
+      const focused=await command("Runtime.evaluate",{
+        contextId:aiContextId,returnByValue:true,
+        expression:"(()=>{const card=[...document.querySelectorAll('.ai-flow-panel')][1]"+
+          "?.querySelector('.ai-flow-node.status-added');"+
+          "if(!card)return false;card.click();"+
+          "return document.getElementById('flowFocusInfo')?.hidden===false&&"+
+          "document.getElementById('flowFocusInfo')?.textContent.includes('ai-authoring-smoke-node');})()"
+      });
+      if(focused.result?.value!==true)
+        throw Error("F2 graph Node click did not reveal source line / group focus");
+      // Restore the pre-existing Plan tab and keyboard focus before the native
+      // Apply/Undo acceptance, to avoid Theia editor-focus interference.
+      await command("Runtime.evaluate",{
+        contextId:aiContextId,returnByValue:true,
+        expression:"(()=>{document.getElementById('tab-plan').click();"+
+          "document.activeElement?.blur();return true;})()"
+      });
       const tabNavigation=await command("Runtime.evaluate",{
         contextId:aiContextId,
         returnByValue:true,
@@ -1637,6 +1695,10 @@ try{
         lineDiffReview:"PASS",
         compilerDiagnosticsReview:"PASS",
         keyboardReviewTabs:"PASS",
+        reactFlowTwoSource:"PASS",
+        reactFlowReadOnly:"PASS",
+        sourceBackedChangedNode:"PASS",
+        graphFocusChangeSet:"PASS",
         compilerCheck:"FAIL_AS_EXPECTED_FOR_UNQUALIFIED_5GC_EXAMPLE",
         applyBlocked:true
       };
