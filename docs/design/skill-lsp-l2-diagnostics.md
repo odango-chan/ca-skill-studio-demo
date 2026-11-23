@@ -1,8 +1,9 @@
 # Skill Language Service · L2-A versioned diagnostics bridge
 
-**Status: Implementation candidate; validation evidence belongs to the PR.**  
+**Status: Implemented; this document records the L2-A snapshot-session contract.**  
 **Scope:** shared language analysis → LSP-shaped diagnostics and a disposable
-snapshot session. This is **not yet** a running LSP server or Theia Worker.
+snapshot session. The current product includes the browser LSP / Theia Worker
+integration described by the companion L2-B document.
 
 ## Intent and boundary
 
@@ -29,9 +30,10 @@ VS Code extension files, existing Visual Patch logic, or the formal Skill DSL.
 - Exact source offsets are JavaScript UTF-16 units; line-only warnings use
   a zero-width location at the start of their actual line. CRLF and Unicode
   offsets must be tested.
-- Package Audit UNAVAILABLE is shown as an explicit warning anchored at the
-  Procedure file start **if that source document exists**, never as zero
-  problems. This anchor is a file-level status, not a claimed source-token span.
+- Package-level NOT_CHECKED / BLOCKED audit status remains visible in Problems
+  even when no exact source token exists. It is unlocated: do not manufacture a
+  line-one squiggle, source range or clickable navigation target. Source-backed
+  Package Audit findings use their exact YAML AST token ranges.
 - Clearing diagnostics omits `version` rather than supplying a stale version.
 
 ### Browser Worker integration
