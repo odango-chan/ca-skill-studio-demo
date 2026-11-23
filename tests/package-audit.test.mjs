@@ -203,7 +203,8 @@ test("local Schema documents report YAML syntax and unsupported dialect defects"
   assert.equal(parseDiagnostic.severity,"error");
 
   const invalidJson=clone(valid);
-  invalidJson.set("schemas/invalid.schema.json",{text:"{type: object}\n"});
+  const invalidJsonText="{\n  type: object\n}\n";
+  invalidJson.set("schemas/invalid.schema.json",{text:invalidJsonText});
   const jsonDiagnostic=find(auditPackage({files:invalidJson,
     dependencyContext:{available:false}}),"SCHEMA_DOCUMENT_PARSE_ERROR","invalid.schema.json");
   assert.ok(jsonDiagnostic,
@@ -211,6 +212,11 @@ test("local Schema documents report YAML syntax and unsupported dialect defects"
   assert.equal(jsonDiagnostic.path,"schemas/invalid.schema.json");
   assert.equal(jsonDiagnostic.status,"confirmed");
   assert.equal(jsonDiagnostic.severity,"error");
+  assert.ok(jsonDiagnostic.sourceRange);
+  assert.equal(invalidJsonText.slice(jsonDiagnostic.sourceRange.start,
+    jsonDiagnostic.sourceRange.end),"t");
+  assert.equal(jsonDiagnostic.line,2);
+  assert.equal(jsonDiagnostic.column,3);
 });
 
 test("local Schema $id collisions are reported at the duplicate declaration",()=>{
