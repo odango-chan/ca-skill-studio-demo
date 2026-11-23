@@ -22,7 +22,7 @@ function gatewayEndpoint(value) {
   return `${url.origin}${routePrefix}/v1/chat/completions`;
 }
 
-function validateModelId(value) {
+export function validateModelId(value) {
   if (typeof value !== "string" || value.trim().length === 0) throw new TypeError("A configured Model ID is required.");
   const modelId = value.trim();
   if (!new RegExp("^[A-Za-z0-9][A-Za-z0-9._:/-]{0,255}$").test(modelId)) {
