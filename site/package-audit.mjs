@@ -124,9 +124,11 @@ function auditLocalSchema(path,file,diagnostics,ids){
   }
   if(document.errors?.length)return;
   if(!parsed.root){
+    // JSON Schema permits boolean schemas as complete documents.
+    if(isScalar(document.contents)&&typeof document.contents.value==="boolean")return;
     add(diagnostics,path,parsed,document.contents,
       "SCHEMA_DOCUMENT_ROOT_INVALID",
-      "Local Schema "+path+" must have a YAML/JSON object root",
+      "Local Schema "+path+" must have a JSON Schema object or boolean root",
       {domain:"schemas",category:"structure"});
     return;
   }
@@ -134,7 +136,7 @@ function auditLocalSchema(path,file,diagnostics,ids){
   const dialectNode=get(parsed.root,"$schema");
   const dialect=scalar(dialectNode);
   if(dialectNode==null){
-    addNotChecked(diagnostics,path,parsed,parsed.root,
+    addNotChecked(diagnostics,path,parsed,null,
       "SCHEMA_DIALECT_NOT_CHECKED",
       "Local Schema "+path+" does not declare $schema; its JSON Schema dialect is NOT_CHECKED",
       "schemas");
