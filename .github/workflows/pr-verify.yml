@@ -61,3 +61,5 @@ jobs:
           cp "$(go env GOROOT)/lib/wasm/wasm_exec.js" dist/wasm_exec.js
           cp dist/skillc.wasm ../experiments/ide-host/vscode/dist/skillc.wasm
           cp dist/wasm_exec.js ../experiments/ide-host/vscode/dist/wasm_exec.js
+      - name: Verify synthetic AI proposal and exact Compiler v2.0.2 candidate PASS
+        run: node experiments/ide-host/scripts/ai-authoring-compiler-acceptance.mjs compiler-source
