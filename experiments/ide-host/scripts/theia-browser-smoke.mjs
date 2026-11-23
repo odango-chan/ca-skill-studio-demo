@@ -1604,12 +1604,15 @@ try{
           "diff.click();const opened=diff.getAttribute('aria-selected')==='true'&&"+
           "!document.getElementById('view-diff').hidden;"+
           "diff.dispatchEvent(new KeyboardEvent('keydown',{key:'ArrowRight',bubbles:true}));"+
-          "return {opened,keyboard:document.getElementById('tab-validation').getAttribute('aria-selected')==='true'&&"+
-          "!document.getElementById('view-validation').hidden};})()"
+          "const keyboard=document.getElementById('tab-validation').getAttribute('aria-selected')==='true'&&"+
+          "!document.getElementById('view-validation').hidden;"+
+          "document.getElementById('tab-plan').click();"+
+          "document.activeElement?.blur();"+
+          "return {opened,keyboard,restored:document.getElementById('tab-plan').getAttribute('aria-selected')==='true'};})()"
       });
-      if(!tabNavigation.result?.value?.opened||!tabNavigation.result?.value?.keyboard)
+      if(!tabNavigation.result?.value?.opened||!tabNavigation.result?.value?.keyboard||!tabNavigation.result?.value?.restored)
         throw Error("AI Workbench keyboard-accessible review tabs failed in Chromium");
-            if(!proposalView.compilerStatus.includes("Compiler v2.0.2 Check: FAIL")||
+      if(!proposalView.compilerStatus.includes("Compiler v2.0.2 Check: FAIL")||
          !proposalView.patchState.includes("Compiler Check failed")||
          !proposalView.applyDisabled)
         throw Error("Compiler failure did not keep the candidate PREVIEW ONLY: "+JSON.stringify({
