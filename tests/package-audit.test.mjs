@@ -159,7 +159,7 @@ test("local Schema documents report YAML syntax and unsupported dialect defects"
       "SCHEMA_DIALECT_UNSUPPORTED","SCHEMA_DIALECT_INVALID"].includes(item.code)));
 
   const booleanSchema=clone(valid);
-  booleanSchema.set("schemas/always-true.schema.yaml",{text:"true\\n"});
+  booleanSchema.set("schemas/always-true.schema.yaml",{text:"true\n"});
   const booleanDiagnostics=auditPackage({files:booleanSchema,
     dependencyContext:{available:false}});
   assert.ok(!booleanDiagnostics.some(item=>
@@ -170,7 +170,7 @@ test("local Schema documents report YAML syntax and unsupported dialect defects"
   const missingDialect=clone(valid);
   missingDialect.get("schemas/establishment-request.schema.yaml").text=
     missingDialect.get("schemas/establishment-request.schema.yaml").text.replace(
-      "$schema: https://json-schema.org/draft/2020-12/schema\\n","");
+      "$schema: https://json-schema.org/draft/2020-12/schema\n","");
   const dialectDiagnostic=find(auditPackage({files:missingDialect,
     dependencyContext:{available:false}}),"SCHEMA_DIALECT_NOT_CHECKED");
   assert.equal(dialectDiagnostic?.status,"not_checked");
