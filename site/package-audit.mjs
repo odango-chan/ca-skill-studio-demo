@@ -88,6 +88,86 @@ function schemaIds(text){
   }
   return {ids,parseable:true};
 }
+
+const SUPPORTED_SCHEMA_DIALECT="https://json-schema.org/draft/2020-12/schema";
+
+/**
+ * Parse local JSON Schema documents without reimplementing JSON Schema
+ * semantics. The local audit owns YAML/JSON syntax, the declared dialect and
+ * package-local $id uniqueness; full keyword/instance semantics remain with
+ * the selected JSON Schema implementation in the Compiler.
+ */
+function auditLocalSchema(path,file,diagnostics,ids){
+  if(typeof file?.text!=="string")return;
+  const counter=new LineCounter();
+  let document;
+  try{
+    document=parseDocument(file.text,{
+      version:"1.2",schema:"core",strict:true,uniqueKeys:true,
+      stringKeys:true,keepSourceTokens:true,lineCounter:counter,logLevel:"silent"
+    });
+  }catch(error){
+    add(diagnostics,path,{counter,text:file.text},
+      {range:[error?.pos?.[0]??0,error?.pos?.[1]??error?.pos?.[0]??0]},
+      "SCHEMA_DOCUMENT_PARSE_ERROR",
+      "Cannot parse local Schema "+path+": "+String(error?.message??error),
+      {domain:"schemas",category:"syntax"});
+    return;
+  }
+  const parsed={root:isMap(document.contents)?document.contents:null,counter,text:file.text};
+  for(const error of document.errors??[]){
+    add(diagnostics,path,parsed,
+      {range:[error.pos?.[0]??0,error.pos?.[1]??error.pos?.[0]??0]},
+      "SCHEMA_DOCUMENT_PARSE_ERROR",
+      "Cannot parse local Schema "+path+": "+error.message,
+      {domain:"schemas",category:"syntax"});
+  }
+  if(document.errors?.length)return;
+  if(!parsed.root){
+    add(diagnostics,path,parsed,document.contents,
+      "SCHEMA_DOCUMENT_ROOT_INVALID",
+      "Local Schema "+path+" must have a YAML/JSON object root",
+      {domain:"schemas",category:"structure"});
+    return;
+  }
+
+  const dialectNode=get(parsed.root,"$schema");
+  const dialect=scalar(dialectNode);
+  if(dialectNode==null){
+    addNotChecked(diagnostics,path,parsed,parsed.root,
+      "SCHEMA_DIALECT_NOT_CHECKED",
+      "Local Schema "+path+" does not declare $schema; its JSON Schema dialect is NOT_CHECKED",
+      "schemas");
+  }else if(!dialect){
+    add(diagnostics,path,parsed,dialectNode,
+      "SCHEMA_DIALECT_INVALID",
+      "Local Schema $schema must be a non-empty dialect URI",
+      {domain:"schemas",category:"structure"});
+  }else if(dialect!==SUPPORTED_SCHEMA_DIALECT){
+    add(diagnostics,path,parsed,dialectNode,
+      "SCHEMA_DIALECT_UNSUPPORTED",
+      "Local Schema "+path+" declares unsupported JSON Schema dialect "+dialect+
+        "; Skill Studio local linking supports "+SUPPORTED_SCHEMA_DIALECT,
+      {domain:"schemas",category:"structure"});
+  }
+
+  const idNode=get(parsed.root,"$id");
+  if(idNode!=null){
+    const id=scalar(idNode);
+    if(!id){
+      add(diagnostics,path,parsed,idNode,
+        "SCHEMA_ID_INVALID","Local Schema $id must be a non-empty string",
+        {domain:"schemas",category:"structure"});
+    }else if(ids.has(id)){
+      add(diagnostics,path,parsed,idNode,
+        "SCHEMA_ID_DUPLICATE",
+        "Local Schema $id is duplicated: "+id+" (first declared in "+ids.get(id)+")",
+        {domain:"schemas",category:"linking"});
+    }else{
+      ids.set(id,path);
+    }
+  }
+}
 /**
  * Index callable identities from a previously verified immutable snapshot.
  * the current CA-SL language contract inherits ToolCatalog v1alpha4 (F.1); a legacy skillc.tool/v0.1
@@ -218,6 +298,14 @@ export function auditPackage({
   const contract=parsed.get(FILES.contract);
   const procedure=parsed.get(FILES.procedure);
   const predicates=parsed.get(FILES.predicates);
+  // Parse every local Schema document even when it is not the first referenced
+  // request Schema. This catches malformed package-owned interfaces before
+  // Compiler Check, while keeping full JSON Schema semantics Compiler-owned.
+  const localSchemaIds=new Map();
+  for(const [path,file] of [...files.entries()].sort((a,b)=>a[0].localeCompare(b[0]))){
+    if(/^schemas\/.+\.(?:json|ya?ml)$/i.test(path))
+      auditLocalSchema(path,file,diagnostics,localSchemaIds);
+  }
   // Continue independent checks when one core document is missing or malformed.
   // Cross-document checks below emit NOT_CHECKED where the missing document is
   // required to establish an identity; they never silently stop the audit.
