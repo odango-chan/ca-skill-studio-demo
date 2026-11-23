@@ -1057,7 +1057,7 @@ export function registerAiAuthoringEditor(vscode, context, { getActiveDocument, 
         compilerCheck,
         canApply,
       } : null;
-      post({
+      const proposalView = {
         type: "proposal",
         summary: proposalResult.proposal.summary,
         plan: proposalResult.proposal.plan,
@@ -1101,7 +1101,24 @@ export function registerAiAuthoringEditor(vscode, context, { getActiveDocument, 
               rationale: operation.rationale,
             })),
         })) : [],
+      };
+      activeSession.latest = {
+        changeSet,
+        source: document.getText(),
+        documentVersion: document.version,
+        packageGeneration: initial.generation,
+      };
+      const recorded = activeSession.history.record({
+        task: userTask,
+        changeSet,
+        generation: initial.generation,
+        groupCount: patchPlan?.groups.length ?? 0,
+        compilerState: compilerCheck?.state ?? "UNAVAILABLE",
+        reason: compilerCheckError ?? patchError ?? proposalResult.proposal.blockers[0] ?? "",
+        view: proposalView,
       });
+      post({ ...proposalView, historyNumber: recorded.number });
+      post({ type: "history", history: activeSession.history.list() });
     } catch (error) {
       if (!isCurrent()) return;
       const aborted = error?.name === "AbortError" || controller.signal.aborted;
