@@ -81,7 +81,7 @@ function setupCase(id,files){
     case "schema-invalid-yaml":{
       const schema=firstSchemaFile(files);
       if(!schema)return null;
-      files.get(schema).text="$schema: [unterminated\\n";
+      files.get(schema).text="$schema: [unterminated\n";
       break;
     }
     case "project-dependency-unconfigured":
