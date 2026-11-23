@@ -33,9 +33,11 @@ for(const language of syntaxManifest.contributes?.languages??[]){
   if(!info.isFile()||info.size<80)
     throw Error("Primary extension language configuration missing or empty: "+asset);
 }
-// Keep the Go/WASM Compiler adapter as a separate classic Worker entry; the
-// pinned wasm_exec.js and skillc.wasm are staged by the CI Go build step.
+// Keep both host adapters for the same Go/WASM Compiler: classic Web Worker
+// for browser hosts and worker_threads for Node extension hosts. The pinned
+// wasm_exec.js and skillc.wasm are staged by the CI Go build step.
 await cp(join(root,"src/compiler-worker.js"),join(root,"dist/compiler-worker.js"));
+await cp(join(root,"src/compiler-node-worker.mjs"),join(root,"dist/compiler-node-worker.mjs"));
 // The pinned Markdown extension owns native Source language services; the shared Studio Preview Host owns rendering.
 await cp("extensions/skill-studio-theme/styles/markdown-preview.css",
   join(root,"media/studio-markdown-preview.css"));
@@ -129,7 +131,8 @@ for(const set of sampleSets){
      manifest.sourceStatus!==set.status||manifest.sourceRef!==set.ref||
      (set.version&&manifest.languageVersion!==set.version)||
      JSON.stringify([...manifest.skills].sort())!==
-       JSON.stringify(["establish-pdu-session","establish-pdu-session-mas"].sort())||
+       JSON.stringify(["establish-pdu-session","establish-pdu-session-mas",
+         "modify-pdu-session-mas","release-pdu-session-mas"].sort())||
      !manifest.blobs||!Array.isArray(manifest.files)||manifest.files.length<5||
      manifest.files.length>100||new Set(manifest.files).size!==manifest.files.length||
      !manifest.files.every(path=>

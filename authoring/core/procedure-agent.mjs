@@ -173,7 +173,7 @@ export function createProcedureAgent({ modelClient } = {}) {
         ]),
       ].join("\n");
 
-      const content = await modelClient.complete({
+      const completion = await modelClient.complete({
         messages: [
           { role: "system", content: SYSTEM_PROMPT },
           { role: "user", content: userContent },
@@ -184,7 +184,10 @@ export function createProcedureAgent({ modelClient } = {}) {
         signal,
       });
 
-      const proposal = parseModelProposal(content, { allowedContextIds });
+      if (!completion || typeof completion.content !== "string") {
+        throw new TypeError("The Gateway Model Client must return a completion with string content.");
+      }
+      const proposal = parseModelProposal(completion.content, { allowedContextIds });
       return Object.freeze({
         taskId: validatedContext.pack.taskId,
         revision: validatedContext.pack.revision,

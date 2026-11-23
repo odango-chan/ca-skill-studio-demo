@@ -1,4 +1,4 @@
-// Classic browser Worker adapter for the pinned Go/WASM Compiler v2.0.0.
+// Classic browser Worker adapter for the pinned Go/WASM Compiler v2.0.2.
 // The Worker has no workspace access, network resolver, credentials or Runtime.
 let boot = null;
 

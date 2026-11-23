@@ -911,7 +911,7 @@ try{
         JSON.stringify(pythonTextMate));
   }
   const packageOverviewEvidence=workbenchEvidence?.packageOverview
-    ?{required:true,twoSkills:true,evidence:workbenchEvidence.packageOverview}
+    ?{required:true,fourSkills:true,evidence:workbenchEvidence.packageOverview}
     :{required:false};
   const nativeMarkdownActivation=requireEditor
     ?await evalJS("(async()=>{const c=window.theia.container;"+
@@ -1006,10 +1006,10 @@ try{
   const importedNotification=afterImport.notificationText.some(message=>
     (message.includes("示例项目已载入并打开工作区：skill-studio-demo/")&&
      message.includes("默认已打开 CA-SL current Procedure（DRAFT / NOT_QUALIFIED）")&&
-     message.includes("导入当前 CA-SL Skill 文件 14 个"))||
+     message.includes("导入当前 CA-SL Skill 文件 26 个"))||
     (message.includes("Example project opened: skill-studio-demo/")&&
      message.includes("CA-SL current Procedure is open (DRAFT / NOT_QUALIFIED)")&&
-     message.includes("Imported 14 current CA-SL Skill files")));
+     message.includes("Imported 26 current CA-SL Skill files")));
   if(!importedNotification||!afterImport.explorerText.includes("skills")||
      !afterImport.explorerText.includes("establish-pdu-session"))
     throw Error("Theia did not open the current CA-SL Example project: "+
@@ -1026,7 +1026,7 @@ try{
   if(requireEditor&&(!workbenchEvidence?.phaseEvidence?.visible||
       !workbenchEvidence.phaseEvidence.sourceOnly||
       !workbenchEvidence?.packageOverview?.skills||
-      workbenchEvidence.packageOverview.skills.length!==2))
+      workbenchEvidence.packageOverview.skills.length!==4))
     throw Error("v1alpha5 Inspector or Package Overview acceptance did not complete: "+
       JSON.stringify({phaseEvidence:workbenchEvidence?.phaseEvidence,
         packageOverview:workbenchEvidence?.packageOverview}).slice(0,3000));
@@ -1070,7 +1070,7 @@ try{
   if(!activationDiagnostics||activationDiagnostics.failures?.length||
      activationDiagnostics.components?.Workbench!=="READY"||
      activationDiagnostics.components?.["Package Explorer"]!=="READY"||
-     activationDiagnostics.packageInventory?.packageCount!==2||
+     activationDiagnostics.packageInventory?.packageCount!==4||
      activationDiagnostics.packageInventory?.state!=="ready"||
      !/^[0-9a-f]{40}$/.test(activationDiagnostics.buildId??"")||
      activationDiagnostics.welcomeCommandRegistered!==true||
@@ -1193,7 +1193,7 @@ try{
       return {inventory,activation,semantic};
     })()`);
     const inventory=persistedEvidence?.inventory??persistedEvidence?.activation?.packageInventory;
-    if(inventory?.state==="ready"&&inventory?.packages?.length===2&&
+    if(inventory?.state==="ready"&&inventory?.packages?.length===4&&
        persistedEvidence.activation?.workbenchReady===true&&
        persistedEvidence.semantic?.registered===true)break;
     await sleep(200);
@@ -1203,7 +1203,7 @@ try{
   if(!persistedEvidence?.inventory&&persistedEvidence?.activation?.packageInventory)
     persistedEvidence.inventory=persistedEvidence.activation.packageInventory;
   if(persistedEvidence.inventory?.state!=="ready"||
-     persistedEvidence.inventory?.packages?.length!==2||
+     persistedEvidence.inventory?.packages?.length!==4||
      persistedEvidence.activation?.failures?.length||
      persistedEvidence.activation?.workbenchReady!==true||
      persistedEvidence.semantic?.registered!==true)
@@ -1330,7 +1330,7 @@ try{
          upgradedIdentity?.procedureCurrentShape===true){
         upgradedEvidence=await evalJS("(()=>{const c=window.theia.container;const k=[...c._bindingDictionary._map.keys()].find(x=>typeof x==='function'&&x.prototype?.executeCommand&&x.prototype?.registerCommand&&x.prototype?.getCommand);return c.get(k).executeCommand('skillStudio.showActivationDiagnostics')})()");
         if(upgradedEvidence?.packageInventory?.state==="ready"&&
-           upgradedEvidence.packageInventory.packages?.length===2)break;
+           upgradedEvidence.packageInventory.packages?.length===4)break;
       }
     }catch{upgradedIdentity=null;}
     await sleep(250);
@@ -1339,7 +1339,7 @@ try{
      upgradedIdentity?.procedureCurrentShape!==true||
      upgradedIdentity?.libExists||upgradedIdentity?.outputExists||
      upgradedIdentity?.workspaceFolders?.length!==1||
-     upgradedEvidence?.packageInventory?.packages?.length!==2||
+     upgradedEvidence?.packageInventory?.packages?.length!==4||
      upgradedEvidence?.failures?.length)
     throw Error("Explicit Example replacement did not restore a clean current v1alpha5 project: "+
       JSON.stringify({identity:upgradedIdentity,activation:upgradedEvidence}).slice(0,3200));
@@ -1363,6 +1363,449 @@ try{
     phaseEvidence:workbenchEvidence?.phaseEvidence??null,
     languageServiceStatus:workbenchEvidence?.languageServiceStatus??null
   }));
+  let aiAuthoringEvidence=null;
+  if(requireEditor&&externalUrl){
+    const nativeCommand=async(id,...args)=>evalJS(
+      "(async()=>{const c=window.theia.container;"+
+      "const key=[...c._bindingDictionary._map.keys()].find(k=>"+
+      "typeof k==='function'&&k.prototype?.executeCommand&&"+
+      "k.prototype?.registerCommand&&k.prototype?.getCommand);"+
+      "if(!key)throw Error('Native Theia command registry missing for AI Authoring');"+
+      "return c.get(key).executeCommand("+JSON.stringify(id)+
+      ",..."+JSON.stringify(args)+");})()");
+    // A local OpenAI-compatible mock proves the complete Host-owned request /
+    // Proposal / Patch / Compiler path without storing a provider credential in CI.
+    const mockProposal={
+      schema:"ca-studio.ai-model-proposal/v1",
+      summary:"AI Authoring mock proposal: add a temporary acceptance node.",
+      plan:["Add one isolated postcondition Node without changing existing 3GPP actions."],
+      operations:[{
+        type:"node.add",
+        target:{nodeId:"ai-authoring-smoke-node"},
+        payload:{definition:{postcondition:{
+          predicates:[{predicate:"session.goal_satisfied",arguments:[]}],
+          routes:{PASS:"SUCCEEDED",FAIL:"FAILED",UNKNOWN:"UNRESOLVED"}
+        }}},
+        rationale:"Verify that a structured model proposal becomes a Host-owned source-preserving patch.",
+        references:["procedure-current"]
+      }],
+      assumptions:[],
+      blockers:[]
+    };
+    const gatewayRequests=[];
+    const mockGateway=createServer((req,res)=>{
+      if(req.method==="OPTIONS"){
+        res.writeHead(204,{
+          "Access-Control-Allow-Origin":"*",
+          "Access-Control-Allow-Methods":"POST, OPTIONS",
+          "Access-Control-Allow-Headers":"content-type,x-opencode-session,x-gateway-token"
+        }).end();
+        return;
+      }
+      if(req.method!=="POST"||req.url!=="/opencode-go/openai/v1/chat/completions"){
+        res.writeHead(404).end();return;
+      }
+      const chunks=[];
+      req.on("data",chunk=>chunks.push(chunk));
+      req.on("end",()=>{
+        try{
+          const body=JSON.parse(Buffer.concat(chunks).toString("utf8"));
+          gatewayRequests.push({body,headers:req.headers});
+          res.writeHead(200,{
+            "Content-Type":"application/json",
+            "Access-Control-Allow-Origin":"*",
+            "x-request-id":"ai-authoring-mock-gateway"
+          });
+          res.end(JSON.stringify({
+            id:"chatcmpl-ai-authoring-acceptance",
+            object:"chat.completion",
+            model:body.model,
+            choices:[{
+              index:0,
+              message:{role:"assistant",content:JSON.stringify(mockProposal)},
+              finish_reason:"stop"
+            }],
+            usage:{prompt_tokens:1,completion_tokens:1,total_tokens:2}
+          }));
+        }catch(error){
+          res.writeHead(400,{"Content-Type":"application/json"}).end(
+            JSON.stringify({error:String(error?.message??error)}));
+        }
+      });
+    });
+    await new Promise(resolve=>mockGateway.listen(0,"127.0.0.1",resolve));
+    const gatewayUrl="http://127.0.0.1:"+mockGateway.address().port+"/opencode-go/openai";
+    let aiContextId=null;
+    let aiFrameId=null;
+    const readAiView=async()=>{
+      const tree=await command("Page.getFrameTree");
+      const frames=[];
+      const walk=node=>{
+        if(!node)return;
+        frames.push(node.frame);
+        for(const child of node.childFrames??[])walk(child);
+      };
+      walk(tree.frameTree);
+      for(const frame of frames.filter(item=>/webview/i.test(item.url??""))){
+        try{
+          const world=await command("Page.createIsolatedWorld",{
+            frameId:frame.id,
+            worldName:"skill-studio-ai-authoring-acceptance",
+            grantUniveralAccess:true
+          });
+          const evaluated=await command("Runtime.evaluate",{
+            contextId:world.executionContextId,
+            returnByValue:true,
+            expression:"(()=>({title:document.title,"+
+              "bodyText:document.body?.innerText??'',"+
+              "csp:document.querySelector('meta[http-equiv=\"Content-Security-Policy\" i]')?.content??'',"+
+              "gatewayConfigured:document.body?.innerText.includes('已配置')===true,"+
+              "proposalSummary:document.getElementById('proposalSummary')?.textContent??'',"+
+              "candidateSource:document.getElementById('candidateSource')?.textContent??'',"+
+              "compilerStatus:document.getElementById('compilerStatus')?.textContent??'',"+
+              "patchState:document.getElementById('patchState')?.textContent??'',"+
+              "statusText:document.getElementById('status')?.textContent??'',"+
+              "patchError:document.getElementById('patchError')?.textContent??'',"+
+              "applyDisabled:document.getElementById('apply')?.disabled!==false"+
+              "}))()"
+          });
+          const view=evaluated.result?.value;
+          if(view?.title==="AI Procedure Authoring"){
+            aiContextId=world.executionContextId;
+            aiFrameId=frame.id;
+            return view;
+          }
+        }catch{
+          // Webview frames can be replaced while the standalone Editor Tab activates.
+        }
+      }
+      return null;
+    };
+    try{
+      const configured=await nativeCommand("skillStudio.internal.configureAiGatewayAcceptance",{
+        gatewayUrl,modelId:"deepseek-v4.1-flash"
+      });
+      if(configured!==true)throw Error("AI Gateway mock route could not be configured in the acceptance host");
+      await nativeCommand("skillStudio.openProcedure",identity.defaultProcedure);
+      const opened=await nativeCommand("skillStudio.openAiAuthoring");
+      if(opened!==true)
+        throw Error("AI Procedure Authoring command did not open its standalone Editor Tab");
+      let initialView=null;
+      let latest=[];
+      for(let attempt=0;attempt<120&&!initialView;attempt++){
+        initialView=await readAiView();
+        if(initialView){
+          latest=[{title:initialView.title,bodyText:initialView.bodyText.slice(0,700)}];
+          const contextReady=initialView.bodyText.includes("上下文来源")&&
+            initialView.bodyText.includes("assurance/contract.yaml")&&
+            initialView.bodyText.includes("assurance/predicates.yaml")&&
+            initialView.bodyText.includes("schemas/establishment-request.schema.yaml");
+          if(!contextReady||!initialView.gatewayConfigured)initialView=null;
+        }
+        if(!initialView)await sleep(100);
+      }
+      if(!initialView)
+        throw Error("AI Procedure Authoring Editor Tab did not load the live Package context and configured Gateway: "+
+          JSON.stringify(latest));
+      if(!initialView.csp.includes("default-src 'none'")||
+         !initialView.csp.includes("connect-src 'none'")||
+         !initialView.csp.includes("script-src 'nonce-"))
+        throw Error("AI Authoring Webview CSP did not retain nonce-only scripts and a disabled direct network path: "+initialView.csp);
+
+      const task="Add one temporary postcondition node named ai-authoring-smoke-node to verify the authoring pipeline. Do not change existing 3GPP actions.";
+      const clicked=await command("Runtime.evaluate",{
+        contextId:aiContextId,
+        returnByValue:true,
+        expression:"(()=>{const task=document.getElementById('task');const button=document.getElementById('generate');"+
+          "if(!task||!button||button.disabled)return {ok:false,reason:'Generate control unavailable'};"+
+          "task.value="+JSON.stringify(task)+";task.dispatchEvent(new Event('input',{bubbles:true}));"+
+          "button.click();return {ok:true};})()"
+      });
+      if(clicked.result?.value?.ok!==true)
+        throw Error("AI Authoring Generate control could not be activated: "+JSON.stringify(clicked.result?.value));
+      const waitForDialogButton=async labels=>{
+        for(let attempt=0;attempt<100;attempt++){
+          const position=await evalJS(
+            "(()=>{const labels="+JSON.stringify(labels)+
+            ";const button=[...document.querySelectorAll('button,[role=\"button\"]')].find(item=>{"+
+            "const r=item.getBoundingClientRect();return r.width>0&&r.height>0&&labels.includes(item.innerText.trim())});"+
+            "if(!button)return null;const r=button.getBoundingClientRect();return {x:r.left+r.width/2,y:r.top+r.height/2,label:button.innerText.trim()}})()");
+          if(position)return position;
+          await sleep(100);
+        }
+        throw Error("AI Authoring data-disclosure confirmation did not appear: "+
+          (await evalJS("document.body.innerText.slice(-1000)")));
+      };
+      const sendPosition=await waitForDialogButton(["发送并生成提案"]);
+      await command("Input.dispatchMouseEvent",{type:"mouseMoved",x:sendPosition.x,y:sendPosition.y});
+      await command("Input.dispatchMouseEvent",{type:"mousePressed",x:sendPosition.x,y:sendPosition.y,button:"left",clickCount:1});
+      await command("Input.dispatchMouseEvent",{type:"mouseReleased",x:sendPosition.x,y:sendPosition.y,button:"left",clickCount:1});
+
+      for(let attempt=0;attempt<120&&gatewayRequests.length===0;attempt++)await sleep(100);
+      if(gatewayRequests.length!==1)
+        throw Error("AI Gateway mock did not receive exactly one model request: "+gatewayRequests.length);
+      const gatewayRequest=gatewayRequests[0];
+      if(gatewayRequest.body?.model!=="deepseek-v4.1-flash"||
+         gatewayRequest.body?.stream!==false||
+         gatewayRequest.body?.response_format?.type!=="json_object"||
+         !Array.isArray(gatewayRequest.body?.messages)||
+         !gatewayRequest.body.messages[1]?.content?.includes("CONTEXT ITEM procedure-current")||
+         !/^[A-Za-z0-9][A-Za-z0-9._:-]{7,127}$/.test(gatewayRequest.headers["x-opencode-session"]??""))
+        throw Error("AI Gateway request did not match the expected OpenAI-compatible v1 Chat Completions contract");
+
+      let proposalView=null;
+      for(let attempt=0;attempt<120&&!proposalView;attempt++){
+        const view=await readAiView();
+        if(view?.proposalSummary.includes("AI Authoring mock proposal")&&
+           view.candidateSource.includes("ai-authoring-smoke-node"))proposalView=view;
+        if(!proposalView)await sleep(100);
+      }
+      if(!proposalView){
+        const finalView=await readAiView();
+        throw Error("Mock model response did not become a source-preserving Patch preview: "+
+          JSON.stringify({
+            gatewayRequestCount:gatewayRequests.length,
+            model:gatewayRequests[0]?.body?.model,
+            responseFormat:gatewayRequests[0]?.body?.response_format,
+            sessionHeaderPresent:Boolean(gatewayRequests[0]?.headers?.["x-opencode-session"]),
+            view:finalView?{
+              bodyText:finalView.bodyText.slice(-1400),
+              proposalSummary:finalView.proposalSummary,
+              compilerStatus:finalView.compilerStatus,
+              patchState:finalView.patchState,
+              statusText:finalView.statusText,
+              patchError:finalView.patchError,
+              applyDisabled:finalView.applyDisabled
+            }:null
+          }));
+      }
+      if(!proposalView.compilerStatus.includes("Compiler v2.0.2 Check: FAIL")||
+         !proposalView.patchState.includes("Compiler Check failed")||
+         !proposalView.applyDisabled)
+        throw Error("Compiler failure did not keep the candidate PREVIEW ONLY: "+JSON.stringify({
+          compilerStatus:proposalView.compilerStatus,patchState:proposalView.patchState,
+          applyDisabled:proposalView.applyDisabled
+        }));
+      aiAuthoringEvidence={
+        title:initialView.title,
+        packageContext:["assurance/contract.yaml","assurance/predicates.yaml",
+          "schemas/establishment-request.schema.yaml"],
+        cspDefaultNone:true,
+        cspConnectNone:true,
+        nonceScriptPolicy:true,
+        gatewayConfigured:true,
+        mockGatewayRequest:"PASS",
+        openAiCompatibleRequest:"PASS",
+        stableSessionHeader:"PASS",
+        structuredModelProposal:"PASS",
+        sourcePreservingPatchPreview:"PASS",
+        compilerCheck:"FAIL_AS_EXPECTED_FOR_UNQUALIFIED_5GC_EXAMPLE",
+        applyBlocked:true
+      };
+      console.log("STUDIO_AI_AUTHORING_MOCK_GATEWAY_E2E_CHROMIUM",JSON.stringify(aiAuthoringEvidence));
+    }finally{
+      try{
+        await nativeCommand("skillStudio.internal.configureAiGatewayAcceptance",{
+          gatewayUrl:"",modelId:"deepseek-v4.1-flash"
+        });
+      }catch{/* The acceptance profile is ephemeral; never hide the primary failure. */}
+      await new Promise(resolve=>mockGateway.close(resolve));
+    }
+    // The backend CI host enables this fixture-only command explicitly.
+    // Unlike the unqualified 5GC mock proposal above, this verifies an exact
+    // Compiler-qualified candidate in the native VS Code/Theia editor.
+    const synthetic=await nativeCommand("skillStudio.internal.syntheticAuthoringApplyAcceptance");
+    if(synthetic?.compilerVersion!=="v2.0.2"||
+       synthetic?.qualification!=="SYNTHETIC_TEST_ONLY"||
+       synthetic?.compilerBaseline?.errors!==0||
+       synthetic?.compilerCandidate?.errors!==0||
+       synthetic?.atomicGroupCount!==1||
+       synthetic?.nativeWorkspaceEdit!=="PASS"||
+       synthetic?.pendingUndo!==true||
+       synthetic?.unsavedDiskUnchanged!==true||
+       synthetic?.autoSaved!==false){
+      throw Error("Synthetic Compiler-qualified native Editor Apply acceptance failed: "+
+        JSON.stringify(synthetic));
+    }
+    const undoCommand=await evalJS(
+      "(async()=>{const c=window.theia.container;"+
+      "const key=[...c._bindingDictionary._map.keys()].find(k=>"+
+      "typeof k==='function'&&k.prototype?.executeCommand&&"+
+      "k.prototype?.registerCommand&&k.prototype?.getCommand);"+
+      "if(!key)throw Error('Native Theia CommandRegistry missing for Undo');"+
+      "const commands=c.get(key);"+
+      "const available=['undo','core.undo'].filter(id=>commands.getCommand(id));"+
+      "const enabled=available.find(id=>commands.isEnabled(id));"+
+      "if(!enabled)throw Error('No enabled frontend Monaco Undo command: '+available);"+
+      "await commands.executeCommand(enabled);return enabled;})()");
+    const undo=await nativeCommand("skillStudio.internal.syntheticAuthoringVerifyUndo");
+    if(undo?.nativeUndo!=="PASS"||undo?.restoredOriginal!==true||
+       undo?.unsavedDiskUnchanged!==true||undo?.autoSaved!==false){
+      throw Error("Theia frontend Undo did not restore the synthetic editor buffer: "+
+        JSON.stringify({undoCommand,undo}));
+    }
+    console.log("STUDIO_AI_AUTHORING_SYNTHETIC_NATIVE_EDIT_UNDO_CHROMIUM_PASS",
+      JSON.stringify({...synthetic,...undo,pendingUndo:false,undoCommand}));
+
+    // This additional PASS must be produced from the actual standalone
+    // AI Editor Tab, not from the independent native-edit acceptance command.
+    // The Node test host stages the official pinned Compiler v2.0.2 fixture
+    // under an isolated temporary directory, never a real 5GC Package.
+    const prepared=await nativeCommand("skillStudio.internal.prepareSyntheticEditorTabAcceptance");
+    if(prepared?.ready!==true||prepared?.syntheticOnly!==true)
+      throw Error("Trusted synthetic Editor Tab fixture did not prepare");
+    const positiveProposal={
+      schema:"ca-studio.ai-model-proposal/v1",
+      summary:"Synthetic Editor Tab proposal: adjust the final failure terminal.",
+      plan:["Preserve all stages and change only the final postcondition FAIL route."],
+      operations:[{
+        type:"stage.route.set",
+        target:{nodeId:"final",stage:"postcondition",outcome:"FAIL"},
+        payload:{targetNodeId:"FAILED"},
+        rationale:"Prove the exact model-shaped patch and Compiler-qualified UI Apply.",
+        references:["procedure-current"]
+      }],
+      assumptions:[],blockers:[]
+    };
+    const positiveRequests=[];
+    const positiveGateway=createServer((req,res)=>{
+      if(req.method!=="POST"||req.url!=="/opencode-go/openai/v1/chat/completions"){
+        res.writeHead(404).end();return;
+      }
+      const chunks=[];
+      req.on("data",chunk=>chunks.push(chunk));
+      req.on("end",()=>{
+        try{
+          const body=JSON.parse(Buffer.concat(chunks).toString("utf8"));
+          positiveRequests.push({model:body.model,session:req.headers["x-opencode-session"]});
+          res.writeHead(200,{"Content-Type":"application/json"});
+          res.end(JSON.stringify({
+            id:"synthetic-editor-tab-compiler-pass",
+            object:"chat.completion",
+            model:body.model,
+            choices:[{
+              index:0,
+              message:{role:"assistant",content:JSON.stringify(positiveProposal)},
+              finish_reason:"stop"
+            }]
+          }));
+        }catch{
+          res.writeHead(400).end("Invalid synthetic Gateway request");
+        }
+      });
+    });
+    await new Promise(resolve=>positiveGateway.listen(0,"127.0.0.1",resolve));
+    try{
+      const syntheticGatewayUrl="http://127.0.0.1:"+
+        positiveGateway.address().port+"/opencode-go/openai";
+      await nativeCommand("skillStudio.internal.configureAiGatewayAcceptance",{
+        gatewayUrl:syntheticGatewayUrl,modelId:"deepseek-v4.1-flash"
+      });
+      const opened=await nativeCommand("skillStudio.openAiAuthoring");
+      if(opened!==true)throw Error("Synthetic production Editor Tab did not open");
+      let positiveReady=false;
+      for(let attempt=0;attempt<100;attempt++){
+        const view=await readAiView();
+        if(view?.gatewayConfigured&&view.bodyText.includes("example")&&
+           view.bodyText.includes("上下文来源")){
+          positiveReady=true;break;
+        }
+        await sleep(100);
+      }
+      if(!positiveReady)
+        throw Error("Synthetic production Editor Tab context is not ready");
+      const task="Change only the synthetic final postcondition FAIL route from SAFE_STOPPED to FAILED. Keep every other route and all nodes unchanged.";
+      const clicked=await command("Runtime.evaluate",{
+        contextId:aiContextId,
+        returnByValue:true,
+        expression:"(()=>{const task=document.getElementById('task');"+
+          "const button=document.getElementById('generate');"+
+          "if(!task||!button||button.disabled)return false;"+
+          "task.value="+JSON.stringify(task)+";"+
+          "task.dispatchEvent(new Event('input',{bubbles:true}));"+
+          "button.click();return true;})()"
+      });
+      if(clicked.result?.value!==true)
+        throw Error("Synthetic Editor Tab Generate control is disabled");
+      let approval=null;
+      for(let attempt=0;attempt<100&&!approval;attempt++){
+        approval=await evalJS(
+          "(()=>{const button=[...document.querySelectorAll('button,[role=\\\"button\\\"]')]"+
+          ".find(item=>item.innerText.trim()==='发送并生成提案'&&"+
+          "item.getBoundingClientRect().width>0);"+
+          "if(!button)return null;const r=button.getBoundingClientRect();"+
+          "return {x:r.left+r.width/2,y:r.top+r.height/2}})()");
+        if(!approval)await sleep(100);
+      }
+      if(!approval)throw Error("Synthetic Editor Tab disclosure approval was missing");
+      await command("Input.dispatchMouseEvent",{type:"mouseMoved",x:approval.x,y:approval.y});
+      await command("Input.dispatchMouseEvent",{type:"mousePressed",x:approval.x,y:approval.y,button:"left",clickCount:1});
+      await command("Input.dispatchMouseEvent",{type:"mouseReleased",x:approval.x,y:approval.y,button:"left",clickCount:1});
+      let readyView=null;
+      for(let attempt=0;attempt<200&&!readyView;attempt++){
+        const view=await readAiView();
+        if(view?.candidateSource.includes("FAIL: FAILED")&&
+           view.compilerStatus.includes("Compiler v2.0.2 Check: PASS")&&
+           view.applyDisabled===false)readyView=view;
+        if(!readyView)await sleep(100);
+      }
+      if(!readyView){
+        const view=await readAiView();
+        throw Error("Production Editor Tab did not yield qualified synthetic Apply: "+
+          JSON.stringify({requests:positiveRequests.length,
+            compilerStatus:view?.compilerStatus,patchState:view?.patchState,
+            patchError:view?.patchError,applyDisabled:view?.applyDisabled,
+            status:view?.statusText}));
+      }
+      if(positiveRequests.length!==1||
+         positiveRequests[0].model!=="deepseek-v4.1-flash"||
+         !positiveRequests[0].session)
+        throw Error("Expected one Host-owned model request for synthetic Editor Tab");
+      const applied=await command("Runtime.evaluate",{
+        contextId:aiContextId,
+        returnByValue:true,
+        expression:"(()=>{const button=document.getElementById('apply');"+
+          "if(!button||button.disabled)return false;button.click();return true;})()"
+      });
+      if(applied.result?.value!==true)
+        throw Error("Compiler-qualified Editor Tab Apply button was not clickable");
+      const verified=await nativeCommand("skillStudio.internal.verifySyntheticEditorTabApplied");
+      if(verified?.nativeWorkspaceEdit!=="PASS"||
+         verified?.unsavedDiskUnchanged!==true||verified?.autoSaved!==false)
+        throw Error("Editor Tab did not apply only to the native unsaved buffer");
+      const undoCommandForTab=await evalJS(
+        "(async()=>{const c=window.theia.container;"+
+        "const key=[...c._bindingDictionary._map.keys()].find(k=>"+
+        "typeof k==='function'&&k.prototype?.executeCommand&&"+
+        "k.prototype?.registerCommand&&k.prototype?.getCommand);"+
+        "const commands=c.get(key);"+
+        "const enabled=['undo','core.undo'].find(id=>"+
+        "commands.getCommand(id)&&commands.isEnabled(id));"+
+        "if(!enabled)throw Error('Frontend Undo unavailable');"+
+        "await commands.executeCommand(enabled);return enabled;})()");
+      const restored=await nativeCommand("skillStudio.internal.verifySyntheticEditorTabUndo");
+      if(restored?.nativeUndo!=="PASS"||restored?.restoredOriginal!==true||
+         restored?.unsavedDiskUnchanged!==true)
+        throw Error("Production Editor Tab frontend Undo did not restore synthetic source");
+      console.log("STUDIO_AI_EDITOR_TAB_SYNTHETIC_PROPOSAL_COMPILER_APPLY_UNDO_PASS",
+        JSON.stringify({
+          qualification:"SYNTHETIC_TEST_ONLY",modelSource:"MOCK_GATEWAY",
+          modelProposalSchema:"PASS",selectedPatch:"PASS",
+          compilerVersion:"v2.0.2",compilerCheck:"PASS",
+          nativeWorkspaceEdit:"PASS",frontendUndo:"PASS",
+          unsavedDiskUnchanged:true,autoSaved:false,
+          undoCommand:undoCommandForTab,
+          realProvider:"NOT_CLAIMED",real5gcQualification:"NOT_CLAIMED"
+        }));
+    }finally{
+      try{
+        await nativeCommand("skillStudio.internal.configureAiGatewayAcceptance",{
+          gatewayUrl:"",modelId:"deepseek-v4.1-flash"
+        });
+      }catch{}
+      await new Promise(resolve=>positiveGateway.close(resolve));
+    }
+  }
   if(requireEditor)
     console.log("THEIA_BROWSER_HOST_V1ALPHA5_ACCEPTANCE_PASS");
   else

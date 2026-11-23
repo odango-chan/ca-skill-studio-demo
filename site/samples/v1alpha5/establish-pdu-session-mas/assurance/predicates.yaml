@@ -11,19 +11,9 @@ predicates:
       type: cel
       expression: requestType == 1 && requestedPduSessionType == "IPV4" && requestedSscMode == 1
 
-  establishment.smf.session_context_absent:
-    parameters:
-      - sessionContext: ca-session-context::urn:connectionagent:ca:observation:smf-session-context-read-result:v1
-    evidence:
-      requires:
-        sessionContext: [ca-session-context::smf.session-context.read-evidence]
-    evaluator:
-      type: cel
-      expression: sessionContext.sessionPresence == "ABSENT"
-
   establishment.mas.subscription_validated:
     parameters:
-      - result: mas::urn:example:openamsm:mas:sc-validate-subscription-result:v1
+      - result: mas::wtlab:openamsm:mas:v0.2.0:sc-validate-subscription-result
     evidence:
       requires:
         result: [mas::sc.subscription-validated]
@@ -33,7 +23,7 @@ predicates:
 
   establishment.mas.secondary_auth_skipped:
     parameters:
-      - result: mas::urn:example:openamsm:mas:saa-secondary-auth-result:v1
+      - result: mas::wtlab:openamsm:mas:v0.2.0:saa-secondary-auth-result
     evidence:
       requires:
         result: [mas::saa.secondary-auth-disposition]
@@ -43,7 +33,7 @@ predicates:
 
   establishment.mas.context_created:
     parameters:
-      - result: mas::urn:example:openamsm:mas:sc-create-sm-context-result:v1
+      - result: mas::wtlab:openamsm:mas:v0.2.0:sc-create-sm-context-result
     evidence:
       requires:
         result: [mas::sc.context-created]
@@ -53,7 +43,7 @@ predicates:
 
   establishment.mas.uecm_registered:
     parameters:
-      - result: mas::urn:example:openamsm:mas:sc-register-uecm-result:v1
+      - result: mas::wtlab:openamsm:mas:v0.2.0:sc-register-uecm-result
     evidence:
       requires:
         result: [mas::sc.uecm-registered]
@@ -63,7 +53,7 @@ predicates:
 
   establishment.mas.policy_association_created:
     parameters:
-      - result: mas::urn:example:openamsm:mas:pa-policy-result:v1
+      - result: mas::wtlab:openamsm:mas:v0.2.0:pa-sm-policy-result
     evidence:
       requires:
         result: [mas::pa.policy-association-created]
@@ -73,7 +63,7 @@ predicates:
 
   establishment.mas.anchor_selected:
     parameters:
-      - result: mas::urn:example:openamsm:mas:ups-anchor-result:v1
+      - result: mas::wtlab:openamsm:mas:v0.2.0:ups-decide-anchor-result
     evidence:
       requires:
         result: [mas::ups.anchor-selected]
@@ -83,7 +73,7 @@ predicates:
 
   establishment.mas.address_allocated:
     parameters:
-      - result: mas::urn:example:openamsm:mas:iam-address-result:v1
+      - result: mas::wtlab:openamsm:mas:v0.2.0:iam-allocate-address-result
     evidence:
       requires:
         result: [mas::iam.address-allocated]
@@ -93,7 +83,7 @@ predicates:
 
   establishment.mas.policy_updated:
     parameters:
-      - result: mas::urn:example:openamsm:mas:pa-policy-result:v1
+      - result: mas::wtlab:openamsm:mas:v0.2.0:pa-sm-policy-result
     evidence:
       requires:
         result: [mas::pa.policy-updated]
@@ -106,7 +96,7 @@ predicates:
   # completed under the current stub; it does not prove a charging reservation.
   establishment.mas.charging_step_completed:
     parameters:
-      - result: mas::urn:example:openamsm:mas:ca-charging-result:v1
+      - result: mas::wtlab:openamsm:mas:v0.2.0:ca-create-charging-result
     evidence:
       requires:
         result: [mas::ca.charging-step-skipped]
@@ -116,7 +106,7 @@ predicates:
 
   establishment.mas.n4_session_established:
     parameters:
-      - result: mas::urn:example:openamsm:mas:upn-create-up-session-result:v1
+      - result: mas::wtlab:openamsm:mas:v0.2.0:upn-create-up-session-result
     evidence:
       requires:
         result: [mas::upn.n4-session-established]
@@ -126,7 +116,7 @@ predicates:
 
   establishment.mas.access_network_ready:
     parameters:
-      - result: mas::urn:example:openamsm:mas:ssm-signal-ue-an-result:v1
+      - result: mas::wtlab:openamsm:mas:v0.2.0:ssm-signal-ue-an-result
     evidence:
       requires:
         result: [mas::ssm.access-network-ready]
@@ -136,7 +126,7 @@ predicates:
 
   establishment.mas.n3_synchronized:
     parameters:
-      - result: mas::urn:example:openamsm:mas:upn-modify-up-session-result:v1
+      - result: mas::wtlab:openamsm:mas:v0.2.0:upn-modify-up-session-result
     evidence:
       requires:
         result: [mas::upn.n3-synchronized]
@@ -146,7 +136,7 @@ predicates:
 
   establishment.mas.establishment_event_recorded:
     parameters:
-      - result: mas::urn:example:openamsm:mas:se-emit-events-result:v1
+      - result: mas::wtlab:openamsm:mas:v0.2.0:se-emit-events-result
     evidence:
       requires:
         result: [mas::se.establishment-event-recorded]

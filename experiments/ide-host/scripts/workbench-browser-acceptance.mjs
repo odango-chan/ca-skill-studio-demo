@@ -249,7 +249,7 @@ export async function runPackageOverviewAcceptance({command,evalJS,sleep,require
   let rows=[];
   for(let attempt=0;attempt<100;attempt++){
     rows=await readTreeRows();
-    if(rows.some(x=>x.visible&&x.text.includes('2 SKILL Packages'))&&
+    if(rows.some(x=>x.visible&&x.text.includes('4 SKILL Packages'))&&
        rows.some(x=>x.visible&&x.text.includes('establish-pdu-session · 3/3 core ·')))break;
     await sleep(100);
   }
@@ -273,16 +273,20 @@ export async function runPackageOverviewAcceptance({command,evalJS,sleep,require
     },true);
     return true;
   })()`);
-  const expectedNames=['establish-pdu-session','establish-pdu-session-mas'];
+  const expectedNames=['establish-pdu-session','establish-pdu-session-mas','modify-pdu-session-mas','release-pdu-session-mas'];
   const discovered=(scan?.packages??[]).map(x=>x.name).sort();
   if(scan?.state!=='ready'||JSON.stringify(discovered)!==JSON.stringify(expectedNames.slice().sort()))
-    throw Error('Package Overview must discover both sample Skills in one Workspace: '+
+    throw Error('Package Overview must discover all four current sample Skills in one Workspace: '+
       JSON.stringify({scan,expectedNames}));
   const classic=scan.packages.find(x=>x.name==='establish-pdu-session');
   const mas=scan.packages.find(x=>x.name==='establish-pdu-session-mas');
+  const modify=scan.packages.find(x=>x.name==='modify-pdu-session-mas');
+  const release=scan.packages.find(x=>x.name==='release-pdu-session-mas');
   if(classic?.fileCount!==8||classic?.corePresent!==3||
-     mas?.fileCount!==6||mas?.corePresent!==3)
-    throw Error('Two-SKILL v1alpha5 inventory does not match the pinned sample manifest: '+
+     mas?.fileCount!==6||mas?.corePresent!==3||
+     modify?.fileCount!==6||modify?.corePresent!==3||
+     release?.fileCount!==6||release?.corePresent!==3)
+    throw Error('Four-SKILL v1alpha5 inventory does not match the pinned sample manifest: '+
       JSON.stringify({classic,mas}));
   function assertGroupInventory(result,packageName,expected){
     const pkg=result?.packages?.find(item=>item.name===packageName);
@@ -298,6 +302,12 @@ export async function runPackageOverviewAcceptance({command,evalJS,sleep,require
     definition:1,assurance:3,schemas:1,scripts:3
   });
   assertGroupInventory(scan,'establish-pdu-session-mas',{
+    definition:1,assurance:3,schemas:1,references:1
+  });
+  assertGroupInventory(scan,'modify-pdu-session-mas',{
+    definition:1,assurance:3,schemas:1,references:1
+  });
+  assertGroupInventory(scan,'release-pdu-session-mas',{
     definition:1,assurance:3,schemas:1,references:1
   });
 
@@ -373,12 +383,14 @@ export async function runPackageOverviewAcceptance({command,evalJS,sleep,require
     const evidence={
       skills:[
         {name:'establish-pdu-session',files:classic.fileCount,core:'3/3'},
-        {name:'establish-pdu-session-mas',files:mas.fileCount,core:'3/3'}
+        {name:'establish-pdu-session-mas',files:mas.fileCount,core:'3/3'},
+        {name:'modify-pdu-session-mas',files:modify.fileCount,core:'3/3'},
+        {name:'release-pdu-session-mas',files:release.fileCount,core:'3/3'}
       ],
       treeVisible:true,scanState:scan.state,composite:compositeEvidence
     };
     console.log('STUDIO_PACKAGE_EXPLORER_BROWSER_ONLY_CHROMIUM',JSON.stringify(evidence));
-    return {required:true,twoSkills:true,browserOnlyInventory:true,evidence};
+    return {required:true,fourSkills:true,browserOnlyInventory:true,evidence};
   }
   const packageNames=expectedNames;
   const isPackageRow=row=>packageNames.some(name=>
@@ -574,21 +586,33 @@ export async function runPackageOverviewAcceptance({command,evalJS,sleep,require
   const classicContract=await openPackageContract('establish-pdu-session');
   await ensurePackageExpanded('establish-pdu-session-mas');
   const masContract=await openPackageContract('establish-pdu-session-mas');
+  await ensurePackageExpanded('modify-pdu-session-mas');
+  const modifyContract=await openPackageContract('modify-pdu-session-mas');
+  await ensurePackageExpanded('release-pdu-session-mas');
+  const releaseContract=await openPackageContract('release-pdu-session-mas');
   if(classicContract.contractName!=='establish-pdu-session'||
      masContract.contractName!=='establish-pdu-session-mas'||
-     classicContract.contractName===masContract.contractName)
+     modifyContract.contractName!=='modify-pdu-session-mas'||
+     releaseContract.contractName!=='release-pdu-session-mas'||
+     new Set([classicContract,masContract,modifyContract,releaseContract].map(c=>c.contractName)).size!==4)
     throw Error('Package file navigation did not preserve each exact Contract URI: '+
       JSON.stringify({classicContract,masContract}));
   await invoke('skillStudio.refreshPackages');
   await invoke('skillStudio.refreshPackages');
   const postExpansion=await evalJS('window.__skillStudioLastCommandResult??null');
-  if(postExpansion?.state!=='ready'||postExpansion.packages?.length!==2)
-    throw Error('Package Explorer refresh did not preserve both Package inventories: '+
+  if(postExpansion?.state!=='ready'||postExpansion.packages?.length!==4)
+    throw Error('Package Explorer refresh did not preserve four Package inventories: '+
       JSON.stringify(postExpansion));
   assertGroupInventory(postExpansion,'establish-pdu-session',{
     definition:1,assurance:3,schemas:1,scripts:3
   });
   assertGroupInventory(postExpansion,'establish-pdu-session-mas',{
+    definition:1,assurance:3,schemas:1,references:1
+  });
+  assertGroupInventory(postExpansion,'modify-pdu-session-mas',{
+    definition:1,assurance:3,schemas:1,references:1
+  });
+  assertGroupInventory(postExpansion,'release-pdu-session-mas',{
     definition:1,assurance:3,schemas:1,references:1
   });
   const previous=activityState?.previous;
@@ -623,14 +647,20 @@ export async function runPackageOverviewAcceptance({command,evalJS,sleep,require
     },{
       name:'establish-pdu-session-mas',files:mas.fileCount,core:'3/3',
       groups:mas.groups.map(group=>({key:group.key,count:group.count})),contract:masContract
+    },{
+      name:'modify-pdu-session-mas',files:modify.fileCount,core:'3/3',
+      groups:modify.groups.map(group=>({key:group.key,count:group.count})),contract:modifyContract
+    },{
+      name:'release-pdu-session-mas',files:release.fileCount,core:'3/3',
+      groups:release.groups.map(group=>({key:group.key,count:group.count})),contract:releaseContract
     }],
     treeVisible:true,scanState:scan.state,
     composite:compositeEvidence,
     treeReadsByKind:postExpansion.treeReadsByKind,
     exactPackageUris:true,restoredActivity:restored
   };
-  console.log('STUDIO_PACKAGE_OVERVIEW_TWO_SKILLS_CHROMIUM',JSON.stringify(evidence));
-  return {required:true,twoSkills:true,evidence};
+  console.log('STUDIO_PACKAGE_OVERVIEW_FOUR_SKILLS_CHROMIUM',JSON.stringify(evidence));
+  return {required:true,fourSkills:true,evidence};
 }
 
 
@@ -1488,9 +1518,9 @@ export async function runWorkbenchAcceptance({
   const packageOverviewEvidence=await runPackageOverviewAcceptance({
     command,evalJS,sleep,requireEditor
   });
-  if(!packageOverviewEvidence?.twoSkills||
-     packageOverviewEvidence.evidence?.skills?.length!==2)
-    throw Error("Package Overview did not discover both v1alpha5 Skills: "+
+  if(!packageOverviewEvidence?.fourSkills||
+     packageOverviewEvidence.evidence?.skills?.length!==4)
+    throw Error("Package Overview did not discover all four v1alpha5 Skills: "+
       JSON.stringify(packageOverviewEvidence));
   // Keep unrelated editors open; closing every tab can block Theia's Webview command bridge.
   await nativeCommand("skillStudio.openProcedure",defaultProcedureUri);
@@ -1505,7 +1535,7 @@ export async function runWorkbenchAcceptance({
   // Build must remain failure-atomic without trusted Owner/Deployment inputs.
   if(requireCompilerWorker){
     const smoke=await nativeCommand("skillStudio.internal.compilerWorkerAcceptance");
-    if(smoke?.compilerVersion!=="v2.0.0"||
+    if(smoke?.compilerVersion!=="v2.0.2"||
        smoke?.languageTarget!=="connectionagent.io/v1alpha5"||
        smoke?.workerTransport!=="PASS"||
        smoke?.artifactFailureAtomicity!=="PASS")

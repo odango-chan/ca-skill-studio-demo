@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { createProcedureAgent } from "../procedure-agent.mjs";
 import { CONTEXT_PACK_SCHEMA, buildContextPack } from "../context-pack.mjs";
 import { MODEL_PROPOSAL_SCHEMA } from "../model-proposal.mjs";
+import { createGatewayModelClient } from "../gateway-client.mjs";
 
 async function context() {
   const built = await buildContextPack({
@@ -46,7 +47,7 @@ function proposal(references = ["procedure-current", "contract-goal"]) {
 test("Procedure Agent requires explicit Context Pack disclosure before any model call", async () => {
   let called = false;
   const agent = createProcedureAgent({
-    modelClient: { complete: async () => { called = true; return proposal(); } },
+    modelClient: { complete: async () => { called = true; return {content:proposal()}; } },
   });
   const { pack, manifest } = await context();
   await assert.rejects(
@@ -59,7 +60,7 @@ test("Procedure Agent requires explicit Context Pack disclosure before any model
 test("Procedure Agent validates the Context Pack and returns a typed proposal", async () => {
   let request;
   const agent = createProcedureAgent({
-    modelClient: { complete: async (value) => { request = value; return proposal(); } },
+    modelClient: { complete: async (value) => { request = value; return {content:proposal()}; } },
   });
   const { pack, manifest } = await context();
   const result = await agent.propose({
@@ -84,7 +85,7 @@ test("Procedure Agent validates the Context Pack and returns a typed proposal", 
 
 test("Procedure Agent rejects proposal references outside the Context Pack manifest", async () => {
   const agent = createProcedureAgent({
-    modelClient: { complete: async () => proposal(["unseen-file"]) },
+    modelClient: { complete: async () => ({content: proposal(["unseen-file"])}) },
   });
   const { pack, manifest } = await context();
   await assert.rejects(
@@ -101,7 +102,7 @@ test("Procedure Agent rejects proposal references outside the Context Pack manif
 test("Procedure Agent rejects a forged or incomplete disclosure manifest before calling the model", async () => {
   let called = false;
   const agent = createProcedureAgent({
-    modelClient: { complete: async () => { called = true; return proposal(); } },
+    modelClient: { complete: async () => { called = true; return {content:proposal()}; } },
   });
   const { pack, manifest } = await context();
   await assert.rejects(
@@ -117,7 +118,7 @@ test("Procedure Agent rejects a forged or incomplete disclosure manifest before 
 });
 
 test("Procedure Agent rejects malformed model output and exposes no write capability", async () => {
-  const agent = createProcedureAgent({ modelClient: { complete: async () => "not json" } });
+  const agent = createProcedureAgent({ modelClient: { complete: async () => ({content:"not json"}) } });
   const { pack, manifest } = await context();
   await assert.rejects(
     agent.propose({
@@ -136,7 +137,7 @@ test("Procedure Agent rejects malformed model output and exposes no write capabi
 test("Procedure Agent rejects Context Pack content whose digest no longer matches", async () => {
   let called = false;
   const agent = createProcedureAgent({
-    modelClient: { complete: async () => { called = true; return proposal(); } },
+    modelClient: { complete: async () => { called = true; return {content:proposal()}; } },
   });
   const { pack, manifest } = await context();
   const tamperedPack = JSON.parse(JSON.stringify(pack));
@@ -156,7 +157,7 @@ test("Procedure Agent rejects Context Pack content whose digest no longer matche
 test("Procedure Agent rejects untrusted extra Context Pack fields and sensitive labels", async () => {
   let called = false;
   const agent = createProcedureAgent({
-    modelClient: { complete: async () => { called = true; return proposal(); } },
+    modelClient: { complete: async () => { called = true; return {content:proposal()}; } },
   });
   const { pack, manifest } = await context();
   const forgedPack = JSON.parse(JSON.stringify(pack));
@@ -210,7 +211,7 @@ test("Context Pack builder output can be consumed by the Procedure Agent without
     maxBytes: 131072,
   });
   const agent = createProcedureAgent({
-    modelClient: { complete: async () => proposal() },
+    modelClient: { complete: async () => ({content:proposal()}) },
   });
   const result = await agent.propose({
     task: "Add the successful route to verification.",
@@ -221,4 +222,38 @@ test("Context Pack builder output can be consumed by the Procedure Agent without
   assert.equal(result.taskId, "integrated-task");
   assert.deepEqual(result.manifest, built.manifest);
   assert.equal(result.proposal.operations[0].type, "stage.route.set");
+});
+
+test("actual Gateway completion envelope is consumed by Procedure Agent end-to-end",async()=>{
+  const {pack,manifest}=await context();
+  let gatewayRequest;
+  const client=createGatewayModelClient({
+    gatewayBaseUrl:"http://127.0.0.1:8787/opencode-go/openai",
+    modelId:"deepseek-v4.1-flash",
+    sessionId:"studio-e2e-test-123",
+    fetchImpl:async(url,init)=>{
+      gatewayRequest={url,init};
+      return new Response(JSON.stringify({
+        id:"test-completion",
+        choices:[{message:{role:"assistant",content:proposal()}}],
+        model:"deepseek-v4.1-flash"
+      }),{status:200,headers:{"content-type":"application/json"}});
+    }
+  });
+  const agent=createProcedureAgent({modelClient:client});
+  const result=await agent.propose({
+    task:"Add a route",contextPack:pack,contextManifest:manifest,
+    contextDisclosureAccepted:true
+  });
+  assert.equal(result.proposal.operations[0].type,"stage.route.set");
+  assert.equal(gatewayRequest.url,
+    "http://127.0.0.1:8787/opencode-go/openai/v1/chat/completions");
+});
+
+test("Procedure Agent rejects mismatched Gateway response types without interpreting objects as source",async()=>{
+  const {pack,manifest}=await context();
+  const agent=createProcedureAgent({modelClient:{complete:async()=>proposal()}});
+  await assert.rejects(agent.propose({
+    task:"Add a route",contextPack:pack,contextManifest:manifest,contextDisclosureAccepted:true
+  }),/completion with string content/);
 });

@@ -1,7 +1,7 @@
-// BuildRequest adapter for the released CA Skill Compiler v2.0.0 / CA-SL v1alpha5.
+// BuildRequest adapter for the released CA Skill Compiler v2.0.2 / CA-SL v1alpha5.
 // This module only serializes authored Skill bytes. It never translates legacy
 // syntax or manufactures Dependency / Owner / Capability trust metadata.
-export const COMPILER_VERSION = "v2.0.0";
+export const COMPILER_VERSION = "v2.0.2";
 export const COMPILER_API_VERSION = "connectionagent.io/compiler-build-request/v1alpha5";
 export const COMPILER_LANGUAGE_TARGET = "connectionagent.io/v1alpha5";
 export const COMPILER_BUILD_RESULT_VERSION = "connectionagent.io/compiler-build-result/v1alpha5";

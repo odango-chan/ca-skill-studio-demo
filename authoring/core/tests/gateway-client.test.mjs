@@ -21,6 +21,7 @@ test("calls the Go Gateway route prefix with an explicit Model ID and stable Ope
   assert.equal(request.url, "http://127.0.0.1:8787/opencode-go/openai/v1/chat/completions");
   assert.equal(request.init.method, "POST");
   assert.equal(request.init.credentials, "omit");
+  assert.equal(request.init.targetAddressSpace, "loopback");
   assert.equal(request.init.headers["content-type"], "application/json");
   assert.equal(request.init.headers["x-opencode-session"], "editor-session-123");
   assert.equal(request.init.headers.authorization, undefined);
@@ -85,4 +86,28 @@ test("rejects a successful non-JSON or empty proposal response", async () => {
   await assert.rejects(nonJsonClient.complete({ messages, contextDisclosureAccepted: true }), /non-JSON response/);
   const emptyClient = createGatewayModelClient({ ...base, fetchImpl: async () => ok({ choices: [{ message: { content: "" } }] }) });
   await assert.rejects(emptyClient.complete({ messages, contextDisclosureAccepted: true }), /usable proposal/);
+});
+
+
+test("declares loopback targetAddressSpace only for local Gateway hosts", async () => {
+  for (const host of ["localhost", "127.0.0.1", "[::1]"]) {
+    let request;
+    const client = createGatewayModelClient({
+      ...base,
+      gatewayBaseUrl: "http://" + host + ":8787/opencode-go/openai",
+      fetchImpl: async (_, init) => { request = init; return ok(); },
+    });
+    await client.complete({ messages, contextDisclosureAccepted: true });
+    assert.equal(request.targetAddressSpace, "loopback", host);
+    assert.equal(request.credentials, "omit", host);
+  }
+
+  let remote;
+  const client = createGatewayModelClient({
+    ...base,
+    gatewayBaseUrl: "https://gateway.internal.example/opencode-go/openai",
+    fetchImpl: async (_, init) => { remote = init; return ok(); },
+  });
+  await client.complete({ messages, contextDisclosureAccepted: true });
+  assert.equal(Object.hasOwn(remote, "targetAddressSpace"), false);
 });

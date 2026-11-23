@@ -2,13 +2,15 @@
   "schemaVersion": 1,
   "sourceRepo": "odango-chan/ca-skills",
   "sourceRef": "refs/heads/main",
-  "sourceSha": "de8d9f667dd1a445c3f6378e0ca793d7407d2036",
+  "sourceSha": "a1ed951b1e677f824c644541a26f08be4dc4847f",
   "sourceStatus": "RELEASED_NOT_QUALIFIED",
   "languageVersion": "connectionagent.io/v1alpha5",
   "projectReadme": "README.md",
   "skills": [
     "establish-pdu-session",
-    "establish-pdu-session-mas"
+    "establish-pdu-session-mas",
+    "modify-pdu-session-mas",
+    "release-pdu-session-mas"
   ],
   "files": [
     "establish-pdu-session-mas/SKILL.md",
@@ -24,13 +26,26 @@
     "establish-pdu-session/schemas/establishment-request.schema.yaml",
     "establish-pdu-session/scripts/validate-smf-session-context-entry.py",
     "establish-pdu-session/scripts/validate-smf-session-context.py",
-    "establish-pdu-session/scripts/validate-subscription-request.py"
+    "establish-pdu-session/scripts/validate-subscription-request.py",
+    "modify-pdu-session-mas/SKILL.md",
+    "modify-pdu-session-mas/assurance/contract.yaml",
+    "modify-pdu-session-mas/assurance/predicates.yaml",
+    "modify-pdu-session-mas/assurance/procedure.yaml",
+    "modify-pdu-session-mas/references/openamsm-operation-mapping.md",
+    "modify-pdu-session-mas/schemas/modify-request.schema.yaml",
+    "release-pdu-session-mas/SKILL.md",
+    "release-pdu-session-mas/assurance/contract.yaml",
+    "release-pdu-session-mas/assurance/predicates.yaml",
+    "release-pdu-session-mas/assurance/procedure.yaml",
+    "release-pdu-session-mas/references/openamsm-operation-mapping.md",
+    "release-pdu-session-mas/schemas/release-request.schema.yaml"
   ],
   "blobs": {
-    "establish-pdu-session-mas/SKILL.md": "9a857f4917f3aafd1ed58f18e24194d1b1801b72",
-    "establish-pdu-session-mas/assurance/contract.yaml": "3dcd2a3fa3cfb9842092ce388fc9b3e8c1d600d0",
-    "establish-pdu-session-mas/assurance/predicates.yaml": "c28900038f8a6f531efcc35777f15825c294b555",
-    "establish-pdu-session-mas/assurance/procedure.yaml": "ed7e8e16a78be76595844a45044c96e4c17ab7b4",
+    "establish-pdu-session-mas/SKILL.md": "78abd789a6ca8bbeb9641290cba67c7ced98b38e",
+    "establish-pdu-session-mas/assurance/contract.yaml": "fe5057b09f7735a8b71c86d4846992114c18551c",
+    "establish-pdu-session-mas/assurance/predicates.yaml": "c3223b3b48086b882afb8fb7bfc6f5de0a98e7ec",
+    "establish-pdu-session-mas/assurance/procedure.yaml": "3d8b0dbdde5baefefaf5b383e3ab8ca711fd4fbe",
+    "establish-pdu-session-mas/references/openamsm-operation-mapping.md": "23ae7fdf4fad34a80ae0d726a34dc29fe807a60b",
     "establish-pdu-session-mas/schemas/establishment-request.schema.yaml": "a17059464dfd3958e5c5761ec38f80fe53cf46c5",
     "establish-pdu-session/SKILL.md": "266191a8bc0ab0d1452621866fac27e8b19b06f8",
     "establish-pdu-session/assurance/contract.yaml": "a624cec5caf462382e0e789d937ec83ef2ef93b8",
@@ -40,6 +55,17 @@
     "establish-pdu-session/scripts/validate-smf-session-context-entry.py": "c3b525f99f3106bfce571b514ddfadea5e3af8f2",
     "establish-pdu-session/scripts/validate-smf-session-context.py": "03be904f2742c71eef18ca390db1a412e5a942ca",
     "establish-pdu-session/scripts/validate-subscription-request.py": "806c9384e827a4a37f394194e9444dce7fc44c5a",
-    "establish-pdu-session-mas/references/openamsm-operation-mapping.md": "f5c786053493b9687a93f37434affa06e199d3ea"
+    "modify-pdu-session-mas/SKILL.md": "02195d224df51ba567dec24c91a0a4ffabfd4761",
+    "modify-pdu-session-mas/assurance/contract.yaml": "edc73e4cb7e30145ee0d4e23f749295858d0bb3e",
+    "modify-pdu-session-mas/assurance/predicates.yaml": "71d683cd70a9e3e6921cdd6e5b89486eac7f1fe3",
+    "modify-pdu-session-mas/assurance/procedure.yaml": "11c4360de5bf9897ef2009c0af9c0088971274c0",
+    "modify-pdu-session-mas/references/openamsm-operation-mapping.md": "79ac872a1aa0ef719a6235455ac6f1cc4ae570d1",
+    "modify-pdu-session-mas/schemas/modify-request.schema.yaml": "26c21dfeb8939883d318268ff8fc1a0c8a07b6ea",
+    "release-pdu-session-mas/SKILL.md": "a5a5b9b90c4fb18bd8b9dda6a29ffed10ce0955e",
+    "release-pdu-session-mas/assurance/contract.yaml": "f5c4b802c235262b62c41bacc194865958641ac6",
+    "release-pdu-session-mas/assurance/predicates.yaml": "f994907691851027543cf764ed24b2c3aea30c48",
+    "release-pdu-session-mas/assurance/procedure.yaml": "3f7c5c770271a68a2b7865240eee1bbe0394acf4",
+    "release-pdu-session-mas/references/openamsm-operation-mapping.md": "79d34fb921183439c50d67de5fb70f4fe3829b94",
+    "release-pdu-session-mas/schemas/release-request.schema.yaml": "1d31d2037584ac49385783dc5df73cb63bcae689"
   }
 }

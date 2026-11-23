@@ -106,6 +106,8 @@ test("Theia plugin is the exact Web extension, with native editor + view contrib
     "samples/v1alpha5/files.json","samples/v1alpha5/README.md",
     "samples/v1alpha5/establish-pdu-session/assurance/procedure.yaml",
     "samples/v1alpha5/establish-pdu-session-mas/assurance/procedure.yaml",
+    "samples/v1alpha5/modify-pdu-session-mas/assurance/procedure.yaml",
+    "samples/v1alpha5/release-pdu-session-mas/assurance/procedure.yaml",
     "media/studio-markdown-preview.css"])
     assert.ok(statSync(join(root,"plugins/odango-chan.ca-skill-studio-ide-spike",f)).size>(f.endsWith("files.json")?50:1000),f);
 });

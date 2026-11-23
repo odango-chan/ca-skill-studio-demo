@@ -3,7 +3,7 @@
 // deletes the Example root and recreates it from the single pinned v1alpha5 source.
 // Ordinary projects are never passed to this importer. It never creates lib/ or output/.
 export const EXAMPLE_PROJECT_NAME="skill-studio-demo";
-const SKILLS=Object.freeze(["establish-pdu-session","establish-pdu-session-mas"]);
+const SKILLS=Object.freeze(["establish-pdu-session","establish-pdu-session-mas","modify-pdu-session-mas","release-pdu-session-mas"]);
 const decoder=new TextDecoder();
 const fail=reason=>{throw Error(reason);};
 const describeUri=uri=>({
@@ -130,7 +130,7 @@ export async function seedExampleProject(vscode,extensionUri,storageUri,
       catch(error){fail("Cannot read CA-SL v1alpha5 manifest: "+JSON.stringify(describeError(error)));}
       return validate(JSON.parse(decoder.decode(bytes)),{
         kind:"CA-SL v1alpha5",
-        sourceSha:"de8d9f667dd1a445c3f6378e0ca793d7407d2036",
+        sourceSha:"a1ed951b1e677f824c644541a26f08be4dc4847f",
         sourceStatus:"RELEASED_NOT_QUALIFIED",
         sourceRef:"refs/heads/main",
         languageVersion:"connectionagent.io/v1alpha5",

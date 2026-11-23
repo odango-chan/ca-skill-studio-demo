@@ -33,7 +33,7 @@ test("built-in Example assets match the pinned ca-skills main blob manifest",()=
   const manifest=JSON.parse(readFileSync(new URL("../site/samples/v1alpha5/files.json",import.meta.url),"utf8"));
   assert.equal(manifest.sourceRepo,"odango-chan/ca-skills");
   assert.equal(manifest.sourceRef,"refs/heads/main");
-  assert.equal(manifest.sourceSha,"de8d9f667dd1a445c3f6378e0ca793d7407d2036");
+  assert.equal(manifest.sourceSha,"a1ed951b1e677f824c644541a26f08be4dc4847f");
   assert.equal(manifest.sourceStatus,"RELEASED_NOT_QUALIFIED");
   for(const path of manifest.files){
     const content=readSample(path.split("/")[0],path.split("/").slice(1).join("/"));

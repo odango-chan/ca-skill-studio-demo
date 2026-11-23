@@ -104,11 +104,11 @@ const total=candidate.files.length;
 test("Example imports only the pinned CA-SL v1alpha5 Skills into skills/",async()=>{
   const h=host(),result=await seedExampleProject(
     h.vscode,uri("/extension"),uri("/global-storage"));
-  assert.equal(candidate.sourceSha,"de8d9f667dd1a445c3f6378e0ca793d7407d2036");
+  assert.equal(candidate.sourceSha,"a1ed951b1e677f824c644541a26f08be4dc4847f");
   assert.equal(candidate.sourceRef,"refs/heads/main");
   assert.equal(candidate.sourceStatus,"RELEASED_NOT_QUALIFIED");
   assert.equal(candidate.languageVersion,"connectionagent.io/v1alpha5");
-  assert.equal(result.candidateFiles,14);
+  assert.equal(result.candidateFiles,26);
   assert.equal(result.files,total);
   assert.equal(result.created,total);
   assert.equal(result.skipped,0);
@@ -116,9 +116,11 @@ test("Example imports only the pinned CA-SL v1alpha5 Skills into skills/",async(
   assert.equal(result.skillsRoot.path,skillRoot);
   assert.equal(result.procedure.path,procedurePath);
   assert.equal(result.procedures["establish-pdu-session-mas"].path,masProcedurePath);
-  assert.equal(h.files.size,total+1,"14 Skill files plus the Example README are imported");
+  assert.equal(h.files.size,total+1,"26 Skill files plus the Example README are imported");
   assert.ok(h.files.has(procedurePath));
   assert.ok(h.files.has(masProcedurePath));
+  assert.ok(h.files.has(skillRoot+"/modify-pdu-session-mas/assurance/procedure.yaml"));
+  assert.ok(h.files.has(skillRoot+"/release-pdu-session-mas/assurance/procedure.yaml"));
   assert.match(decode(h.files.get(procedurePath)),/^# Illustrative CA-SL v1alpha5/m);
   assert.match(decode(h.files.get(procedurePath)),/start: get-sm-subscription-data/);
   assert.doesNotMatch(decode(h.files.get(procedurePath)),/ueRef|ue-ref/);
@@ -169,8 +171,8 @@ test("Existing Example stays untouched unless replacement is explicitly requeste
     .map(([name])=>name).sort(),["README.md","skills"],
     "replacement keeps the active root but removes every retired root entry");
   assert.deepEqual((await h.vscode.workspace.fs.readDirectory(uri(skillRoot)))
-    .map(([name])=>name).sort(),["establish-pdu-session","establish-pdu-session-mas"],
-    "replacement restores only the two current Skills");
+    .map(([name])=>name).sort(),["establish-pdu-session","establish-pdu-session-mas","modify-pdu-session-mas","release-pdu-session-mas"].sort(),
+    "replacement restores all four current Skills");
   assert.match(decode(h.files.get(procedurePath)),/^# Illustrative CA-SL v1alpha5/m);
   assert.match(decode(h.files.get(masProcedurePath)),/start: validate-sm-subscription/);
   assert.match(decode(h.files.get(root+"/README.md")),/CA-SL v1alpha5 PDU Session examples/);

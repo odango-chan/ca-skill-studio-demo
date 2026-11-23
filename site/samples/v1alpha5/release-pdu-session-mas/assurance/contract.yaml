@@ -1,0 +1,16 @@
+# CA-SL v1alpha5. MAS exports and Evidence Guarantees are unpublished candidates.
+goal: pdu_session.release_owner_plan_completed
+precondition: validate-release-request.precondition
+requestSchema: schemas/release-request.schema.yaml
+contextSchema: ca-context::urn:connectionagent:ca:context:subject:v1
+dependencies:
+  ca-context: urn:connectionagent:ca:host-context
+  mas: wtlab:packages:openamsm:mas-compiler-contract
+capabilities:
+  - mas.upn.up.session.delete
+  - mas.ssm.ue.an.signal
+  - mas.pa.sm.policy.delete
+  - mas.sc.context.release
+  - mas.se.events.emit
+limits:
+  maxActions: 20

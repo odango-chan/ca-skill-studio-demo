@@ -18,6 +18,8 @@ import {openProjectFolder,isSingleFolderWorkspace,restorePendingExampleProject,P
 import {registerProjectWelcome} from "./project-welcome.mjs";
 
 import {registerWorkbench} from "./workbench.mjs";
+import {registerAiAuthoringEditor} from "./ai-authoring-editor.mjs";
+import {registerSyntheticAuthoringAcceptance} from "./ai-authoring-acceptance.mjs";
 import {staticPreviewResourceUrl} from "./webview-resource-url.mjs";
 import {registerContractCommands,mountContractPreview} from "./contract-editor.mjs";
 import {registerPredicateCommands,mountPredicatePreview} from "./predicate-editor.mjs";
@@ -188,6 +190,12 @@ export function activate(context){
       compilerProblemsProvider:compilerIntegration.problems
     }),unavailableWorkbench);
   workbenchReady=workbench!==unavailableWorkbench;
+  const authoringEditor=registerSafely("AI Authoring Editor",()=>registerAiAuthoringEditor(vscode,context,{
+    getActiveDocument:()=>workbench?.getActiveDocument?.()??null,
+    compilerIntegration
+  }),null);
+  registerSafely("Synthetic AI Authoring acceptance",()=>registerSyntheticAuthoringAcceptance(
+    vscode,context,compilerIntegration,authoringEditor));
   registerSafely("Package diagnostic tests",()=>registerPackageDiagnosticTesting(vscode,context,{
     getActiveProcedure:()=>workbench?.getActiveDocument?.()??
       vscode.window.activeTextEditor?.document??null
