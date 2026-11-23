@@ -1638,21 +1638,32 @@ try{
         throw Error("F3 Monaco Diff did not render with non-empty exact candidate in Chromium: "+
           JSON.stringify(diagnostic.result?.value));
       }
-      const diffMode=await command("Runtime.evaluate",{
-        contextId:aiContextId,returnByValue:true,
-        expression:"(()=>{try{const select=document.getElementById('monacoDiffMode');"+
-          "if(!select||!window.skillStudioAiYamlDiff)return {ok:false,reason:'missing control or adapter'};"+
-          "select.value='inline';select.dispatchEvent(new Event('change',{bubbles:true}));"+
-          "document.getElementById('monacoDiffNext').click();"+
-          "document.getElementById('monacoDiffPrevious').click();"+
-          "select.value='side-by-side';select.dispatchEvent(new Event('change',{bubbles:true}));"+
-          "return {ok:select.value==='side-by-side'&&!document.getElementById('monacoDiffSurface').hidden,"+
-          "value:select.value,hidden:document.getElementById('monacoDiffSurface').hidden};"+
-          "}catch(error){return {ok:false,reason:String(error?.stack||error)}}})()"
-      });
-      if(diffMode.result?.value?.ok!==true)
-        throw Error("F3 side-by-side/inline diff navigation failed: "+
-          JSON.stringify({value:diffMode.result?.value,exception:diffMode.exceptionDetails}));
+      // Webview reveal can recreate the iframe between the render probe and
+      // the controls probe. Retry a bounded number of times and distinguish
+      // a missing select from an unloaded adapter, rather than assuming one.
+      let diffMode=null;
+      for(let attempt=0;attempt<40;attempt++){
+        diffMode=await command("Runtime.evaluate",{
+          contextId:aiContextId,returnByValue:true,
+          expression:"(()=>{try{const select=document.getElementById('monacoDiffMode');"+
+            "const api=window.skillStudioAiYamlDiff;"+
+            "const surface=document.getElementById('monacoDiffSurface');"+
+            "if(!select||!api||!surface)return {ok:false,selectPresent:!!select,"+
+              "adapterPresent:!!api,surfacePresent:!!surface,title:document.title};"+
+            "select.value='inline';select.dispatchEvent(new Event('change',{bubbles:true}));"+
+            "document.getElementById('monacoDiffNext')?.click();"+
+            "document.getElementById('monacoDiffPrevious')?.click();"+
+            "select.value='side-by-side';select.dispatchEvent(new Event('change',{bubbles:true}));"+
+            "return {ok:select.value==='side-by-side'&&!surface.hidden,"+
+              "value:select.value,hidden:surface.hidden,identity:api.identity};"+
+            "}catch(error){return {ok:false,error:String(error?.stack||error)}}})()"
+        });
+        if(diffMode.result?.value?.ok===true)break;
+        await sleep(100);
+      }
+      if(diffMode?.result?.value?.ok!==true)
+        throw Error("F3 Monaco Diff controls failed in Chromium: "+
+          JSON.stringify({value:diffMode?.result?.value,exception:diffMode?.exceptionDetails}));
       // F2 must render actual React Flow canvases from the pinned v1alpha5
       // Source projection, not just the F1 text summary.
       const graphTab=await command("Runtime.evaluate",{
