@@ -625,7 +625,7 @@ test("F4 Workbench Refine + history is session-only, shows Context origin, and r
   assert.match(source,/buildRefinementTask/);
   assert.ok(source.includes("history.record("));
   assert.ok(source.includes("history.inspect("));
-  assert.match(source,/activeSession\\.pending = null/);
+  assert.ok(source.includes("activeSession.pending = null"));
   assert.match(source,/contextStamp/);
   assert.match(source,/isLiveDocumentRevision/);
   assert.doesNotMatch(source,/localStorage\\.setItem|sessionStorage\\.setItem/);
