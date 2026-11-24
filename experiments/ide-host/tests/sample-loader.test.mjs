@@ -16,10 +16,12 @@ const uri=path=>({scheme:"file",path,toString(){return "file://"+path;}});
 const joinPath=(base,...paths)=>uri(posix.normalize(posix.join(base.path,...paths)));
 
 function host(candidateOverride=null,{
-  files:seedFiles=[],folders:seedFolders=[],bundledZipOverride=null
+  files:seedFiles=[],folders:seedFolders=[],bundledZipOverride=null,
+  staleStatAfterDelete=false
 }={}){
   const files=new Map(seedFiles.map(([path,value])=>[path,new Uint8Array(value)]));
   const folders=new Set(["/global-storage",...seedFolders]);
+  const staleStats=new Set();
   const workspace={workspaceFolders:[],fs:{
     async readFile(target){
       if(target.path==="/extension/samples/v1alpha5/files.json")
@@ -35,9 +37,10 @@ function host(candidateOverride=null,{
     async createDirectory(target){
       const parts=target.path.split("/").filter(Boolean);
       let current="";
-      for(const part of parts){current+="/"+part;folders.add(current);}
+      for(const part of parts){current+="/"+part;folders.add(current);staleStats.delete(current);}
     },
     async stat(target){
+      if(staleStats.has(target.path))return {type:1};
       if(files.has(target.path)||folders.has(target.path)||
          [...files.keys()].some(path=>path.startsWith(target.path+"/"))||
          [...folders].some(path=>path.startsWith(target.path+"/")))
@@ -69,11 +72,18 @@ function host(candidateOverride=null,{
       const prefix=target.path+"/";
       let found=false;
       for(const path of [...files.keys()]){
-        if(path===target.path||path.startsWith(prefix)){files.delete(path);found=true;}
+        if(path===target.path||path.startsWith(prefix)){
+          if(staleStatAfterDelete)staleStats.add(path);
+          files.delete(path);found=true;
+        }
       }
       for(const path of [...folders]){
-        if(path===target.path||path.startsWith(prefix)){folders.delete(path);found=true;}
+        if(path===target.path||path.startsWith(prefix)){
+          if(staleStatAfterDelete)staleStats.add(path);
+          folders.delete(path);found=true;
+        }
       }
+      if(staleStatAfterDelete)staleStats.add(target.path);
       if(!found)throw Object.assign(Error("missing"),{code:"FileNotFound"});
     },
     async rename(source,destination){
@@ -85,19 +95,20 @@ function host(candidateOverride=null,{
       await this.createDirectory(uri(posix.dirname(to)));
       for(const folder of folderEntries){
         const suffix=folder===from?"":folder.slice(from.length);
-        folders.add(to+suffix);
+        folders.add(to+suffix);staleStats.delete(to+suffix);
       }
       for(const [path,value] of fileEntries){
         const suffix=path===from?"":path.slice(from.length);
-        files.set(to+suffix,new Uint8Array(value));
+        files.set(to+suffix,new Uint8Array(value));staleStats.delete(to+suffix);
       }
+      staleStats.delete(to);
       for(const [path] of fileEntries)files.delete(path);
       for(const path of folderEntries)folders.delete(path);
     },
     async writeFile(target,bytes){
       const parent=posix.dirname(target.path);
       assert.ok(folders.has(parent),"parent directory must exist: "+parent);
-      files.set(target.path,new Uint8Array(bytes));
+      files.set(target.path,new Uint8Array(bytes));staleStats.delete(target.path);
     }
   }};
   return {vscode:{Uri:{file:uri,joinPath},workspace},files,folders,workspace};
@@ -345,6 +356,27 @@ test("Example-only migration refuses unrelated workspaces, legacy sources and us
   assert.equal((await ensureOpenedExampleInterface(h.vscode,
     uri("/extension"),uri("/global-storage"))).status,"PRESERVED");
   assert.equal(decode(h.files.get(root+"/.vscode/settings.json")),'{"editor.fontSize":18}');
+});
+
+test("Explicit replacement rewrites deleted files when the host retains stale stat results",async()=>{
+  const h=host(null,{staleStatAfterDelete:true});
+  const first=await seedExampleProject(h.vscode,uri("/extension"),uri("/global-storage"));
+  const projectRoot=first.root.path;
+  await h.vscode.workspace.fs.createDirectory(uri(projectRoot+"/lib"));
+  await h.vscode.workspace.fs.createDirectory(uri(projectRoot+"/output"));
+  h.files.set(projectRoot+"/local-note.md",new TextEncoder().encode("retired"));
+  const replaced=await seedExampleProject(h.vscode,uri("/extension"),uri("/global-storage"),
+    {replaceExisting:true});
+  assert.equal(replaced.replacedExisting,true);
+  assert.equal(replaced.created,total);
+  assert.equal(replaced.skipped,0);
+  assert.equal(replaced.readmeUpdated,true);
+  assert.ok(h.files.has(procedurePath));
+  assert.ok(h.files.has(masProcedurePath));
+  assert.match(decode(h.files.get(procedurePath)),/^start:/m);
+  assert.equal(h.files.has(projectRoot+"/local-note.md"),false);
+  assert.equal(h.folders.has(projectRoot+"/lib"),false);
+  assert.equal(h.folders.has(projectRoot+"/output"),false);
 });
 
 test("Explicit replacement resets .vscode user settings only after rebuilding the Example",async()=>{
