@@ -2170,6 +2170,17 @@ try{
       }catch{/* The acceptance profile is ephemeral; never hide the primary failure. */}
       await new Promise(resolve=>mockGateway.close(resolve));
     }
+    // Exercise the actual browser Worker against the official v2.1.0
+    // Development Build fixture, including VerifyDevelopment and tamper rejection.
+    const compilerWorker=await nativeCommand("skillStudio.internal.compilerWorkerAcceptance");
+    if(compilerWorker?.compilerVersion!=="2.1.0"||
+       compilerWorker?.developmentBuild!=="PASS"||
+       compilerWorker?.developmentVerify!=="PASS"||
+       compilerWorker?.developmentExecutionStatus!=="NOT_ADMITTED"||
+       compilerWorker?.tamperedArtifactRejected!==true){
+      throw Error("Compiler v2.1.0 browser Worker acceptance failed: "+JSON.stringify(compilerWorker));
+    }
+    console.log("STUDIO_COMPILER_V2_1_BROWSER_WORKER_ACCEPTANCE_PASS",JSON.stringify(compilerWorker));
     // The backend CI host enables this fixture-only command explicitly.
     // Unlike the unqualified 5GC mock proposal above, this verifies an exact
     // Compiler-qualified candidate in the native VS Code/Theia editor.
