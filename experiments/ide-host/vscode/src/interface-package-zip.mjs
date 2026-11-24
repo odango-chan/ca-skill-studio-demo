@@ -29,11 +29,20 @@ function bytesAt(bytes,p,n){
   return bytes.subarray(p,p+n);
 }
 function pathname(bytes){
-  let path;
-  try{path=decoder.decode(bytes);}catch{fail('invalid UTF-8 ZIP entry name');}
-  try{validateSnapshotPath(path);}catch{fail('unsafe ZIP entry path');}
-  if(path==='manifest.json')fail('reserved snapshot manifest name');
-  return path;
+  let raw;
+  try{raw=decoder.decode(bytes);}catch{fail('invalid UTF-8 ZIP entry name');}
+  // zip -qr archive . from the canonical Provider release includes ./ and
+  // ./schemas/ directory entries. Normalize this one archive-root prefix,
+  // never arbitrary dot/parent traversal or path rewriting inside files.
+  const root=raw==='./';
+  const normalized=raw.startsWith('./')?raw.slice(2):raw;
+  const directory=root||normalized.endsWith('/');
+  const path=root?'.':directory?normalized.slice(0,-1):normalized;
+  if(!root){
+    try{validateSnapshotPath(path);}catch{fail('unsafe ZIP entry path');}
+    if(path==='manifest.json')fail('reserved snapshot manifest name');
+  }
+  return {path,directory};
 }
 async function inflate(raw,method,size){
   if(method===0){
@@ -93,8 +102,10 @@ export async function decodeInterfacePackageZip(bytes){
        ![0,8].includes(method)||size>MAX_FILE||compressed>MAX_ZIP)
       fail('unsafe ZIP flags, method or entry size');
     const unixMode=(external>>>16)&0xf000;
-    if(unixMode!==0&&unixMode!==0x8000)fail('ZIP symlinks and special files unsupported');
-    const path=pathname(bytesAt(bytes,p+46,nameLen));
+    const {path,directory}=pathname(bytesAt(bytes,p+46,nameLen));
+    if(unixMode!==0&&unixMode!==(directory?0x4000:0x8000))
+      fail('ZIP symlinks, special files or mismatched entry types unsupported');
+    if(directory&&size!==0)fail('nonempty ZIP directory');
     if(names.has(path.toLowerCase()))fail('duplicate or case-colliding ZIP path');
     names.add(path.toLowerCase());
     total+=size;
@@ -105,12 +116,13 @@ export async function decodeInterfacePackageZip(bytes){
       fail('ZIP central/local header mismatch');
     const localNameLen=read16(view,localOffset+26),localExtra=read16(view,localOffset+28);
     const localName=pathname(bytesAt(bytes,localOffset+30,localNameLen));
-    if(localName!==path)fail('ZIP local filename mismatch');
+    if(localName.path!==path||localName.directory!==directory)
+      fail('ZIP local filename mismatch');
     const start=localOffset+30+localNameLen+localExtra;
     const end=start+compressed;
     if(end>cdStart||start<localOffset+30)fail('ZIP data overlaps directory');
     ranges.push([localOffset,end]);
-    entries.push({path,compressed:bytesAt(bytes,start,compressed),
+    entries.push({path,directory,compressed:bytesAt(bytes,start,compressed),
       method,size,checksum});
     p=next;
   }
@@ -118,11 +130,16 @@ export async function decodeInterfacePackageZip(bytes){
   ranges.sort((a,b)=>a[0]-b[0]);
   for(let i=1;i<ranges.length;i++)
     if(ranges[i][0]<ranges[i-1][1])fail('overlapping ZIP local entries');
-  const files=[];
+  const files=[],directories=[];
   for(const entry of entries){
     const expanded=await inflate(entry.compressed,entry.method,entry.size);
     if(crc32(expanded)!==entry.checksum)fail('ZIP CRC mismatch: '+entry.path);
-    files.push({path:entry.path,bytes:expanded});
+    if(entry.directory)directories.push(entry.path);
+    else files.push({path:entry.path,bytes:expanded});
+  }
+  for(const dir of directories){
+    if(dir!=='.'&&!files.some(file=>file.path.startsWith(dir+'/')))
+      fail('orphan or unlisted ZIP directory: '+dir);
   }
   return verifyInterfacePackageFiles(files);
 }
