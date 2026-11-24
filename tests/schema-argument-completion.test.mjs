@@ -130,5 +130,5 @@ test('wrong dialect or absent Tool does not invent input fields',async()=>{
   const changedStage=document.replace('observation:', 'operation:');
   assert.equal(completion(changedStage,hints),null);
   const absent=completion(document,[]);
-  assert.equal(absent.length,0);
+  assert.equal(absent,null);
 });
