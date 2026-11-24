@@ -431,9 +431,11 @@ export function registerDependencyIntegration(vscode,context,{onLockChanged=()=>
   // lifecycle without touching project settings or importing a fake lock.
   command("skillStudio.internal.browserZipPickerAcceptance",async()=>{
     const picked=await pickBrowserInterfaceZip(vscode);
-    return picked
-      ?{status:"SELECTED",bytes:picked.bytes.length,digest:await sha256(picked.bytes)}
-      :{status:"CANCELLED"};
+    if(!picked)return {status:"CANCELLED"};
+    const verified=await decodeInterfacePackageZip(picked.bytes);
+    return {status:"VERIFIED",syntheticOnly:true,bytes:picked.bytes.length,
+      digest:await sha256(picked.bytes),packageId:verified.manifest.packageId,
+      version:verified.manifest.version,exportCount:verified.manifest.exports.length};
   });
   // Chromium-only acceptance surface. Synthetic content is never registered
   // as a dependency, persisted as a lock or advertised as Owner-qualified.
