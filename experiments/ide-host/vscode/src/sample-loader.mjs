@@ -2,6 +2,10 @@
 // Replacing an existing Example is a deliberate, user-confirmed operation that
 // deletes the Example root and recreates it from the single pinned v1alpha5 source.
 // Ordinary projects are never passed to this importer. It never creates lib/ or output/.
+import {writeImmutableSnapshot} from "./dependency-service.mjs";
+import {EXAMPLE_INTERFACE_ARCHIVE,prepareExampleInterfaceDependency,
+  exampleWorkspaceSettingsContent} from "./example-interface-dependency.mjs";
+
 export const EXAMPLE_PROJECT_NAME="skill-studio-demo";
 const SKILLS=Object.freeze(["establish-pdu-session","establish-pdu-session-mas","modify-pdu-session-mas","release-pdu-session-mas"]);
 const decoder=new TextDecoder();
@@ -138,6 +142,15 @@ export async function seedExampleProject(vscode,extensionUri,storageUri,
       });
     };
     const candidate=await readManifest();
+    // Validate the EXACT bundled release ZIP before touching even an existing
+    // Example. A missing/corrupt asset must never partially replace user work.
+    phase="verify-pinned-example-interface";
+    const exampleInterface=await prepareExampleInterfaceDependency(
+      await readBundledResource(vscode,vscode.Uri.joinPath(
+        extensionUri,"samples","v1alpha5","interface-package",
+        EXAMPLE_INTERFACE_ARCHIVE+".b64"
+      ))
+    );
     const root=vscode.Uri.joinPath(storageUri,EXAMPLE_PROJECT_NAME);
     const skillsRoot=vscode.Uri.joinPath(root,"skills");
     const exists=async uri=>{
@@ -196,13 +209,31 @@ export async function seedExampleProject(vscode,extensionUri,storageUri,
       report({phase:"files",completed:created+skipped,total});
     }
 
+    // Only the built-in Example gets this dependency. A fresh or explicitly
+    // replaced Example receives a pinned snapshot + .vscode/settings.json.
+    // Existing user settings are never rewritten on a non-replacing reopen;
+    // this also respects users who intentionally removed ca-client.
+    const settingsUri=vscode.Uri.joinPath(root,".vscode","settings.json");
+    let exampleDependencySeeded=false;
+    if(!(await exists(settingsUri))){
+      phase="persist-example-interface-snapshot";
+      const persisted=await writeImmutableSnapshot(vscode,root,exampleInterface.files);
+      if(persisted.snapshotDigest!==exampleInterface.snapshotDigest)
+        fail("Example Interface Package snapshot digest mismatch");
+      phase="write-example-project-settings";
+      await fs.createDirectory(vscode.Uri.joinPath(root,".vscode"));
+      await fs.writeFile(settingsUri,exampleWorkspaceSettingsContent(exampleInterface));
+      exampleDependencySeeded=true;
+    }
+
     if(replacedExisting){
       phase="verify-replaced-example";
       if(created!==total||skipped!==0||!readmeUpdated)
         fail("Confirmed Example replacement was incomplete: "+
           JSON.stringify({created,skipped,total,readmeUpdated}));
       const rootNames=(await fs.readDirectory(root)).map(([name])=>name).sort();
-      if(JSON.stringify(rootNames)!==JSON.stringify(["README.md","skills"]))
+      if(JSON.stringify(rootNames)!==
+         JSON.stringify([".skill-studio",".vscode","README.md","skills"]))
         fail("Retired Example root contents remain after replacement: "+
           rootNames.join(", "));
       const skillNames=(await fs.readDirectory(skillsRoot))
@@ -220,7 +251,10 @@ export async function seedExampleProject(vscode,extensionUri,storageUri,
       sourceSha:candidate.sourceSha,
       sourceShas:{v1alpha5:candidate.sourceSha},
       candidateFiles:candidate.files.length,
-      files:total,created,skipped,replacedExisting,readmeUpdated
+      files:total,created,skipped,replacedExisting,readmeUpdated,
+      exampleDependencySeeded,
+      exampleDependencyId:exampleInterface.declaration.id,
+      exampleDependencySnapshotDigest:exampleInterface.snapshotDigest
     };
   }catch(error){throw Error(phase+": "+String(error?.message??error));}
 }
