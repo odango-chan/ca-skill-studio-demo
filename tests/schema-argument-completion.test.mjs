@@ -71,7 +71,7 @@ async function locked(overrides={}){
     }))};
 }
 function completion(source,hints,search='        '){
-  const at=source.indexOf(search,source.indexOf('arguments:'));
+  const at=source.lastIndexOf(search,source.indexOf('      routes:'));
   assert.ok(at>=0,'fixture missing argument line');
   const offset=at+search.length;
   const line=source.slice(0,offset).split('\n').length-1;
@@ -120,9 +120,9 @@ test('completed arguments suppress duplicates; enum values come from Schema',asy
   assert.equal(values[0].textEdit.newText,'"DETAILED"');
 });
 test('wrong dialect or absent Tool does not invent input fields',async()=>{
-  const wrong=projectLockedInterfaceCompletionHints(
-    await locked({$schema:'https://json-schema.org/draft/2019-09/schema'}));
-  assert.equal(wrong.length,0);
+  await assert.rejects(
+    ()=>locked({$schema:'https://json-schema.org/draft/2019-09/schema'}),
+    /published Schema ID or dialect mismatch/);
   const hints=projectLockedInterfaceCompletionHints(await locked());
   const unrelated=document.replace('ca-client::context.smf.session.read',
     'ca-client::other.read');
