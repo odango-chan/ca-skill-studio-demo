@@ -292,6 +292,7 @@ test('Schema-backed value stems guide typing from Context and producer Node',asy
   const output=pathProcedure.replace('read.observation.output.','read.observation.');
   assert.deepEqual(pathCompletion(output,enriched,
     '        payload: read.observation.').map(x=>x.label),['output']);
-  assert.equal(pathCompletion(stage,hints,'        payload: read.'),null,
+  const withoutOutput=hints.map(({outputProperties,outputSchemaId,...entry})=>entry);
+  assert.equal(pathCompletion(stage,withoutOutput,'        payload: read.'),null,
     'Do not suggest producer output without an exported output Schema');
 });
