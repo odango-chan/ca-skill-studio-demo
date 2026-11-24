@@ -1,7 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {readFileSync} from "node:fs";
-import {calculateSnapshot,verifyLockedFiles,decodeBase64,canonicalJson}
+import {calculateSnapshot,calculateCompilerDependencySnapshotDigest,
+ verifyLockedFiles,decodeBase64,canonicalJson}
  from "../vscode/src/dependency-snapshot.mjs";
 const vector=JSON.parse(readFileSync(
   "experiments/ide-host/tests/fixtures/compiler-v01-snapshot-vectors.json","utf8"));
@@ -38,6 +39,42 @@ test("unsafe and duplicated relative paths fail before digest",async()=>{
   await assert.rejects(calculateSnapshot([
     {path:"a.json",bytes:new Uint8Array()},{path:"a.json",bytes:new Uint8Array()}
   ]),/Duplicate/);
+});
+test("Compiler v2.1.0 Development snapshot digest matches frozen raw-byte framing",async()=>{
+  const enc=new TextEncoder();
+  const files=[
+    {path:"schemas/a.schema.json",bytes:enc.encode("{\"type\":\"object\"}\n")},
+    {path:"package.json",bytes:enc.encode("{\"apiVersion\":\"connectionagent.io/interface-package/v1alpha1\"}\n")}
+  ];
+  const expected="sha256:a399ffd6f6f2d54b4c73f276415172faeccb0bc653b9dc98bf42eb6523529423";
+  assert.equal(await calculateCompilerDependencySnapshotDigest(files),expected);
+  assert.equal(await calculateCompilerDependencySnapshotDigest([...files].reverse()),expected);
+  const single=await calculateCompilerDependencySnapshotDigest([
+    {path:"package.json",bytes:enc.encode("{}")}
+  ]);
+  assert.equal(single,"sha256:6a69101004ac585ded11fcc3370e8dc6723f9360966109e87dea293c6e223b7f");
+  const tampered=files.map(file=>({path:file.path,bytes:file.bytes.slice()}));
+  tampered[0].bytes[2]^=1;
+  assert.notEqual(await calculateCompilerDependencySnapshotDigest(tampered),expected);
+  // The old Studio cache digest remains a separate format and must not be
+  // mistaken for the Compiler v2.1.0 Interface Package snapshot identity.
+  assert.notEqual((await calculateSnapshot(files)).snapshotDigest,expected);
+});
+const compilerDevelopmentFixture=JSON.parse(readFileSync(
+  "experiments/ide-host/tests/fixtures/compiler-v2.1-development-request.json","utf8"));
+test("Compiler v2.1.0 published Development Build fixture confirms snapshot digests",async()=>{
+  assert.equal(compilerDevelopmentFixture.apiVersion,
+    "connectionagent.io/compiler-development-build-request/v1alpha1");
+  assert.equal(compilerDevelopmentFixture.lock.apiVersion,
+    "connectionagent.io/interface-dependency-lock/v1alpha1");
+  assert.equal(compilerDevelopmentFixture.snapshots.length,3);
+  for(const snapshot of compilerDevelopmentFixture.snapshots){
+    const files=snapshot.files.map(file=>({
+      path:file.path,bytes:decodeBase64(file.bytes)
+    }));
+    assert.equal(await calculateCompilerDependencySnapshotDigest(files),
+      snapshot.key.snapshotDigest,snapshot.key.packageId);
+  }
 });
 test("canonical Tool Contract JSON ignores object insertion order",()=>{
   const a={apiVersion:"skillc.tool/v0.1",operations:[{id:"ping",inputSchema:{type:"object"},

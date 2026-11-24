@@ -58,58 +58,58 @@ function validateRelativePath(path) {
  * The caller must provide independently authenticated dependency/Owner inputs;
  * this adapter never manufactures trust from local source or lock metadata.
  */
+/**
+ * Create the shared, bounded Skill source-file projection. Both frozen
+ * v1alpha5 BuildRequest and v2.1.0 Development Build use the same exact
+ * source paths and UTF-8 bytes; only their dependency/link contracts differ.
+ */
+export function createCompilerSourceFiles({packageName,documents}={}){
+  if(typeof packageName!=="string"||!PACKAGE_NAME.test(packageName))
+    throw new Error("Skill Package name is not a valid v1alpha5 target");
+  if(!Array.isArray(documents)||!documents.length)
+    throw new Error("A complete Skill source snapshot is required");
+  const seen=new Set(),files=[];
+  let totalBytes=0;
+  for(const document of documents){
+    if(typeof document?.relativePath==="string"&&
+       /^tests\/[^/]+\.route-scenario\.json$/i.test(document.relativePath))continue;
+    if(!isCompilerTextSource(document?.relativePath))continue;
+    const relativePath=validateRelativePath(document.relativePath);
+    if(typeof document.text!=="string")
+      throw new Error("Skill source is not valid UTF-8 text: "+relativePath);
+    const path="skills/"+packageName+"/"+relativePath;
+    if(encoder.encode(path).byteLength>240||seen.has(path))
+      throw new Error("Duplicate or overlong Compiler source path: "+path);
+    seen.add(path);
+    const bytes=encoder.encode(document.text);
+    if(bytes.byteLength>1024*1024)
+      throw new Error("Skill source exceeds the Studio 1 MiB file limit: "+relativePath);
+    totalBytes+=bytes.byteLength;
+    if(totalBytes>4*1024*1024||files.length>=512)
+      throw new Error("Skill source exceeds the bounded Studio Compiler snapshot limit");
+    files.push({path,bytes:encodeBase64(bytes)});
+  }
+  if(!files.length)throw new Error("No supported text source files were found in this Skill");
+  files.sort((a,b)=>compareUtf8(a.path,b.path));
+  return files;
+}
+
 export function createCompilerBuildRequest({
   packageName,
   documents,
-  resolvedDependencies = [],
+  resolvedDependencies=[],
   trustedBuildContext
-} = {}) {
-  if (typeof packageName !== "string" || !PACKAGE_NAME.test(packageName)) {
-    throw new Error("Skill Package name is not a valid v1alpha5 target");
-  }
-  if (!Array.isArray(documents) || !documents.length) {
-    throw new Error("A complete Skill source snapshot is required");
-  }
-  if (!Array.isArray(resolvedDependencies)) {
+}={}){
+  if(!Array.isArray(resolvedDependencies))
     throw new Error("resolvedDependencies must be an array");
-  }
-
-  const seen = new Set();
-  const files = [];
-  let totalBytes = 0;
-  for (const document of documents) {
-    if (typeof document?.relativePath === "string" &&
-        /^tests\/[^/]+\.route-scenario\.json$/i.test(document.relativePath)) continue;
-    if (!isCompilerTextSource(document?.relativePath)) continue;
-    const relativePath = validateRelativePath(document.relativePath);
-    if (typeof document.text !== "string") {
-      throw new Error("Skill source is not valid UTF-8 text: " + relativePath);
-    }
-    const path = "skills/" + packageName + "/" + relativePath;
-    if (encoder.encode(path).byteLength > 240 || seen.has(path)) {
-      throw new Error("Duplicate or overlong Compiler source path: " + path);
-    }
-    seen.add(path);
-    const bytes = encoder.encode(document.text);
-    if (bytes.byteLength > 1024 * 1024) {
-      throw new Error("Skill source exceeds the Studio 1 MiB file limit: " + relativePath);
-    }
-    totalBytes += bytes.byteLength;
-    if (totalBytes > 4 * 1024 * 1024 || files.length >= 512) {
-      throw new Error("Skill source exceeds the bounded Studio Compiler snapshot limit");
-    }
-    files.push({ path, bytes: encodeBase64(bytes) });
-  }
-  if (!files.length) throw new Error("No supported text source files were found in this Skill");
-  files.sort((a, b) => compareUtf8(a.path, b.path));
-
+  const files=createCompilerSourceFiles({packageName,documents});
   return {
-    apiVersion: COMPILER_API_VERSION,
-    languageTarget: COMPILER_LANGUAGE_TARGET,
+    apiVersion:COMPILER_API_VERSION,
+    languageTarget:COMPILER_LANGUAGE_TARGET,
     files,
-    resolvedDependencies: [...resolvedDependencies],
-    targets: [packageName],
-    ...(trustedBuildContext === undefined ? {} : {trustedBuildContext})
+    resolvedDependencies:[...resolvedDependencies],
+    targets:[packageName],
+    ...(trustedBuildContext===undefined?{}:{trustedBuildContext})
   };
 }
 
