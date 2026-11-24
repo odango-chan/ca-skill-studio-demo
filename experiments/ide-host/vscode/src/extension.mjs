@@ -13,7 +13,8 @@ function newNonce(){
   globalThis.crypto.getRandomValues(bytes);
   return [...bytes].map(n=>n.toString(16).padStart(2,"0")).join("");
 }
-import {EXAMPLE_PROJECT_NAME,seedExampleProject} from "./sample-loader.mjs";
+import {EXAMPLE_PROJECT_NAME,seedExampleProject,
+  ensureOpenedExampleInterface} from "./sample-loader.mjs";
 import {openProjectFolder,isSingleFolderWorkspace,restorePendingExampleProject,PENDING_EXAMPLE_OPEN_KEY} from "./project-navigation.mjs";
 import {registerProjectWelcome} from "./project-welcome.mjs";
 
@@ -919,6 +920,20 @@ export function activate(context){
         groups,visibleEditors,maxViewColumn,
         pythonColumn,ordinaryYamlColumn};
     }));
+  // One-time, non-destructive upgrade for an already-open Example from an
+  // earlier Studio. Never mutate another workspace or existing user settings.
+  // This runs after extension providers are registered, before navigation.
+  void ensureOpenedExampleInterface(vscode,context.extensionUri,
+    context.globalStorageUri).then(async result=>{
+      if(result.status==="SEEDED"){
+        console.log("STUDIO_EXAMPLE_INTERFACE_MIGRATED",JSON.stringify(result));
+        workbench?.invalidateDependencyAnalysis?.();
+        try{await vscode.commands.executeCommand("skillStudio.refreshDependencies");}
+        catch{/* The lock is already durable; the next Explorer read verifies it. */}
+      }
+    },error=>{
+      console.warn("STUDIO_EXAMPLE_INTERFACE_MIGRATION_BLOCKED",String(error?.message??error));
+    });
   // Welcome was registered first so it remains available after optional failures.
   // Open Example switches to a named folder, which restarts the extension host.
   // Complete the user-requested default Procedure open only after the new
