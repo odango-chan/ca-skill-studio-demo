@@ -41,6 +41,21 @@ function stageContext(source,lineStart){
   }
   return {stage,section,tool,existing};
 }
+function keysAfterCursor(source,offset){
+  const end=source.indexOf('\n',offset);
+  if(end<0)return new Set();
+  const found=new Set();
+  for(const line of source.slice(end+1).split(/\r?\n/)){
+    if(!line.trim()||/^\s*#/.test(line))continue;
+    // Nested object/sequence content under an argument stays in this scope.
+    const member=/^ {8}([A-Za-z_][A-Za-z0-9_-]*):(?:\s|$)/.exec(line);
+    if(member){found.add(member[1]);continue;}
+    if(/^ {8,}/.test(line))continue;
+    // The first sibling routes/tool/stage/Node ends this arguments map.
+    break;
+  }
+  return found;
+}
 function edit(start,end,lineStart,newText,kind,label,detail,documentation,sortText){
   return {
     label,kind,detail,documentation,
@@ -75,8 +90,9 @@ export function schemaArgumentCompletions(snapshot,document,prefix,offset,lineSt
   if(key){
     const typed=key[1]??'';
     const start=offset-typed.length;
+    const seen=new Set([...context.existing,...keysAfterCursor(document.text,offset)]);
     return properties.filter(p=>p.name.startsWith(typed)&&
-      !context.existing.has(p.name)).sort((a,b)=>
+      !seen.has(p.name)).sort((a,b)=>
       Number(Boolean(b.required))-Number(Boolean(a.required))||
       a.name.localeCompare(b.name)).map(p=>{
       const detail=(p.required?'required · ':'optional · ')+p.type+
