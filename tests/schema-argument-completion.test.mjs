@@ -9,6 +9,8 @@ import {projectLockedInterfaceCompletionHints}
   from '../experiments/ide-host/vscode/src/interface-schema-completion.mjs';
 import {schemaArgumentCompletions}
   from '../language/schema-argument-completions.mjs';
+import {schemaValuePathCompletions}
+  from '../language/schema-value-path-completions.mjs';
 
 const enc=new TextEncoder(),SCHEMA='urn:wtlab:input:v1',OUTPUT='urn:wtlab:output:v1';
 const inputSchema={
@@ -131,4 +133,103 @@ test('wrong dialect or absent Tool does not invent input fields',async()=>{
   assert.equal(completion(changedStage,hints),null);
   const absent=completion(document,[]);
   assert.equal(absent,null);
+});
+
+
+const requestSchema=[
+  '$schema: https://json-schema.org/draft/2020-12/schema',
+  'type: object',
+  'properties:',
+  '  dnn: {type: string, description: Data Network Name}',
+  '  sNssai:',
+  '    type: object',
+  '    properties:',
+  '      sst: {type: integer, description: Slice/Service Type}',
+  '      sd: {type: string}',
+  ''
+].join('\n');
+const contractSource='requestSchema: schemas/request.schema.yaml\n';
+function pathCompletion(text,hints=[],cursorText){
+  const index=text.indexOf(cursorText);
+  assert.ok(index>=0,'Expected exact cursor fixture: '+cursorText);
+  const offset=index+cursorText.length,line=text.slice(0,offset).split('\n').length-1;
+  const lineStart=text.lastIndexOf('\n',offset-1)+1;
+  return schemaValuePathCompletions({
+    completeness:'complete',schemaCompletionHints:hints,documents:[
+      {relativePath:'assurance/contract.yaml',text:contractSource,version:1},
+      {relativePath:'schemas/request.schema.yaml',text:requestSchema,version:1}
+    ]
+  },{relativePath:'assurance/procedure.yaml',text},
+  text.slice(lineStart,offset),offset,lineStart,line);
+}
+const pathProcedure=[
+  'start: read',
+  'nodes:',
+  '  read:',
+  '    observation:',
+  '      tool: ca-client::context.smf.session.read',
+  '      arguments:',
+  '        supi: context.request.sNssai.',
+  '      routes:',
+  '        SUCCEEDED: update',
+  '  update:',
+  '    operation:',
+  '      tool: ca-client::other.write',
+  '      arguments:',
+  '        payload: read.observation.output.',
+  '      routes:',
+  '        FAILED: FAILED',
+  ''
+].join('\n');
+test('Request YAML Schema completes nested context.request fields and exact source replacement',()=>{
+  const suggestions=pathCompletion(pathProcedure,[],
+    '        supi: context.request.sNssai.');
+  assert.deepEqual(suggestions.map(x=>x.label),['sd','sst']);
+  assert.equal(suggestions[1].textEdit.newText,'sst');
+  assert.equal(suggestions[1].textEdit.range.start.character,
+    '        supi: context.request.sNssai.'.length);
+  assert.match(suggestions[1].detail,/AUTH_NOT_CHECKED/);
+  const nested=pathProcedure.replace('context.request.sNssai.','context.request.');
+  assert.deepEqual(pathCompletion(nested,[],
+    '        supi: context.request.').map(x=>x.label),['dnn','sNssai']);
+});
+test('imported published output Schema offers only dominating producer fields',async()=>{
+  const hints=projectLockedInterfaceCompletionHints(await locked());
+  const outputs=[{name:'context',type:'object',description:'Read result',
+    children:[{name:'supi',type:'string',description:'SUPI',children:null}]}];
+  const enriched=hints.map(h=>({...h,outputProperties:outputs}));
+  const completions=pathCompletion(pathProcedure,enriched,
+    '        payload: read.observation.output.');
+  assert.deepEqual(completions.map(x=>x.label),['context']);
+  const nested=pathProcedure.replace('payload: read.observation.output.',
+    'payload: read.observation.output.context.');
+  assert.deepEqual(pathCompletion(nested,enriched,
+    '        payload: read.observation.output.context.').map(x=>x.label),['supi']);
+  const bypass=pathProcedure
+    .replace('start: read','start: alternative')
+    .replace('  read:\n','  alternative:\n    observation:\n      tool: ca-client::context.smf.session.read\n      routes:\n        SUCCEEDED: update\n  read:\n');
+  assert.deepEqual(pathCompletion(bypass,enriched,
+    '        payload: read.observation.output.'),[]);
+  const misplaced=pathProcedure.replace('read.observation.output.','update.operation.output.');
+  assert.deepEqual(pathCompletion(misplaced,enriched,
+    '        payload: update.operation.output.'),[]);
+});
+test('an unverified or absent Schema never guesses context/output fields',()=>{
+  const unsupported=requestSchema.replace('draft/2020-12','draft/2019-09');
+  const value=pathProcedure;
+  const hint=[{id:'ca-client::context.smf.session.read',kind:'observation',
+    trust:'DECLARATION_ONLY',outputProperties:[{name:'status',type:'string',children:null}]}];
+  assert.deepEqual(pathCompletion(value,[], '        payload: read.observation.output.'),[]);
+  assert.deepEqual(schemaValuePathCompletions({
+    completeness:'complete',schemaCompletionHints:hint,
+    documents:[
+      {relativePath:'assurance/contract.yaml',text:contractSource},
+      {relativePath:'schemas/request.schema.yaml',text:unsupported}
+    ]
+  },{relativePath:'assurance/procedure.yaml',text:value},
+  '        supi: context.request.sNssai.',
+  value.indexOf('        supi: context.request.sNssai.')+
+    '        supi: context.request.sNssai.'.length,
+  value.lastIndexOf('\n',value.indexOf('        supi: context.request.sNssai.'))+1,
+  6),[]);
 });
