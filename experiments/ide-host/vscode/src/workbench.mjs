@@ -1400,7 +1400,7 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
           const queryToolCompletion=await complete(procedureDocument,
             "tool: ca-client::openamsm.smf.mas.sc.q");
           const querySource=procedureDocument.getText();
-          const queryArgumentsAnchor="      arguments:\\n        ";
+          const queryArgumentsAnchor="      arguments:\n        ";
           const queryArgumentsStart=querySource.lastIndexOf(queryArgumentsAnchor);
           if(queryArgumentsStart<0)
             throw Error("Pinned ca-client query arguments probe anchor is missing");
