@@ -1,3 +1,6 @@
+import { Agent } from '@theia/ai-core/lib/common/agent';
+import { ChatAgent, ChatAgentLocation } from '@theia/ai-chat/lib/common/chat-agents';
+import { MutableChatRequestModel, TextChatResponseContentImpl } from '@theia/ai-chat/lib/common/chat-model';
 import { ContainerModule, decorate, injectable } from '@theia/core/shared/inversify';
 import { FrontendApplicationContribution } from '@theia/core/lib/browser/frontend-application-contribution';
 import type { FrontendApplication } from '@theia/core/lib/browser/frontend-application';
@@ -7,7 +10,7 @@ import { MAIN_AREA_CLASS } from '@theia/core/lib/browser/shell/application-shell
 import { TheiaDockPanel } from '@theia/core/lib/browser/shell/theia-dock-panel';
 import { Widget, type DockPanel } from '@theia/core/lib/browser/widgets/widget';
 import { CommandRegistry } from '@theia/core/lib/common/command';
-import { EditorManager } from '@theia/editor/lib/browser/editor-manager';
+import { EditorPreviewManager } from '@theia/editor-preview/lib/browser/editor-preview-manager';
 import { constrainMainEditorPanelOptions, isMainEditorPanelOptions, createPreviewAutoRevealPreference, hasVisualizableSourceEditor } from './fixed-editor-panel-policy.mjs';
 
 // Dedicated Preview container: never nest the visualization beneath Inspector.
@@ -16,12 +19,13 @@ const PREVIEW_VIEW_ID = 'skillStudio.preview';
 const PREVIEW_WIDGET_ID = 'plugin-view:skillStudio.preview';
 
 const AI_WORKBENCH_VIEW = 'skillStudio.aiAuthoring';
+const STUDIO_CHAT_AGENT = Symbol('StudioChatAgent');
 
 function isAiWorkbench(widget: Widget | undefined) {
     return (widget as (Widget & { viewType?: string }) | undefined)?.viewType === AI_WORKBENCH_VIEW;
 }
 
-class StudioEditorManager extends EditorManager {
+class StudioEditorManager extends EditorPreviewManager {
     protected override updateCurrentEditor(): void {
         if (isAiWorkbench(this.shell.getCurrentWidget('main'))) {
             // Theia normally keeps the last native editor as current. Keeping
@@ -34,6 +38,51 @@ class StudioEditorManager extends EditorManager {
     }
 }
 decorate(injectable(), StudioEditorManager);
+
+interface StudioAgentResult {
+    summary?: string;
+    compilerState?: string;
+    canApply?: boolean;
+    cancelled?: boolean;
+    error?: string;
+}
+
+function createStudioChatAgent(commands: CommandRegistry): ChatAgent {
+    return {
+        id: 'SkillStudio',
+        name: 'SkillStudio',
+        description: 'Propose and check a change to the active Skill Procedure. Studio confirms disclosure and owns Apply and Undo.',
+        locations: [ChatAgentLocation.Panel],
+        variables: [], prompts: [], languageModelRequirements: [], agentSpecificVariables: [], functions: [],
+        async invoke(request: MutableChatRequestModel) {
+            const id = crypto.randomUUID();
+            const response = request.response;
+            const token = response.cancellationToken;
+            const task = request.request.text.replace(/^\s*@SkillStudio(?=\s|$)\s*/, '').trim();
+            if (token.isCancellationRequested) return;
+            const cancellation = token.onCancellationRequested(() => {
+                void commands.executeCommand('skillStudio.internal.cancelNativeAgent', id).catch(() => undefined);
+            });
+            try {
+                response.addProgressMessage({ content: '正在读取当前 Procedure，检查发送范围。' });
+                const result = await commands.executeCommand<StudioAgentResult>('skillStudio.internal.runNativeAgent', id, task);
+                if (token.isCancellationRequested || result?.cancelled) return;
+                if (!result?.summary) {
+                    response.response.addContent(new TextChatResponseContentImpl(result?.error || 'Studio 没有返回候选。'));
+                } else {
+                    response.response.addContent(new TextChatResponseContentImpl(
+                        result.summary + '\n\nCompiler Check · ' + (result.compilerState || 'UNAVAILABLE') +
+                        '\n\n点击顶部 AI Workbench 查看 Change Set 和 Diff。' +
+                        (result.canApply ? '审阅确认后可应用到当前文件。' : '当前候选仅供审阅。')
+                    ));
+                }
+                response.complete();
+            } finally {
+                cancellation.dispose();
+            }
+        }
+    };
+}
 
 function addWorkspaceModeControl(app: FrontendApplication, commands: CommandRegistry) {
     const shell = app.shell;
@@ -71,6 +120,11 @@ function addWorkspaceModeControl(app: FrontendApplication, commands: CommandRegi
         control.node.appendChild(button);
         return button;
     });
+    const chat = document.createElement('button');
+    chat.type = 'button';
+    chat.textContent = 'AI Chat';
+    chat.onclick = () => { void commands.executeCommand('aiChat:toggle'); };
+    control.node.appendChild(chat);
     const update = () => {
         const current = shell.getCurrentWidget('main');
         const active = isAiWorkbench(current) ? 0 :
@@ -88,7 +142,11 @@ function addWorkspaceModeControl(app: FrontendApplication, commands: CommandRegi
 }
 
 export default new ContainerModule((bind, unbind, isBound, rebind) => {
-    rebind(EditorManager).to(StudioEditorManager).inSingletonScope();
+    rebind(EditorPreviewManager).to(StudioEditorManager).inSingletonScope();
+    bind<ChatAgent>(STUDIO_CHAT_AGENT).toDynamicValue(({ container }) =>
+        createStudioChatAgent(container.get(CommandRegistry))).inSingletonScope();
+    bind(Agent).toService(STUDIO_CHAT_AGENT);
+    bind(ChatAgent).toService(STUDIO_CHAT_AGENT);
 
     // Theia does not expose VS Code's generated workbench.view.extension.*
     // commands through its extension host. Reveal the contributed secondary
