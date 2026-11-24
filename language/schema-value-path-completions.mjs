@@ -74,7 +74,7 @@ function graphInfo(source){
   const edges=new Map();
   for(const [id,node] of items){
     const out=new Set();
-    for(const stage of STAGES){
+    for(const stage of ["wait",...STAGES]){
       const routes=field(field(node,stage),"routes");
       if(routes===null||routes===undefined)continue;
       if(!isMap(routes))return null;
@@ -134,7 +134,7 @@ function producerTree(snapshot,graph,current,producer,stage){
   if(!isMap(segment))return null;
   // Node dominance is necessary, not sufficient. An earlier business stage
   // might branch to the consumer before this output was produced.
-  for(const earlier of STAGES.slice(0,STAGES.indexOf(stage))){
+  for(const earlier of ["wait",...STAGES.slice(0,STAGES.indexOf(stage))]){
     const routes=field(field(node,earlier),"routes");
     if(!isMap(routes))continue;
     for(const item of routes.items){
