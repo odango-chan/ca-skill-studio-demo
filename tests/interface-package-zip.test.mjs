@@ -49,7 +49,8 @@ test('locked published JSON Schema is verified without rewriting bytes',async()=
 });
 test('ZIP validation rejects wrong checksum, malformed schema identity and extra files',async()=>{
   for(const options of [{wrongHash:true},{wrongSchema:true},{extra:true}]){
-    await assert.rejects(()=>decodeInterfacePackageZip((await fixture(options)).bytes),
+    const {bytes}=await fixture(options);
+    await assert.rejects(()=>decodeInterfacePackageZip(bytes),
       /Interface Package ZIP BLOCKED/);
   }
 });
