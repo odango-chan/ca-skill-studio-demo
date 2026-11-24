@@ -124,7 +124,7 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
       }
     }
     const provider={
-      provideDocumentSemanticTokens(document,cancellationToken){
+      provideDocumentSemanticTokens(document,cancellationToken,activatedEditor){
         if(cancellationToken?.isCancellationRequested)
           return new vscode.SemanticTokens(new Uint32Array());
         const sourceText=document.getText();
@@ -144,7 +144,7 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
         semanticTokenDiagnostics.lastError=null;
         if(renderer){
           try{
-            const rendered=renderer.render(document,result.data);
+            const rendered=renderer.render(document,result.data,activatedEditor);
             semanticTokenDiagnostics.renderer="theia-text-editor-decoration";
             semanticTokenDiagnostics.renderedTokenCount=rendered.tokenCount;
             semanticTokenDiagnostics.renderedTypeCount=rendered.tokenTypeCount;
@@ -166,6 +166,18 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
       provider,
       legend
     );
+    if(renderer){
+      // Theia may keep Monaco's semantic-token provider result when a
+      // retained Webview temporarily replaces the same native editor. The
+      // decoration adapter can lose its own ranges when that model changes.
+      context.subscriptions.push(vscode.window.onDidChangeActiveTextEditor(editor=>{
+        const active=editor?.document;
+        if(active?.uri.scheme==="file"&&isProcedurePath(active.uri.path)&&
+           !renderer.hasCurrentRanges(active)){
+          provider.provideDocumentSemanticTokens(active,undefined,editor);
+        }
+      }));
+    }
     semanticTokenDiagnostics.registered=true;
     semanticTokenDiagnostics.tokenTypeCount=SKILL_SEMANTIC_TOKEN_TYPES.length;
     semanticTokenDiagnostics.transport="extension-host";
