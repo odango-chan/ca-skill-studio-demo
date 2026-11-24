@@ -446,12 +446,14 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
               operations.push(...catalog.operations);
             }
             if(dependency.kind==="interface-package"){
-              // Suggestions describe immutable declarations, never Owner trust.
+              // Keep each Callable's unqualified identity for Package Audit.
+              // Completion constructs alias::callable from this one declaration.
+              const catalog=indexV1Alpha4ToolCatalogCallables(dependency.id,decoded);
+              toolCatalogs.push({dependencyId:dependency.id,
+                available:catalog.available,reason:catalog.reason});
+              operations.push(...catalog.operations);
               const hints=projectLockedInterfaceCompletionHints(dependency);
               schemaCompletionHints.push(...hints);
-              operations.push(...hints.map(item=>({
-                id:item.id,dependencyId:item.dependencyId,kind:item.kind
-              })));
             }
             for(const file of decoded){
               const schemaFile=dependency.kind==="schema-bundle"
