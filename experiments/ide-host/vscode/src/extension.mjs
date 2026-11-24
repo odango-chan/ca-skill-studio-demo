@@ -13,7 +13,8 @@ function newNonce(){
   globalThis.crypto.getRandomValues(bytes);
   return [...bytes].map(n=>n.toString(16).padStart(2,"0")).join("");
 }
-import {EXAMPLE_PROJECT_NAME,seedExampleProject} from "./sample-loader.mjs";
+import {EXAMPLE_PROJECT_NAME,seedExampleProject,
+  ensureOpenedExampleInterface} from "./sample-loader.mjs";
 import {openProjectFolder,isSingleFolderWorkspace,restorePendingExampleProject,PENDING_EXAMPLE_OPEN_KEY} from "./project-navigation.mjs";
 import {registerProjectWelcome} from "./project-welcome.mjs";
 
@@ -27,6 +28,8 @@ import {registerPredicateCommands,mountPredicatePreview} from "./predicate-edito
 import {registerSchemaCommands,mountSchemaPreview} from "./schema-editor.mjs";
 import {registerPackageOverview} from "./package-overview.mjs";
 import {registerDependencyIntegration} from "./dependency-integration.mjs";
+import {resolveLockedDependencies} from "./dependency-service.mjs";
+import {projectLockedInterfaceCompletionHints} from "./interface-schema-completion.mjs";
 import {registerCompilerIntegration} from "./compiler-integration.mjs";
 import {registerPackageDiagnosticTesting} from "./package-diagnostic-testing.mjs";
 import {registerPackageRouteTesting} from "./package-route-testing.mjs";
@@ -543,6 +546,13 @@ export function activate(context){
         /^\s*start\s*:/m.test(procedureRead.text)&&
         /^\s*nodes\s*:/m.test(procedureRead.text)&&
         !/^\s*procedures\s*:/m.test(procedureRead.text));
+      const isExample=root?.toString?.()===exampleRoot.toString();
+      const dependencies=isExample
+        ?await resolveLockedDependencies(vscode,root):null;
+      const interfaceSnapshot=dependencies?.snapshots?.find(item=>
+        item.id==="ca-client"&&item.kind==="interface-package");
+      const interfaceHints=interfaceSnapshot
+        ?projectLockedInterfaceCompletionHints(interfaceSnapshot):[];
       return {
         workspaceName:vscode.workspace.name??null,
         workspaceFile:vscode.workspace.workspaceFile?.toString?.()??null,
@@ -557,6 +567,17 @@ export function activate(context){
         contractReadError:contractRead.error,procedureReadError:procedureRead.error,
         libExists:await exists(lib),
         outputExists:await exists(output),
+        ...(isExample?{exampleInterface:{
+          status:dependencies?.status,
+          imported:Boolean(interfaceSnapshot),
+          lockedDependencyCount:dependencies?.snapshots?.length??0,
+          availableCompletionCallables:interfaceHints.length,
+          contextReadHint:interfaceHints.some(item=>
+            item.id==="ca-client::openamsm.smf.mas.sc.query"&&
+            item.argumentProperties?.some(p=>p.name==="supi")),
+          qualification:"AUTH_NOT_CHECKED",
+          diagnostics:dependencies?.diagnostics?.map(item=>item.code)??[]
+        }}:{}),
         ...(seededApiVersion?{seededApiVersion}:{})
       };
     }
@@ -643,7 +664,10 @@ export function activate(context){
                 root:result.root.toString(),replaceRequested:replaceExisting,
                 replacedExisting:result.replacedExisting,
                 candidateFiles:result.candidateFiles,created:result.created,
-                skipped:result.skipped,readmeUpdated:result.readmeUpdated
+                skipped:result.skipped,readmeUpdated:result.readmeUpdated,
+                exampleDependencySeeded:result.exampleDependencySeeded,
+                exampleDependencyId:result.exampleDependencyId,
+                exampleDependencySnapshotDigest:result.exampleDependencySnapshotDigest
               }));
               if(replaceExisting&&(!result.replacedExisting||
                  result.created!==result.candidateFiles||result.skipped!==0||
@@ -896,6 +920,20 @@ export function activate(context){
         groups,visibleEditors,maxViewColumn,
         pythonColumn,ordinaryYamlColumn};
     }));
+  // One-time, non-destructive upgrade for an already-open Example from an
+  // earlier Studio. Never mutate another workspace or existing user settings.
+  // This runs after extension providers are registered, before navigation.
+  void ensureOpenedExampleInterface(vscode,context.extensionUri,
+    context.globalStorageUri).then(async result=>{
+      if(result.status==="SEEDED"){
+        console.log("STUDIO_EXAMPLE_INTERFACE_MIGRATED",JSON.stringify(result));
+        workbench?.invalidateDependencyAnalysis?.();
+        try{await vscode.commands.executeCommand("skillStudio.refreshDependencies");}
+        catch{/* The lock is already durable; the next Explorer read verifies it. */}
+      }
+    },error=>{
+      console.warn("STUDIO_EXAMPLE_INTERFACE_MIGRATION_BLOCKED",String(error?.message??error));
+    });
   // Welcome was registered first so it remains available after optional failures.
   // Open Example switches to a named folder, which restarts the extension host.
   // Complete the user-requested default Procedure open only after the new

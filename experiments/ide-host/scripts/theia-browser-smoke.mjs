@@ -851,6 +851,16 @@ try{
         extensionIdentity:identity,
         extensionConsoleReports:workspaceReports.slice(-3)}));
 
+  if(identity.exampleInterface?.status!=="READY"||
+     identity.exampleInterface?.imported!==true||
+     identity.exampleInterface?.availableCompletionCallables<11||
+     identity.exampleInterface?.contextReadHint!==true||
+     identity.exampleInterface?.qualification!=="AUTH_NOT_CHECKED")
+    throw Error("Default Example did not load its exact immutable ca-client-tools v1.1.0 Schema dependency: "+
+      JSON.stringify(identity.exampleInterface));
+  console.log("STUDIO_EXAMPLE_PINNED_INTERFACE_READY_CHROMIUM",JSON.stringify(
+    identity.exampleInterface
+  ));
   const frameTree=await command("Page.getFrameTree");
   const frames=[];
   const walkFrames=node=>{

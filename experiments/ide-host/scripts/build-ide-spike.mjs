@@ -183,10 +183,26 @@ for(const set of sampleSets){
     await mkdir(dirname(target),{recursive:true});
     await writeFile(target,bytes);
   }
+  // The release ZIP is a separate Provider artifact, NOT a ca-skills
+  // authored Skill file. Ship its exact, independently SHA-verified bytes as
+  // text so Theia/Pages and offline hosts seed the same immutable snapshot.
+  const artifact="ca-client-tools_interface_1.1.0.zip.b64";
+  const sourceAsset=join(set.source,"interface-package",artifact);
+  const base64=(await readFile(sourceAsset,"utf8")).trim();
+  const archive=Buffer.from(base64,"base64");
+  const digest="sha256:"+createHash("sha256").update(archive).digest("hex");
+  if(archive.length!==4289||
+     archive.toString("base64")!==base64||
+     digest!=="sha256:cbd8fad939844cda5474f33f18d3cdc015c69dd8c1dc3908e84bd5273ce6e71b")
+    throw Error("Bundled ca-client-tools v1.1.0 Interface Package differs from released ZIP");
+  const targetAsset=join(set.destination,"interface-package",artifact);
+  await mkdir(dirname(targetAsset),{recursive:true});
+  await writeFile(targetAsset,base64+"\n");
   console.log("STUDIO_PREPARED_SAMPLE",JSON.stringify({
     kind:set.kind,root:set.destination,skills:manifest.skills,
     files:manifest.files.length,sourceSha:manifest.sourceSha,
-    sourceStatus:manifest.sourceStatus
+    sourceStatus:manifest.sourceStatus,
+    exampleInterfaceAsset:artifact,exampleInterfaceSha256:digest
   }));
 }
 console.log("SKILL Studio IDE host: built Node and browser extension entries, isolated LSP Worker and ReactFlow webview assets; Theia application build and Pages release are separate.");
