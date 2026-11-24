@@ -678,6 +678,47 @@ try{
     throw Error("The explicit example import did not open its project and 5GC Procedure: "+
       JSON.stringify(startupDiagnostics).slice(0,3200));
   }
+  const studioCommand=(id,...args)=>evalJS(`(() => {
+    const c=window.theia.container;
+    const key=[...c._bindingDictionary._map.keys()].find(k=>
+      typeof k==='function'&&k.prototype?.executeCommand&&k.prototype?.getCommand);
+    return c.get(key).executeCommand(${JSON.stringify(id)},...${JSON.stringify(args)});
+  })()`);
+  const readWorkspaceMode=()=>evalJS(`(() => {
+    const nav=document.getElementById('skill-studio-workspace-mode');
+    return { mode:nav?.querySelector('[aria-pressed="true"]')?.textContent,
+      switching:!!nav?.querySelector('button:disabled'),
+      groups:window.__skillStudioFixedEditorLayout?.().tabBarCount };
+  })()`);
+  const switchWorkspaceMode=async label=>{
+    const clicked=await evalJS(`(() => {
+      const button=[...document.querySelectorAll('#skill-studio-workspace-mode button')]
+        .find(item=>item.textContent===${JSON.stringify(label)});
+      if(!button || !button.getClientRects().length) return false;
+      button.click();
+      return true;
+    })()`);
+    if(!clicked)throw Error("Missing top-level Studio mode control: "+label);
+    for(let attempt=0;attempt<100;attempt++){
+      const state=await readWorkspaceMode();
+      if(state?.mode===label && !state.switching && state.groups===1)return;
+      await sleep(100);
+    }
+    throw Error("Mode switch did not preserve one editor group: "+
+      JSON.stringify({label,actual:await readWorkspaceMode()}));
+  };
+  if(requireEditor){
+    let initialMode;
+    for(let attempt=0;attempt<100;attempt++){
+      initialMode=await readWorkspaceMode();
+      if(initialMode?.mode==='AI Workbench' && initialMode.groups===1)break;
+      await sleep(100);
+    }
+    if(initialMode?.mode!=='AI Workbench' || initialMode.groups!==1)
+      throw Error("Fresh Studio profile did not open AI Workbench: "+JSON.stringify(initialMode));
+    await switchWorkspaceMode('Console');
+    console.log("STUDIO_WORKSPACE_MODE_DEFAULT_CHROMIUM_PASS");
+  }
   const afterImport=await evalJS(`(async()=>{
     const names=[];let opfsError=null;
     try{
@@ -1363,6 +1404,60 @@ try{
     phaseEvidence:workbenchEvidence?.phaseEvidence??null,
     languageServiceStatus:workbenchEvidence?.languageServiceStatus??null
   }));
+  if(requireEditor){
+    await studioCommand("skillStudio.openProcedure",identity.defaultProcedure);
+    const sourceState=action=>evalJS(`(() => {
+      const c=window.theia.container;
+      const key=[...c._bindingDictionary._map.keys()].find(k=>
+        typeof k==='function'&&k.prototype?.getWidgets&&k.prototype?.activateWidget);
+      const widget=c.get(key).getCurrentWidget('main');
+      const editor=widget?.editor?.getControl?.();
+      const model=editor?.getModel();
+      if(!model)return null;
+      if(${JSON.stringify(action)}==='edit'){
+        editor.pushUndoStop();
+        editor.executeEdits('mode-acceptance',[{
+          range:{startLineNumber:1,startColumn:1,endLineNumber:1,endColumn:1},
+          text:'# studio-mode-unsaved-sentinel\\n'
+        }]);
+        editor.pushUndoStop();
+      }
+      if(${JSON.stringify(action)}==='undo')editor.trigger('keyboard','undo',null);
+      return {uri:model.uri.toString(),text:model.getValue(),dirty:widget.saveable?.dirty};
+    })()`);
+    await switchWorkspaceMode('Console');
+    const original=await sourceState('read');
+    const dirty=await sourceState('edit');
+    if(!original || !dirty?.text.startsWith('# studio-mode-unsaved-sentinel'))
+      throw Error("Unable to prepare native unsaved Source for mode acceptance");
+    await switchWorkspaceMode('AI Workbench');
+    await switchWorkspaceMode('Console');
+    const restored=await sourceState('read');
+    if(restored?.uri!==dirty.uri || restored.text!==dirty.text ||
+        (dirty.dirty===true && restored.dirty!==true))
+      throw Error("Console round trip lost selected file or unsaved Source");
+    await sourceState('undo');
+    for(let attempt=0;attempt<40;attempt++){
+      if((await sourceState('read'))?.text===original.text)break;
+      await sleep(100);
+    }
+    if((await sourceState('read'))?.text!==original.text)
+      throw Error("Native Undo after mode round trip failed");
+    // Start the Gateway scenario with a fresh editor context after changing its
+    // endpoint. Console mode intentionally keeps the current AI view alive.
+    const closed=await evalJS(`(async () => {
+      const c=window.theia.container;
+      const key=[...c._bindingDictionary._map.keys()].find(k=>
+        typeof k==='function'&&k.prototype?.getWidgets&&k.prototype?.closeWidget);
+      const shell=c.get(key);
+      const ai=shell.getWidgets('main').find(widget=>widget.title.label==='AI Procedure Authoring');
+      if(!ai)return false;
+      await shell.closeWidget(ai.id);
+      return !shell.getWidgets('main').some(widget=>widget.id===ai.id);
+    })()`);
+    if(!closed)throw Error("Could not close the isolated workspace-mode test tab");
+    console.log("STUDIO_WORKSPACE_MODE_DIRTY_BUFFER_CHROMIUM_PASS");
+  }
   let aiAuthoringEvidence=null;
   if(requireEditor&&externalUrl){
     const nativeCommand=async(id,...args)=>evalJS(
@@ -1562,7 +1657,10 @@ try{
         throw Error("AI Gateway request did not match the expected OpenAI-compatible v1 Chat Completions contract");
 
       let proposalView=null;
-      for(let attempt=0;attempt<120&&!proposalView;attempt++){
+      // Allow the Host's 60-second Compiler Worker timeout to settle and
+      // report a real terminal result before asserting the Patch preview.
+      const proposalDeadline=Date.now()+70000;
+      while(Date.now()<proposalDeadline&&!proposalView){
         const view=await readAiView();
         if(view?.proposalSummary.includes("AI Authoring mock proposal")&&
            view.candidateSource.includes("ai-authoring-smoke-node"))proposalView=view;
@@ -1815,6 +1913,24 @@ try{
          !gatewayRequests[1].body.messages[1].content.includes("node.add"))
         throw Error("F4 expected two disclosed proposals and Host session revisions; calls="+
           gatewayRequests.length);
+      await command("Runtime.evaluate",{
+        contextId:aiContextId,returnByValue:true,
+        expression:"document.getElementById('refineTask').value='unsent refine draft'"
+      });
+      await switchWorkspaceMode('Console');
+      await switchWorkspaceMode('AI Workbench');
+      const resumed=await readAiView();
+      const retained=await command("Runtime.evaluate",{
+        contextId:aiContextId,returnByValue:true,
+        expression:"(()=>({history:document.querySelectorAll('#revisionTimeline .revision-entry').length,"+
+          "groups:document.querySelectorAll('#groups input:checked').length,"+
+          "refine:document.getElementById('refineTask')?.value}))()"
+      });
+      if(!resumed?.proposalSummary || !resumed.candidateSource ||
+          retained.result?.value?.history!==2 || retained.result.value.groups<1 ||
+          retained.result.value.refine!=='unsent refine draft')
+        throw Error("AI Workbench round trip lost proposal, candidate, groups, refine or history");
+      console.log("STUDIO_WORKSPACE_MODE_AI_STATE_CHROMIUM_PASS");
       const clickedHistory=await command("Runtime.evaluate",{
         contextId:aiContextId,returnByValue:true,
         expression:"(()=>{const buttons=[...document.querySelectorAll('#revisionTimeline .revision-entry button')];"+
@@ -2026,7 +2142,8 @@ try{
       await command("Input.dispatchMouseEvent",{type:"mousePressed",x:approval.x,y:approval.y,button:"left",clickCount:1});
       await command("Input.dispatchMouseEvent",{type:"mouseReleased",x:approval.x,y:approval.y,button:"left",clickCount:1});
       let readyView=null;
-      for(let attempt=0;attempt<200&&!readyView;attempt++){
+      const qualifiedDeadline=Date.now()+70000;
+      while(Date.now()<qualifiedDeadline&&!readyView){
         const view=await readAiView();
         if(view?.candidateSource.includes("FAIL: FAILED")&&
            view.compilerStatus.includes("Compiler v2.0.2 Check: PASS")&&
@@ -2045,6 +2162,12 @@ try{
          positiveRequests[0].model!=="deepseek-v4.1-flash"||
          !positiveRequests[0].session)
         throw Error("Expected one Host-owned model request for synthetic Editor Tab");
+      await switchWorkspaceMode('Console');
+      await switchWorkspaceMode('AI Workbench');
+      const qualifiedAfterSwitch=await readAiView();
+      if(qualifiedAfterSwitch?.applyDisabled!==false ||
+         qualifiedAfterSwitch.candidateSource!==readyView.candidateSource)
+        throw Error("Mode round trip lost the Compiler-qualified candidate");
       const applied=await command("Runtime.evaluate",{
         contextId:aiContextId,
         returnByValue:true,

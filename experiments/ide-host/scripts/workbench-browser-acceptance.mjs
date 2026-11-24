@@ -1067,7 +1067,17 @@ export async function runWorkbenchAcceptance({
        currentLanguageFeatures.ownerQualification!=="NOT_QUALIFIED")
       throw Error("Native current language-provider acceptance failed: "+
         JSON.stringify(currentLanguageFeatures));
-    semanticTokenEvidence=await nativeCommand("skillStudio.internal.semanticTokenDiagnostics");
+    // Provider fixture cleanup and Webview focus changes can update Theia's
+    // visible editor list asynchronously. Focus the exact native Source
+    // before checking its real editor decorations and rendered colors.
+    await nativeCommand(
+      "skillStudio.internal.openProcedureSourceForHighlightDiagnostics",defaultProcedureUri);
+    for(let attempt=0;attempt<40;attempt++){
+      semanticTokenEvidence=await nativeCommand("skillStudio.internal.semanticTokenDiagnostics");
+      const renderer=semanticTokenEvidence?.rendererDiagnostics;
+      if(renderer?.lastUri===defaultProcedureUri && renderer.lastAppliedRangeCount>0)break;
+      await sleep(100);
+    }
     const rendererState=semanticTokenEvidence?.rendererDiagnostics;
     if(semanticTokenEvidence?.registered!==true||
        !(semanticTokenEvidence?.lastTokenCount>0)||
@@ -1075,6 +1085,7 @@ export async function runWorkbenchAcceptance({
        !(semanticTokenEvidence?.renderedTokenCount>0)||
        !(semanticTokenEvidence?.renderedTypeCount>=2)||
        semanticTokenEvidence?.renderError||
+       rendererState?.lastUri!==defaultProcedureUri||
        !(rendererState?.lastMatchingEditorCount>0)||
        !(rendererState?.lastVersionMatchedEditorCount>0)||
        !(rendererState?.lastAppliedEditorCount>0)||
