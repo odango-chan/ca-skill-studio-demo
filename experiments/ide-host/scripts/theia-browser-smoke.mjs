@@ -1363,6 +1363,12 @@ try{
     phaseEvidence:workbenchEvidence?.phaseEvidence??null,
     languageServiceStatus:workbenchEvidence?.languageServiceStatus??null
   }));
+  const studioCommand=(id,...args)=>evalJS(`(() => {
+    const c=window.theia.container;
+    const key=[...c._bindingDictionary._map.keys()].find(k=>
+      typeof k==='function'&&k.prototype?.executeCommand&&k.prototype?.getCommand);
+    return c.get(key).executeCommand(${JSON.stringify(id)},...${JSON.stringify(args)});
+  })()`);
   const readWorkspaceMode=()=>evalJS(`(() => {
     const nav=document.getElementById('skill-studio-workspace-mode');
     return { mode:nav?.querySelector('[aria-pressed="true"]')?.textContent,
@@ -1387,6 +1393,7 @@ try{
       JSON.stringify({label,actual:await readWorkspaceMode()}));
   };
   if(requireEditor){
+    await studioCommand("skillStudio.openProcedure",identity.defaultProcedure);
     const sourceState=action=>evalJS(`(() => {
       const c=window.theia.container;
       const key=[...c._bindingDictionary._map.keys()].find(k=>
@@ -1424,6 +1431,19 @@ try{
     }
     if((await sourceState('read'))?.text!==original.text)
       throw Error("Native Undo after mode round trip failed");
+    // Start the Gateway scenario with a fresh editor context after changing its
+    // endpoint. Console mode intentionally keeps the current AI view alive.
+    const closed=await evalJS(`(async () => {
+      const c=window.theia.container;
+      const key=[...c._bindingDictionary._map.keys()].find(k=>
+        typeof k==='function'&&k.prototype?.getWidgets&&k.prototype?.closeWidget);
+      const shell=c.get(key);
+      const ai=shell.getWidgets('main').find(widget=>widget.title.label==='AI Procedure Authoring');
+      if(!ai)return false;
+      await shell.closeWidget(ai.id);
+      return !shell.getWidgets('main').some(widget=>widget.id===ai.id);
+    })()`);
+    if(!closed)throw Error("Could not close the isolated workspace-mode test tab");
     console.log("STUDIO_WORKSPACE_MODE_DIRTY_BUFFER_CHROMIUM_PASS");
   }
   let aiAuthoringEvidence=null;
@@ -2126,6 +2146,12 @@ try{
          positiveRequests[0].model!=="deepseek-v4.1-flash"||
          !positiveRequests[0].session)
         throw Error("Expected one Host-owned model request for synthetic Editor Tab");
+      await switchWorkspaceMode('Console');
+      await switchWorkspaceMode('AI Workbench');
+      const qualifiedAfterSwitch=await readAiView();
+      if(qualifiedAfterSwitch?.applyDisabled!==false ||
+         qualifiedAfterSwitch.candidateSource!==readyView.candidateSource)
+        throw Error("Mode round trip lost the Compiler-qualified candidate");
       const applied=await command("Runtime.evaluate",{
         contextId:aiContextId,
         returnByValue:true,

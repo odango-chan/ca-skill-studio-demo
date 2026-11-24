@@ -423,7 +423,7 @@ export function isCurrentAuthoringSession(current, expected) {
 }
 
 export function isLiveDocumentRevision(document, revision) {
-  return Boolean(document && revision &&
+  return Boolean(document && !document.isClosed && revision &&
     Number.isSafeInteger(revision.documentVersion) &&
     typeof revision.source === "string" &&
     document.version === revision.documentVersion &&
