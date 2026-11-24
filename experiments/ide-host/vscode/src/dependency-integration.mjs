@@ -253,20 +253,27 @@ export function registerDependencyIntegration(vscode,context,{onLockChanged=()=>
         vscode.TextEditorRevealType?.InCenter);
     }
   }
+  let readonlyAcceptancePhase="NOT_STARTED";
   async function showReadonlyInterfaceSource(snapshot,path,text){
+    readonlyAcceptancePhase="SOURCE_PREPARE";
     const uri=prepareToolCatalog(snapshot,path,text);
+    readonlyAcceptancePhase="SOURCE_OPEN_DOCUMENT";
     let document=await vscode.workspace.openTextDocument(uri);
+    readonlyAcceptancePhase="SOURCE_LANGUAGE";
     const language=/\.ya?ml$/i.test(path)?"yaml":/\.json$/i.test(path)?"json":null;
     if(language&&document.languageId!==language){
       if(typeof vscode.languages?.setTextDocumentLanguage!=="function")
         throw Error("Host cannot assign native source language to read-only dependency");
       document=await vscode.languages.setTextDocumentLanguage(document,language);
     }
+    readonlyAcceptancePhase="SOURCE_SHOW_EDITOR";
     await vscode.window.showTextDocument(document,{
       viewColumn:vscode.ViewColumn.One,preview:true,preserveFocus:false
     });
+    readonlyAcceptancePhase="SOURCE_SHOW_PREVIEW";
     if(/\.schema\.(?:json|ya?ml)$/i.test(path))
       await vscode.commands.executeCommand("skillStudio.showPreview",uri);
+    readonlyAcceptancePhase="SOURCE_READY";
     return {uri,document};
   }
   async function openInterfaceFile(id,path){
@@ -447,12 +454,25 @@ export function registerDependencyIntegration(vscode,context,{onLockChanged=()=>
     },null,2);
     const synthetic={id:"synthetic-readonly-probe",
       snapshotDigest:"sha256:"+("d".repeat(64))};
-    const {uri,document}=await showReadonlyInterfaceSource(synthetic,
-      "schemas/source-probe.schema.json",source);
-    return {syntheticOnly:true,scheme:uri.scheme,
-      languageId:document.languageId,
-      sourceUnchanged:document.getText()===source,
-      virtualPath:uri.path,editorColumn:vscode.ViewColumn.One};
+    let timer;
+    try{
+      return await Promise.race([
+        showReadonlyInterfaceSource(synthetic,
+          "schemas/source-probe.schema.json",source).then(({uri,document})=>({
+            syntheticOnly:true,scheme:uri.scheme,
+            languageId:document.languageId,
+            sourceUnchanged:document.getText()===source,
+            virtualPath:uri.path,editorColumn:vscode.ViewColumn.One
+          })),
+        new Promise(resolve=>{timer=setTimeout(()=>resolve({
+          status:"BLOCKED",phase:readonlyAcceptancePhase,
+          error:"Theia native virtual-document source did not settle in 12 seconds"
+        }),12000);})
+      ]);
+    }catch(error){
+      return {status:"BLOCKED",phase:readonlyAcceptancePhase,
+        error:String(error?.message??error)};
+    }finally{if(timer)clearTimeout(timer);}
   });
   command("skillStudio.addDependency",async()=>{
     const root=await ensureRoot();
