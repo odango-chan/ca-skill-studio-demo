@@ -151,9 +151,16 @@ async function persistExampleInterfaceIfAbsent(vscode,root,prepared,
         {recursive:true,useTrash:false});
     }
   }
-  // Replace the settings file only AFTER every Skill and immutable snapshot
-  // has been written; this is the final workspace-affecting I/O.
-  await fs.writeFile(settingsUri,exampleWorkspaceSettingsContent(prepared));
+  // Replace settings only AFTER every Skill and immutable snapshot exists.
+  // Rewriting identical bytes causes a pointless Theia configuration reload
+  // during Example reset, which can interrupt its pending navigation.
+  const desired=exampleWorkspaceSettingsContent(prepared);
+  if(replaceSettings&&await exists(settingsUri)){
+    const old=await fs.readFile(settingsUri);
+    if(old.length===desired.length&&old.every((value,index)=>value===desired[index]))
+      return true;
+  }
+  await fs.writeFile(settingsUri,desired);
   return true;
 }
 
