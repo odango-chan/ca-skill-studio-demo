@@ -4,7 +4,7 @@
 import {sha256} from './dependency-snapshot.mjs';
 const MAX_ZIP=24*1024*1024;
 const checksum=/^sha256:[a-f0-9]{64}$/;
-const repoName=/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/;
+const repoName=/^[A-Za-z0-9][A-Za-z0-9_.-]*\/[A-Za-z0-9][A-Za-z0-9_.-]*$/;
 const assetName=/^[A-Za-z0-9_.-]+\.zip$/;
 const tagName=/^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/;
 const fail=message=>{throw Error('Pinned Interface Release BLOCKED: '+message);};
@@ -45,7 +45,22 @@ export async function readPinnedInterfaceRelease({
     if(!response.ok)fail('release asset download HTTP '+response.status);
     if((response.headers?.get('content-type')??'').toLowerCase().includes('json'))
       fail('GitHub returned asset metadata rather than ZIP bytes');
-    bytes=new Uint8Array(await response.arrayBuffer());
+    if(!response.body?.getReader)fail('bounded streaming download unavailable');
+    const reader=response.body.getReader(),chunks=[];
+    let total=0;
+    try{
+      while(true){
+        const {done,value}=await reader.read();
+        if(done)break;
+        total+=value.byteLength;
+        if(total>MAX_ZIP||total>selected.size)
+          fail('release asset exceeds declared size');
+        chunks.push(value);
+      }
+    }finally{try{await reader.cancel();}catch{}}
+    bytes=new Uint8Array(total);
+    let offset=0;
+    for(const chunk of chunks){bytes.set(chunk,offset);offset+=chunk.length;}
   }catch(error){fail('exact release ZIP unavailable (network/CORS): '+String(error.message??error));}
   if(bytes.length!==selected.size||bytes.length>MAX_ZIP)
     fail('release asset length mismatch');
