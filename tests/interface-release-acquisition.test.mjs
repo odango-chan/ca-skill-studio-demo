@@ -38,19 +38,19 @@ test('a wrong SHA-256 and JSON asset response cannot become a verified import',a
     repository,tag,asset,expectedSha256:'sha256:'+'0'.repeat(64),
     fetchImpl:mock()
   }),/SHA-256 differs/);
-  await assert.rejects(()=>readPinnedInterfaceRelease(
-    await options(mock({type:'application/json'}))),/metadata rather than ZIP/);
+  const jsonResponse=await options(mock({type:'application/json'}));
+  await assert.rejects(()=>readPinnedInterfaceRelease(jsonResponse),/metadata rather than ZIP/);
 });
 test('reject latest, ambiguous published assets and oversized release claims',async()=>{
-  await assert.rejects(()=>readPinnedInterfaceRelease(
-    await options(mock({release:{...metadata,assets:[]}}))),/asset missing/);
-  await assert.rejects(()=>readPinnedInterfaceRelease(
-    await options(mock({release:{...metadata,assets:[...metadata.assets,...metadata.assets]}}))),
-    /ambiguous/);
-  await assert.rejects(()=>readPinnedInterfaceRelease({
-    ...(await options(mock())),tag:'../latest'
-  }),/exact owner/);
-  await assert.rejects(()=>readPinnedInterfaceRelease(
-    await options(mock({release:{...metadata,assets:[{...metadata.assets[0],
-      size:25000000}]}}))),/size or identity invalid/);
+  const missing=await options(mock({release:{...metadata,assets:[]}}));
+  await assert.rejects(()=>readPinnedInterfaceRelease(missing),/asset missing/);
+  const ambiguous=await options(mock({release:{...metadata,
+    assets:[...metadata.assets,...metadata.assets]}}));
+  await assert.rejects(()=>readPinnedInterfaceRelease(ambiguous),/ambiguous/);
+  const unsafe={...(await options(mock())),tag:'../latest'};
+  await assert.rejects(()=>readPinnedInterfaceRelease(unsafe),/exact owner/);
+  const oversized=await options(mock({release:{...metadata,
+    assets:[{...metadata.assets[0],size:25000000}]}}));
+  await assert.rejects(()=>readPinnedInterfaceRelease(oversized),
+    /size or identity invalid/);
 });
