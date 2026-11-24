@@ -3,6 +3,8 @@ import {runPackageOverviewAcceptance,runWorkbenchAcceptance,assertSourceVisualPa
 // normal backend-backed browser host. Static mode uses an explicitly isolated
 // same-origin demo-only webview adapter; backend mode uses Theia's normal host.
 import {createServer} from "node:http";
+import {createHash} from "node:crypto";
+import {zipPackage} from "../../../site/zip.mjs";
 import {createReadStream,existsSync} from "node:fs";
 import {mkdtemp,readFile,rm,writeFile} from "node:fs/promises";
 import {spawn} from "node:child_process";
@@ -284,6 +286,40 @@ try{
     return false;
   })()`);
   await sleep(300);
+  // Non-failing diagnostic of the real browser-side GitHub Release download
+  // path. A CI origin is not the production Pages origin, and CORS failure must
+  // remain BLOCKED rather than silently falling back to an unpinned URL.
+  const releaseBrowserProbe=await evalJS(`(async()=>{
+    const tagUrl='https://api.github.com/repos/odango-chan/ca-client-tools/releases/tags/v1.1.0';
+    const expected='sha256:cbd8fad939844cda5474f33f18d3cdc015c69dd8c1dc3908e84bd5273ce6e71b';
+    try{
+      const response=await fetch(tagUrl,{mode:'cors',credentials:'omit',
+        headers:{Accept:'application/vnd.github+json'},
+        signal:AbortSignal.timeout(8500)});
+      if(!response.ok)return {state:'BLOCKED',phase:'release',http:response.status};
+      const info=await response.json();
+      const asset=info.assets?.find(x=>x.name==='ca-client-tools_interface_1.1.0.zip');
+      if(info.tag_name!=='v1.1.0'||!asset?.url)
+        return {state:'BLOCKED',phase:'exact-release-asset'};
+      const binary=await fetch(asset.url,{mode:'cors',credentials:'omit',
+        headers:{Accept:'application/octet-stream'},
+        signal:AbortSignal.timeout(8500)});
+      const contentType=binary.headers.get('content-type')||'';
+      if(!binary.ok||contentType.includes('json'))
+        return {state:'BLOCKED',phase:'binary-response',
+          http:binary.status,contentType};
+      const bytes=new Uint8Array(await binary.arrayBuffer());
+      const hash=new Uint8Array(await crypto.subtle.digest('SHA-256',bytes));
+      const digest='sha256:'+Array.from(hash,b=>b.toString(16).padStart(2,'0')).join('');
+      return {state:bytes.length===asset.size&&digest===expected?'PASS':'BLOCKED',
+        phase:'archive-digest',bytes:bytes.length,assetBytes:asset.size,
+        sha256Match:digest===expected,contentType};
+    }catch(error){
+      return {state:'BLOCKED',phase:'browser-network-or-CORS',
+        reason:String(error?.message??error)};
+    }
+  })()`);
+  console.log("STUDIO_INTERFACE_RELEASE_BROWSER_CORS_PROBE",JSON.stringify(releaseBrowserProbe));
   const diagnostics=await evalJS(`({
     htmlClass:document.documentElement.className,
     bodyStyle:document.body?.getAttribute('style'),
@@ -2348,6 +2384,159 @@ try{
       }
       console.log("STUDIO_NATIVE_CHAT_WARNING_NO_OVERLAP_CHROMIUM_PASS");
     }
+  }
+  if(requireEditor&&requireBrowserLsp){
+    const readonly=await evalJS(`(async()=>{
+      const c=window.theia?.container;
+      if(!c)throw Error('Theia container unavailable');
+      const key=[...(c._bindingDictionary?._map?.keys?.()??[])].find(k=>
+        typeof k==='function'&&k.prototype?.executeCommand&&
+        k.prototype?.registerCommand&&k.prototype?.getCommand);
+      if(!key)throw Error('Native Theia command service missing');
+      return await c.get(key).executeCommand(
+        'skillStudio.internal.interfaceReadonlySourceAcceptance');
+    })()`);
+    if(readonly?.syntheticOnly!==true||
+       readonly?.scheme!=='skill-studio-dependency'||
+       readonly?.languageId!=='json'||readonly?.sourceUnchanged!==true||
+       readonly?.editorColumn!==1||
+       !readonly?.virtualPath?.includes('/schemas/source-probe.schema.json'))
+      throw Error("Native Theia readonly Interface Schema source/Preview failed: "+
+        JSON.stringify(readonly));
+    console.log("STUDIO_INTERFACE_SCHEMA_NATIVE_READONLY_CHROMIUM_PASS",
+      JSON.stringify(readonly));
+  }
+  if(requireEditor&&requireBrowserLsp){
+    const started=await evalJS("(()=>{"+
+      "const c=window.theia.container;"+
+      "const k=[...c._bindingDictionary._map.keys()].find(k=>"+
+      "typeof k==='function'&&k.prototype?.executeCommand&&"+
+      "k.prototype?.registerCommand&&k.prototype?.getCommand);"+
+      "if(!k)throw Error('Theia command service unavailable');"+
+      "window.__studioZipPickerAcceptance=c.get(k).executeCommand("+
+      "'skillStudio.internal.browserZipPickerAcceptance');"+
+      "return true;})()");
+    if(started!==true)throw Error("Cannot open browser-local ZIP picker");
+    let fileInput=null;
+    for(let attempt=0;attempt<60&&!fileInput;attempt++){
+      const tree=await command("Page.getFrameTree");
+      const frames=[],collect=node=>{
+        if(!node)return;frames.push(node.frame);
+        for(const child of node.childFrames??[])collect(child);
+      };
+      collect(tree.frameTree);
+      for(const frame of frames.filter(f=>/webview/i.test(f.url??""))){
+        try{
+          const world=await command("Page.createIsolatedWorld",{
+            frameId:frame.id,worldName:"studio-browser-zip-file-input",
+            grantUniveralAccess:true
+          });
+          const result=await command("Runtime.evaluate",{
+            contextId:world.executionContextId,
+            returnByValue:true,awaitPromise:true,
+            expression:"(()=>({input:!!document.querySelector('input[type=file]'),"+
+              "csp:document.querySelector('meta[http-equiv=Content-Security-Policy]')?.content??''}))()"
+          });
+          if(result.result?.value?.input){
+            fileInput={contextId:world.executionContextId,...result.result.value};
+            break;
+          }
+        }catch{}
+      }
+      if(!fileInput)await sleep(150);
+    }
+    if(!fileInput||!fileInput.csp.includes("script-src 'nonce-"))
+      throw Error("Browser ZIP device file input/CSP was not rendered: "+
+        JSON.stringify(fileInput));
+    await command("Runtime.evaluate",{
+      contextId:fileInput.contextId,returnByValue:true,
+      expression:"document.getElementById('cancel').click();true"
+    });
+    const cancelled=await evalJS("window.__studioZipPickerAcceptance");
+    if(cancelled?.status!=="CANCELLED")
+      throw Error("Browser ZIP picker did not cancel cleanly: "+JSON.stringify(cancelled));
+    console.log("STUDIO_BROWSER_LOCAL_INTERFACE_ZIP_PICKER_CHROMIUM_PASS",JSON.stringify({
+      input:true,nonceCsp:true,cancellation:"PASS",projectFilesUnchanged:true
+    }));
+    // Actual Chrome DOM.setFileInputFiles -> HTML File API -> chunked webview
+    // bridge -> extension host -> formal ZIP/manifest/hash decoder. Synthetic
+    // release-shaped bytes; no project lock or Owner trust is created.
+    const syntheticSchema=JSON.stringify({
+      $schema:'https://json-schema.org/draft/2020-12/schema',
+      $id:'urn:wtlab:browser-upload-probe:v1',
+      type:'object',properties:{supi:{type:'string'}}
+    });
+    const hash=source=>'sha256:'+createHash('sha256')
+      .update(new TextEncoder().encode(source)).digest('hex');
+    const syntheticManifest={
+      apiVersion:'connectionagent.io/interface-package/v1alpha1',
+      languageTarget:'connectionagent.io/v1alpha5',
+      packageId:'urn:wtlab:browser-upload-acceptance',
+      version:'1.0.0',publisher:'wtlab',
+      dependencies:[],
+      files:[{path:'schemas/input.schema.json',sha256:hash(syntheticSchema)}],
+      exports:[{kind:'Schema',id:'urn:wtlab:browser-upload-probe:v1',
+        path:'schemas/input.schema.json'}]
+    };
+    const syntheticZip=zipPackage([
+      {path:'package.json',text:JSON.stringify(syntheticManifest)},
+      {path:'schemas/input.schema.json',text:syntheticSchema}
+    ]);
+    const uploadPath=join(profile,'synthetic-interface-package.zip');
+    await writeFile(uploadPath,syntheticZip);
+    const accepted=await evalJS("(()=>{"+
+      "const c=window.theia.container;"+
+      "const k=[...c._bindingDictionary._map.keys()].find(k=>"+
+      "typeof k==='function'&&k.prototype?.executeCommand&&"+
+      "k.prototype?.registerCommand&&k.prototype?.getCommand);"+
+      "window.__studioZipPickerUploaded=c.get(k).executeCommand("+
+      "'skillStudio.internal.browserZipPickerAcceptance');"+
+      "return true;})()");
+    if(accepted!==true)throw Error('Browser ZIP upload command did not open');
+    let inputObjectId=null;
+    for(let attempt=0;attempt<80&&!inputObjectId;attempt++){
+      const tree=await command('Page.getFrameTree');
+      const frames=[],walk=node=>{
+        if(!node)return;frames.push(node.frame);
+        for(const child of node.childFrames??[])walk(child);
+      };
+      walk(tree.frameTree);
+      for(const frame of frames.filter(item=>/webview/i.test(item.url??''))){
+        try{
+          const world=await command('Page.createIsolatedWorld',{
+            frameId:frame.id,worldName:'studio-upload-file-selection',
+            grantUniveralAccess:true
+          });
+          const evaluated=await command('Runtime.evaluate',{
+            contextId:world.executionContextId,
+            expression:"document.querySelector('input[type=file]')",
+            returnByValue:false
+          });
+          inputObjectId=evaluated.result?.objectId??null;
+          if(inputObjectId)break;
+        }catch{}
+      }
+      if(!inputObjectId)await sleep(150);
+    }
+    if(!inputObjectId)
+      throw Error('Native browser File API input not found for ZIP upload');
+    await command('DOM.setFileInputFiles',{
+      files:[uploadPath],objectId:inputObjectId
+    });
+    const imported=await evalJS('window.__studioZipPickerUploaded');
+    const expectedDigest='sha256:'+createHash('sha256')
+      .update(syntheticZip).digest('hex');
+    if(imported?.status!=='VERIFIED'||imported.syntheticOnly!==true||
+       imported.packageId!==syntheticManifest.packageId||
+       imported.version!=='1.0.0'||imported.digest!==expectedDigest||
+       imported.bytes!==syntheticZip.length||imported.exportCount!==1)
+      throw Error('Browser File API ZIP upload or manifest verification failed: '+
+        JSON.stringify(imported));
+    console.log('STUDIO_BROWSER_DEVICE_INTERFACE_ZIP_UPLOAD_CHROMIUM_PASS',JSON.stringify({
+      qualification:'SYNTHETIC_ONLY',fileInput:true,chunkedWebviewTransfer:true,
+      sha256Verified:true,manifestVerified:true,workspaceLockUnchanged:true
+    }));
+
   }
   if(requireEditor)
     console.log("THEIA_BROWSER_HOST_V1ALPHA5_ACCEPTANCE_PASS");

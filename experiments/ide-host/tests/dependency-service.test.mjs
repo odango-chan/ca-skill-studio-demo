@@ -3,6 +3,13 @@ import assert from "node:assert/strict";
 import {acquireBuiltin,acquireUpload} from "../vscode/src/contract-acquisition.mjs";
 import {applyDependency,refreshDependency,removeDependency,resolveLockedDependencies}
   from "../vscode/src/dependency-service.mjs";
+import {zipPackage} from "../../../site/zip.mjs";
+import {sha256} from "../vscode/src/dependency-snapshot.mjs";
+import {decodeInterfacePackageZip} from "../vscode/src/interface-package-zip.mjs";
+import {projectLockedInterfaceCompletionHints}
+  from "../vscode/src/interface-schema-completion.mjs";
+import {schemaArgumentCompletions}
+  from "../../../language/schema-argument-completions.mjs";
 const uri=path=>({path,toString(){return "file://"+path;}});
 function host(){
   const root=uri("/workspace"),files=new Map(),dirs=new Set(["/workspace"]);
@@ -143,4 +150,114 @@ test("Upload Refresh observes drift but never mutates existing Lock",async()=>{
   await applyDependency(h.vscode,h.root,"uploaded",changed,{confirm:async()=>true});
   assert.equal((await resolveLockedDependencies(h.vscode,h.root)).status,"READY");
   assert.notEqual(JSON.stringify(h.values.dependencyLock),previous);
+});
+
+
+test("published-style ZIP → explicit lock → reload → live Tool Schema argument hints",async()=>{
+  const h=host(),enc=new TextEncoder();
+  const inputId="urn:wtlab:locked:query:v1",outputId="urn:wtlab:locked:result:v1";
+  const input=JSON.stringify({
+    $schema:"https://json-schema.org/draft/2020-12/schema",
+    $id:inputId,type:"object",required:["supi","pduSessionId"],
+    properties:{
+      supi:{type:"string",description:"3GPP subscriber identity"},
+      pduSessionId:{type:"integer",description:"PDU Session identifier"},
+      view:{type:"string",enum:["SUMMARY","FULL"]}
+    }
+  });
+  const result=JSON.stringify({
+    $schema:"https://json-schema.org/draft/2020-12/schema",
+    $id:outputId,type:"object",properties:{status:{type:"string"}}
+  });
+  const catalog=[
+    "apiVersion: connectionagent.io/toolcatalog/v1alpha4",
+    "kind: ToolCatalog",
+    "metadata:",
+    "  owner: wtlab",
+    "spec:",
+    "  contracts:",
+    "    - id: context.smf.session.read",
+    "      kind: observation",
+    "      effect: READ",
+    "      queryContextSchema:",
+    "        $ref: "+inputId,
+    "      outputSchema:",
+    "        $ref: "+outputId,
+    "      ownerOutcomes: [SUCCEEDED, FAILED]",
+    ""
+  ].join("\n");
+  const entries=[
+    {path:"schemas/input.schema.json",text:input},
+    {path:"schemas/result.schema.json",text:result},
+    {path:"tool-catalog.yaml",text:catalog}
+  ];
+  const files=await Promise.all(entries.map(async f=>({
+    path:f.path,sha256:await sha256(enc.encode(f.text))
+  })));
+  const manifest={
+    apiVersion:"connectionagent.io/interface-package/v1alpha1",
+    packageId:"urn:wtlab:interface:read",version:"1.0.0",
+    publisher:"wtlab",languageTarget:"connectionagent.io/v1alpha5",
+    dependencies:[],files,exports:[
+      {kind:"Schema",id:inputId,path:"schemas/input.schema.json"},
+      {kind:"Schema",id:outputId,path:"schemas/result.schema.json"},
+      {kind:"CallableCatalog",id:"context.smf.session.read",path:"tool-catalog.yaml"}
+    ]
+  };
+  const archive=zipPackage([{path:"package.json",text:JSON.stringify(manifest)},...entries]);
+  const imported=await decodeInterfacePackageZip(archive);
+  const acquired={
+    kind:"interface-package",
+    source:{type:"interface-zip",upload:"read-interface.zip",
+      contentDigest:await sha256(archive),packageId:manifest.packageId,
+      version:manifest.version,publisher:manifest.publisher},
+    files:imported.files
+  };
+  await assert.rejects(()=>applyDependency(h.vscode,h.root,"ca-client",acquired,
+    {confirm:async()=>false}),/confirmation required/);
+  assert.equal(h.values.dependencies.length,0);
+  assert.equal(h.files.size,0);
+  const pinned=await applyDependency(h.vscode,h.root,"ca-client",acquired,
+    {confirm:async()=>true});
+  assert.equal(pinned.status,"READY");
+  assert.equal(h.values.dependencies[0].kind,"interface-package");
+  assert.equal(h.values.dependencyLock.entries.length,1);
+  const reloaded=await resolveLockedDependencies(h.vscode,h.root);
+  assert.equal(reloaded.status,"READY");
+  assert.equal(reloaded.snapshots.length,1);
+  const hints=projectLockedInterfaceCompletionHints(reloaded.snapshots[0]);
+  assert.equal(hints.length,1);
+  assert.equal(hints[0].id,"ca-client::context.smf.session.read");
+  const source=[
+    "start: read","nodes:","  read:","    observation:",
+    "      tool: ca-client::context.smf.session.read",
+    "      arguments:","        ","      routes:","        FAILED: FAILED",""
+  ].join("\n");
+  const offset=source.indexOf("      arguments:\n")+"      arguments:\n        ".length;
+  const lineStart=source.lastIndexOf("\n",offset-1)+1;
+  const options=schemaArgumentCompletions(
+    {completeness:"complete",schemaCompletionHints:hints},
+    {relativePath:"assurance/procedure.yaml",text:source},
+    "        ",offset,lineStart,6
+  );
+  assert.deepEqual(options.map(x=>x.label),["pduSessionId","supi","view"]);
+  assert.ok(options[0].detail.includes("AUTH_NOT_CHECKED"));
+  const oldLock=JSON.stringify(h.values.dependencyLock);
+  const before=h.updates.length;
+  const refresh=await refreshDependency(h.vscode,h.root,"ca-client",
+    async()=>acquired);
+  assert.equal(refresh.changed,false);
+  assert.equal(JSON.stringify(h.values.dependencyLock),oldLock);
+  assert.equal(h.updates.length,before);
+  // Tampering changes the locked file bytes, never silently reopens the
+  // original release or turns its old completion hints into qualified truth.
+  const digest=h.values.dependencyLock.entries[0].snapshotDigest.slice(7);
+  const schemaPath="/workspace/.skill-studio/dependencies/"+digest+
+    "/schemas/input.schema.json";
+  assert.ok(h.files.has(schemaPath));
+  h.files.set(schemaPath,enc.encode('{"type":"string"}'));
+  const corrupt=await resolveLockedDependencies(h.vscode,h.root);
+  assert.equal(corrupt.status,"ERROR");
+  assert.equal(corrupt.snapshots.length,0);
+  assert.equal(corrupt.diagnostics[0].code,"LOCKED_SNAPSHOT_CORRUPT");
 });

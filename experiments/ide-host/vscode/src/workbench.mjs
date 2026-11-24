@@ -13,6 +13,8 @@ import {buildPackageZip,bytesToBase64} from '../../../../site/package-zip-export
 import {resolveLockedDependencies} from "./dependency-service.mjs";
 import {readProjectConfiguration} from "./project-configuration.mjs";
 import {decodeBase64} from "./dependency-snapshot.mjs";
+import {projectLockedInterfaceCompletionHints}
+  from "./interface-schema-completion.mjs";
 import {collectPackageSnapshot,packageRootForProcedure} from "./package-snapshot.mjs";
 import {resolveSemanticTokenSourcePath} from "./semantic-token-path.mjs";
 import {
@@ -427,7 +429,7 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
         try{
           const project=readProjectConfiguration(vscode,folder.uri);
           const resolved=await resolveLockedDependencies(vscode,folder.uri);
-          const operations=[],schemas=[],toolCatalogs=[];
+          const operations=[],schemas=[],toolCatalogs=[],schemaCompletionHints=[];
           const decoder=new TextDecoder("utf-8",{fatal:true});
           for(const dependency of resolved.snapshots??[]){
             const decoded=(dependency.files??[])
@@ -443,6 +445,16 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
               });
               operations.push(...catalog.operations);
             }
+            if(dependency.kind==="interface-package"){
+              // Keep each Callable's unqualified identity for Package Audit.
+              // Completion constructs alias::callable from this one declaration.
+              const catalog=indexV1Alpha4ToolCatalogCallables(dependency.id,decoded);
+              toolCatalogs.push({dependencyId:dependency.id,
+                available:catalog.available,reason:catalog.reason});
+              operations.push(...catalog.operations);
+              const hints=projectLockedInterfaceCompletionHints(dependency);
+              schemaCompletionHints.push(...hints);
+            }
             for(const file of decoded){
               const schemaFile=dependency.kind==="schema-bundle"
                 ?/\.(?:json|ya?ml)$/i.test(file.path)
@@ -456,10 +468,11 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
             declarations:project.settings.dependencies,
             snapshots:(resolved.snapshots??[]).map(item=>({id:item.id,kind:item.kind})),
             diagnostics:resolved.diagnostics??[],
-            operations,toolCatalogs,schemas
+            operations,toolCatalogs,schemas,schemaCompletionHints
           };
           snapshot.dependencyOperations=operations;
           snapshot.dependencySchemas=schemas;
+          snapshot.schemaCompletionHints=schemaCompletionHints;
         }catch(error){
           dependencyContext={
             available:false,reason:String(error?.message??error)
@@ -1203,6 +1216,9 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
           "      tool: ca::session.read",
           "      arguments:",
           "        ueRef: context.ueRef",
+          "        schemaProbe: context.request.sNssai.",
+          "        schemaRootProbe: context.",
+          "        schemaStartProbe: context",
           "      routes:",
           "        SUCCEEDED: mutate",
           "        FAILED: SAFE_STOPPED",
@@ -1282,7 +1298,7 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
           "assurance/procedure.yaml":procedure,
           "assurance/predicates.yaml":predicates,
           "schemas/request.schema.yaml":
-            "$schema: https://json-schema.org/draft/2020-12/schema\ntype: object\n",
+            "$schema: https://json-schema.org/draft/2020-12/schema\ntype: object\nproperties:\n  sNssai:\n    type: object\n    properties:\n      sst: {type: integer, description: Slice/Service Type}\n      sd: {type: string}\n",
           "scripts/runner.py":"def main():\n    return {}\n"
         };
         let release=null;
@@ -1351,6 +1367,12 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
           const waitTimeoutTarget=await complete(procedureDocument,"        TIMEOUT: ");
           const waitOutput=await complete(procedureDocument,
             "        request: await-event.wait.output");
+          const contextRequestFields=await complete(procedureDocument,
+            "        schemaProbe: context.request.sNssai.");
+          const contextRoot=await complete(procedureDocument,
+            "        schemaRootProbe: context.");
+          const contextStart=await complete(procedureDocument,
+            "        schemaStartProbe: context");
           const unknownTarget=await complete(procedureDocument,
             "OUTCOME_UNKNOWN: ");
           const require=(items,label,description)=>{
@@ -1392,6 +1414,10 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
           require(waitResponseAfter,"final","Wait response boundary Node");
           require(waitTimeoutTarget,"timeout-handler","Wait timeout target Node");
           require(waitOutput,"await-event.wait.output","typed Wait output binding");
+          require(contextRequestFields,"sst","Schema-driven context.request nested field");
+          require(contextRequestFields,"sd","Schema-driven context.request nested field");
+          require(contextRoot,"request","Schema-driven context root");
+          require(contextStart,"context.request","Schema-driven request path stem");
           require(unknownTarget,"SAFE_STOPPED","OUTCOME_UNKNOWN terminal");
           if(unknownTarget.some(item=>["check","read","mutate","await-event","timeout-handler","run-script","final"].includes(item)))
             throw Error("OUTCOME_UNKNOWN offered a business Node target: "+
@@ -1456,6 +1482,7 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
             operationRouteKeys:routeKeys,mutationRouteKeys,scriptPathCompletion:scriptPath,
             waitNodeFields,waitFields,waitEventFields,waitResponseFields,
             waitRouteKeys,waitResponseAfter,waitTimeoutTarget,waitOutput,
+            contextRequestFields,contextRoot,contextStart,
             outcomeUnknownTargets:unknownTarget,
             contractDefinition:gateDefinition.length,
             predicateDefinition:predicateDefinition.length,

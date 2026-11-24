@@ -15,6 +15,10 @@ import {
   SKILL_SEMANTIC_TOKEN_MODIFIERS
 } from "../../../../../language/semantic-tokens.mjs";
 import { parseDocument, isMap, isScalar, isSeq } from "yaml";
+import {schemaArgumentCompletions}
+  from "../../../../../language/schema-argument-completions.mjs";
+import {schemaValuePathCompletions}
+  from "../../../../../language/schema-value-path-completions.mjs";
 import { LanguageDiagnosticSession } from "../../../../../language/lsp/session.js";
 import {
   buildSkillSymbolIndex,
@@ -861,7 +865,10 @@ function currentGrammarCompletions(value, document, prefix, offset, lineStart) {
     // Only list exact IDs explicitly supplied with the accepted snapshot.
     // These are source hints; membership, Scope and Effect are not inferred.
     const ids=[...new Set((value.snapshot.dependencyOperations??[])
-      .map(item=>item.id).filter(id=>typeof id==="string"&&id.includes("::")))];
+      .filter(item=>typeof item?.dependencyId==="string"&&
+        /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/.test(item.dependencyId)&&
+        typeof item.id==="string"&&/^[A-Za-z0-9_][A-Za-z0-9_.-]*$/.test(item.id))
+      .map(item=>item.dependencyId+"::"+item.id))];
     return make(ids,tool[2],offset-tool[2].length,CompletionItemKind.Reference,
       "Unverified imported reference; Compiler must check exact Owner/Capability");
   }
@@ -882,6 +889,14 @@ connection.onCompletion(params => {
   const starts = lineStarts(document.text);
   const lineStart = starts[params.position.line];
   const prefix = document.text.slice(lineStart, offset);
+  const schemaCompletions=schemaArgumentCompletions(
+    value.snapshot,document,prefix,offset,lineStart,params.position.line
+  );
+  if(schemaCompletions!==null)return schemaCompletions;
+  const pathCompletions=schemaValuePathCompletions(
+    value.snapshot,document,prefix,offset,lineStart,params.position.line
+  );
+  if(pathCompletions!==null)return pathCompletions;
   const currentCompletions = currentGrammarCompletions(value,document,prefix,offset,lineStart);
   if(currentCompletions!==null)return currentCompletions;
 

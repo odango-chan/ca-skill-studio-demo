@@ -133,7 +133,7 @@ export async function lockCandidate(vscode,selectedRoot,id,acquired){
   const project=readProjectConfiguration(vscode,selectedRoot);
   if(!/^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/.test(id??"")||id.length>80)
     fail("ERROR","Invalid dependency alias");
-  if(acquired.kind!=="tool-catalog"&&acquired.kind!=="schema-bundle")
+  if(!["tool-catalog","schema-bundle","interface-package"].includes(acquired.kind))
     fail("ERROR","Invalid Compiler dependency kind");
   const snapshot=await calculateSnapshot(acquired.files);
   const declaration={id,kind:acquired.kind,source:acquired.source};
@@ -148,8 +148,8 @@ export async function refreshDependency(vscode,selectedRoot,id,acquire){
   if(typeof acquire!=="function")fail("BLOCKED","Source acquisition adapter unavailable");
   const candidate=await lockCandidate(vscode,selectedRoot,id,await acquire(old.source));
   const sameSource=metadataMatches(candidate.declaration.source,old.source);
-  const uploadReimport=old.source.type==="upload"&&
-    candidate.declaration.source.type==="upload"&&
+  const uploadReimport=["upload","interface-zip"].includes(old.source.type)&&
+    candidate.declaration.source.type===old.source.type&&
     candidate.declaration.source.upload===old.source.upload;
   if(!sameSource&&!uploadReimport)
     fail("ERROR","Refresh must preserve source identity (Upload may change content digest)");

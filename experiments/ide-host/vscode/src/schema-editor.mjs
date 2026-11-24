@@ -2,8 +2,8 @@ import {openNativeSource,revealNativeSourceLine} from './native-source.mjs';
 
 import {projectJsonSchema, resolveSchemaPointer} from '../../../../site/schema-projection.mjs';
 
-const SCHEMA_PATH = /\/schemas\/(?:[^/]+\/)*[^/]+\.schema\.ya?ml$/i;
-const LOCAL_FILE = /^[A-Za-z0-9_-]+(?:[._-][A-Za-z0-9_-]+)*\.schema\.ya?ml$/;
+const SCHEMA_PATH = /\/schemas\/(?:[^/]+\/)*[^/]+\.schema\.(?:json|ya?ml)$/i;
+const LOCAL_FILE = /^[A-Za-z0-9_-]+(?:[._-][A-Za-z0-9_-]+)*\.schema\.(?:json|ya?ml)$/;
 
 function nonce() {
   const bytes = new Uint8Array(20);
@@ -96,9 +96,9 @@ function html(token) {
     "for(const item of node.children||[])field(d,item);parent.append(d);}",
     "function filter(){const needle=$('search').value.trim().toLowerCase();for(const d of document.querySelectorAll('.field')){d.hidden=false;if(!needle)continue;const own=(d.dataset.field||'').includes(needle);const descendants=[...d.querySelectorAll('.field')].some(x=>(x.dataset.field||'').includes(needle));d.hidden=!(own||descendants);if(descendants)d.open=true;}}",
     "function render(msg){last=msg.projection;version=msg.version;$('status').textContent='SOURCE VERSION '+version;$('title').textContent=(msg.packageName?msg.packageName+' · ':'')+(last.title||last.schemaId||'Schema');$('tree').replaceChildren();$('banner').replaceChildren();$('summary').replaceChildren();$('search').value='';",
-    "if(last.state==='SOURCE_ONLY'){const f=el('section','fallback');f.append(el('h2','','当前 Schema 无法安全可视化'));f.append(el('p','subtitle',last.reason||'请查看原始 YAML'));f.append(action('打开 YAML Source','openSource'));$('tree').append(f);return;}",
+    "if(last.state==='SOURCE_ONLY'){const f=el('section','fallback');f.append(el('h2','','当前 Schema 无法安全可视化'));f.append(el('p','subtitle',last.reason||'请查看原始 Schema'));f.append(action('打开 Schema Source','openSource'));$('tree').append(f);return;}",
     "$('summary').append(el('span','pill','Draft 2020-12'),el('span','pill',last.fieldCount+' fields'),el('span','pill','只读 · Source 真源'));if(last.schemaId)$('summary').append(el('span','pill','Schema ID '+last.schemaId));",
-    "if(last.state==='PARTIAL'){const b=el('div','banner');b.append(el('strong','', '部分可视化 · 未展示内容仍保留在 YAML'));const ul=el('ul');for(const p of [...(last.unprojectedPaths||[]),...(last.projectionWarnings||[])])ul.append(el('li','',p));b.append(ul);$('banner').append(b);}",
+    "if(last.state==='PARTIAL'){const b=el('div','banner');b.append(el('strong','', '部分可视化 · 未展示内容仍保留在 Source'));const ul=el('ul');for(const p of [...(last.unprojectedPaths||[]),...(last.projectionWarnings||[])])ul.append(el('li','',p));b.append(ul);$('banner').append(b);}",
     "field($('tree'),last.tree);}",
     "$('search').addEventListener('input',filter);$('openSource').addEventListener('click',()=>api.postMessage({type:'openSource',version}));",
     "window.addEventListener('message',event=>{const m=event.data;if(m?.type==='snapshot')render(m);else if(m?.type==='error')$('status').textContent=m.message||'Schema editor error';});api.postMessage({type:'ready'});"
@@ -108,7 +108,7 @@ function html(token) {
     '<meta name="viewport" content="width=device-width, initial-scale=1">'+
     '<title>SKILL Schema Visual</title><style nonce="'+token+'">'+style+'</style></head>'+
     '<body><header><div class="brand"><div class="eyebrow">SKILL STUDIO · SCHEMAS</div><h1>Schema Designer · <span id="title"></span></h1></div>'+
-    '<div class="actions"><span id="status" class="status"></span><button id="openSource" class="primary">打开 YAML Source</button></div></header>'+
+    '<div class="actions"><span id="status" class="status"></span><button id="openSource" class="primary">打开 Schema Source</button></div></header>'+
     '<main><p class="desc">从当前文档投影的 Draft 2020-12 字段树 · $ref 仅跳转精确本地定义，不访问网络。</p>'+
     '<div id="banner"></div><div class="toolbar"><input id="search" aria-label="查找字段" placeholder="搜索字段或路径">'+
     '<div id="summary" class="toolbar"></div></div><div id="tree" class="tree"></div>'+
@@ -127,13 +127,13 @@ async function chooseSchema(vscode, uri) {
   if (supplied && isSkillSchema(supplied.path)) return supplied;
   const active = vscode.window.activeTextEditor?.document.uri;
   if (active && isSkillSchema(active.path)) return active;
-  const found = await vscode.workspace.findFiles('**/schemas/*.schema.yaml','**/node_modules/**',50);
+  const found = await vscode.workspace.findFiles('**/schemas/*.{schema.yaml,schema.json}','**/node_modules/**',50);
   // Optional precise package-relative path for deterministic callers/tests.
   // Never construct a URI from arbitrary command input; choose an actual
   // workspace file only when there is exactly one matching candidate.
   if (typeof uri === 'string') {
     const suffix = uri;
-    if (!/^schemas\/[A-Za-z0-9_-]+(?:[._-][A-Za-z0-9_-]+)*\.schema\.ya?ml$/.test(suffix))
+    if (!/^schemas\/[A-Za-z0-9_-]+(?:[._-][A-Za-z0-9_-]+)*\.schema\.(?:json|ya?ml)$/.test(suffix))
       throw new Error('Unsafe or unsupported Schema relative path');
     const matches = found.filter(file => file.path.endsWith('/'+suffix));
     if (matches.length !== 1)
@@ -152,7 +152,7 @@ async function chooseSchema(vscode, uri) {
 }
 export function mountSchemaPreview(vscode,document,panel,{isCurrent=()=>true}={}) {
       if (!isSkillSchema(document.uri.path)) {
-        void vscode.window.showWarningMessage('Only Skill schemas/*.schema.yaml is supported');
+        void vscode.window.showWarningMessage('Only Skill schemas/*.schema.yaml or *.schema.json is supported');
         return {dispose(){}};
       }
       const webview = panel.webview;

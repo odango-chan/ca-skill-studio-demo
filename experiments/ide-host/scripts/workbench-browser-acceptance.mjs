@@ -1054,6 +1054,10 @@ export async function runWorkbenchAcceptance({
        currentLanguageFeatures.waitResponseAfter?.includes("timeout-handler")||
        !currentLanguageFeatures.waitTimeoutTarget?.includes("timeout-handler")||
        !currentLanguageFeatures.waitOutput?.includes("await-event.wait.output")||
+       !currentLanguageFeatures.contextRequestFields?.includes("sst")||
+       !currentLanguageFeatures.contextRequestFields?.includes("sd")||
+       !currentLanguageFeatures.contextRoot?.includes("request")||
+       !currentLanguageFeatures.contextStart?.includes("context.request")||
        currentLanguageFeatures.waitTimeoutTarget?.includes("SUCCEEDED")||
        !currentLanguageFeatures.outcomeUnknownTargets?.includes("SAFE_STOPPED")||
        !currentLanguageFeatures.contractDefinition||

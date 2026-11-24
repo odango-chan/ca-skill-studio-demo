@@ -44,6 +44,7 @@
     "onCommand:skillStudio.updateDependencyLock",
     "onCommand:skillStudio.removeDependency",
     "onCommand:skillStudio.inspectDependencyContract",
+    "onCommand:skillStudio.openInterfaceExport",
     "onCommand:skillStudio.showWelcome",
     "onCommand:skillStudio.checkSkill",
     "onCommand:skillStudio.buildSkill",
@@ -190,6 +191,11 @@
         "title": "%command.inspectDependencyContract%"
       },
       {
+        "command": "skillStudio.openInterfaceExport",
+        "title": "Open Immutable Interface Package Export",
+        "category": "SKILL Studio"
+      },
+      {
         "command": "skillStudio.checkSkill",
         "title": "%command.checkSkill%",
         "category": "SKILL Studio"
@@ -232,6 +238,16 @@
           ".markdown"
         ],
         "configuration": "./dist/grammars/markdown/language-configuration.json"
+      },
+      {
+        "id": "json",
+        "aliases": [
+          "JSON",
+          "json"
+        ],
+        "extensions": [
+          ".json"
+        ]
       },
       {
         "id": "yaml",
