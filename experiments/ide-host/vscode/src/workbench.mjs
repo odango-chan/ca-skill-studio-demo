@@ -13,6 +13,8 @@ import {buildPackageZip,bytesToBase64} from '../../../../site/package-zip-export
 import {resolveLockedDependencies} from "./dependency-service.mjs";
 import {readProjectConfiguration} from "./project-configuration.mjs";
 import {decodeBase64} from "./dependency-snapshot.mjs";
+import {projectLockedInterfaceCompletionHints}
+  from "./interface-schema-completion.mjs";
 import {collectPackageSnapshot,packageRootForProcedure} from "./package-snapshot.mjs";
 import {resolveSemanticTokenSourcePath} from "./semantic-token-path.mjs";
 import {
@@ -427,7 +429,7 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
         try{
           const project=readProjectConfiguration(vscode,folder.uri);
           const resolved=await resolveLockedDependencies(vscode,folder.uri);
-          const operations=[],schemas=[],toolCatalogs=[];
+          const operations=[],schemas=[],toolCatalogs=[],schemaCompletionHints=[];
           const decoder=new TextDecoder("utf-8",{fatal:true});
           for(const dependency of resolved.snapshots??[]){
             const decoded=(dependency.files??[])
@@ -443,6 +445,14 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
               });
               operations.push(...catalog.operations);
             }
+            if(dependency.kind==="interface-package"){
+              // Suggestions describe immutable declarations, never Owner trust.
+              const hints=projectLockedInterfaceCompletionHints(dependency);
+              schemaCompletionHints.push(...hints);
+              operations.push(...hints.map(item=>({
+                id:item.id,dependencyId:item.dependencyId,kind:item.kind
+              })));
+            }
             for(const file of decoded){
               const schemaFile=dependency.kind==="schema-bundle"
                 ?/\.(?:json|ya?ml)$/i.test(file.path)
@@ -456,10 +466,11 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
             declarations:project.settings.dependencies,
             snapshots:(resolved.snapshots??[]).map(item=>({id:item.id,kind:item.kind})),
             diagnostics:resolved.diagnostics??[],
-            operations,toolCatalogs,schemas
+            operations,toolCatalogs,schemas,schemaCompletionHints
           };
           snapshot.dependencyOperations=operations;
           snapshot.dependencySchemas=schemas;
+          snapshot.schemaCompletionHints=schemaCompletionHints;
         }catch(error){
           dependencyContext={
             available:false,reason:String(error?.message??error)
