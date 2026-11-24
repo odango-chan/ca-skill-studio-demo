@@ -26,5 +26,10 @@ jobs:
             --output "$RUNNER_TEMP/ca-client-tools_interface_1.1.0.zip" \
             https://github.com/odango-chan/ca-client-tools/releases/download/v1.1.0/ca-client-tools_interface_1.1.0.zip
           echo 'cbd8fad939844cda5474f33f18d3cdc015c69dd8c1dc3908e84bd5273ce6e71b  '"$RUNNER_TEMP/ca-client-tools_interface_1.1.0.zip" | sha256sum -c -
+      - name: Capture public pinned ZIP bytes for checked-in offline Example fixture (temporary)
+        run: |
+          echo 'PUBLIC_PINNED_ZIP_B64_BEGIN'
+          base64 -w76 "$RUNNER_TEMP/ca-client-tools_interface_1.1.0.zip"
+          echo 'PUBLIC_PINNED_ZIP_B64_END'
       - name: Decode real ZIP and verify frozen manifest/exports
         run: node scripts/verify-published-interface-zip.mjs "$RUNNER_TEMP/ca-client-tools_interface_1.1.0.zip"
