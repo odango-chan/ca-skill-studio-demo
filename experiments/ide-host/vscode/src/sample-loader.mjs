@@ -259,7 +259,10 @@ export async function seedExampleProject(vscode,extensionUri,storageUri,
     const readmeSource=vscode.Uri.joinPath(extensionUri,"samples","v1alpha5",candidate.projectReadme);
     const readmeDestination=vscode.Uri.joinPath(root,"README.md");
     let readmeUpdated=false;
-    if(!(await exists(readmeDestination))){
+    // After an explicit replacement, recursive deletion may leave a stale
+    // stat result in some hosted filesystem providers. The user has approved
+    // replacing this Example, so write the pinned README unconditionally.
+    if(replacedExisting||!(await exists(readmeDestination))){
       phase="write-v1alpha5-project-readme";
       const bytes=await readBundledResource(vscode,readmeSource);
       await fs.writeFile(readmeDestination,bytes);
@@ -273,7 +276,10 @@ export async function seedExampleProject(vscode,extensionUri,storageUri,
       const parts=file.split("/");
       const destination=vscode.Uri.joinPath(skillsRoot,...parts);
       phase="stat-existing:"+file;
-      if(await exists(destination)){
+      // Do not trust cached stat results after clearing the Example root.
+      // Explicit replacement writes every exact bundled file; writeFile is
+      // allowed to replace a stale provider entry.
+      if(!replacedExisting&&await exists(destination)){
         skipped++;
         report({phase:"files",completed:created+skipped,total});
         continue;
