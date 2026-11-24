@@ -43,6 +43,7 @@
     "onCommand:skillStudio.updateDependencyLock",
     "onCommand:skillStudio.removeDependency",
     "onCommand:skillStudio.inspectDependencyContract",
+    "onCommand:skillStudio.openInterfaceExport",
     "onCommand:skillStudio.showWelcome",
     "onCommand:skillStudio.checkSkill",
     "onCommand:skillStudio.buildSkill",
@@ -187,6 +188,11 @@
       {
         "command": "skillStudio.inspectDependencyContract",
         "title": "%command.inspectDependencyContract%"
+      },
+      {
+        "command": "skillStudio.openInterfaceExport",
+        "title": "Open Immutable Interface Package Export",
+        "category": "SKILL Studio"
       },
       {
         "command": "skillStudio.checkSkill",
