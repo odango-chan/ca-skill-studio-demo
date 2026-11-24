@@ -567,6 +567,7 @@ export function activate(context){
         contractReadError:contractRead.error,procedureReadError:procedureRead.error,
         libExists:await exists(lib),
         outputExists:await exists(output),
+        ...(isExample?{welcome:projectWelcome?.getDiagnostics?.()??null}:{}),
         ...(isExample?{exampleInterface:{
           status:dependencies?.status,
           imported:Boolean(interfaceSnapshot),
