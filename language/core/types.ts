@@ -38,6 +38,22 @@ export interface PackageSnapshot {
     readonly path: string;
     readonly text: string;
   }[];
+  /** Read-only, generation-scoped input Schema hints from exact locked exports. */
+  readonly schemaCompletionHints?: readonly {
+    readonly id: string;
+    readonly dependencyId: string;
+    readonly kind: "operation" | "observation";
+    readonly inputSchemaId: string;
+    readonly trust: "DECLARATION_ONLY";
+    readonly argumentProperties: readonly {
+      readonly name: string;
+      readonly required: boolean;
+      readonly type: string;
+      readonly description: string;
+      readonly title: string;
+      readonly choices: readonly (string | number | boolean)[];
+    }[];
+  }[];
   /** Current project-lock context for the same Package analysis generation. */
   readonly dependencyContext?: Readonly<Record<string, unknown>>;
   readonly reason?: string;
