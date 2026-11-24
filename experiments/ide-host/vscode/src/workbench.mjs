@@ -503,7 +503,11 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
         files:snapshot.documents.map(item=>({
           path:item.relativePath,version:item.version,chars:item.text.length
         })).filter(item=>item.path.startsWith("assurance/")||
-          item.path.endsWith("select_establishment_configuration.py"))
+          item.path.endsWith("select_establishment_configuration.py")),
+        dependencyContextAvailable:dependencyContext.available===true,
+        resolvedDependencyIds:(dependencyContext.snapshots??[]).map(item=>item.id),
+        schemaCompletionHintIds:(dependencyContext.schemaCompletionHints??[])
+          .map(item=>item.id)
       };
       updateLanguageStatus("ANALYZING","Analyzing "+snapshot.packageName+
         " · generation "+snapshot.generation);
@@ -1391,13 +1395,12 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
           // Assert the immutable Schema hint reached this Package generation,
           // then query the real browser Worker and native Theia Completion API.
           const queryToolId="ca-client::openamsm.smf.mas.sc.query";
-          const dependencyHints=state.lastSentSnapshot?.schemaCompletionHints??[];
-          const queryHint=dependencyHints.filter(item=>
-            item.id===queryToolId&&item.kind==="observation"&&
-            item.trust==="DECLARATION_ONLY");
-          if(queryHint.length!==1)
-            throw Error("Pinned ca-client Schema hint did not reach the accepted LSP Package snapshot: "+
-              JSON.stringify({queryHint,dependencyHints:dependencyHints.map(item=>item.id)}));
+          const dependencyHintIds=state.lastSentSnapshot?.schemaCompletionHintIds??[];
+          if(state.lastSentSnapshot?.dependencyContextAvailable!==true||
+             !state.lastSentSnapshot?.resolvedDependencyIds?.includes("ca-client")||
+             dependencyHintIds.filter(id=>id===queryToolId).length!==1)
+            throw Error("Pinned ca-client Schema hint was not projected into the accepted LSP Package snapshot: "+
+              JSON.stringify(state.lastSentSnapshot));
           const queryToolCompletion=await complete(procedureDocument,
             "tool: ca-client::openamsm.smf.mas.sc.q");
           const querySource=procedureDocument.getText();
