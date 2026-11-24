@@ -45,6 +45,14 @@ export interface PackageSnapshot {
     readonly kind: "operation" | "observation";
     readonly inputSchemaId: string;
     readonly trust: "DECLARATION_ONLY";
+    readonly outputSchemaId?: string;
+    readonly outputProperties?: readonly {
+      readonly name: string;
+      readonly type: string;
+      readonly required: boolean;
+      readonly description: string;
+      readonly children: readonly unknown[] | null;
+    }[];
     readonly argumentProperties: readonly {
       readonly name: string;
       readonly required: boolean;
