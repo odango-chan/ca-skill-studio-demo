@@ -2289,6 +2289,27 @@ try{
       await new Promise(resolve=>positiveGateway.close(resolve));
     }
   }
+  if(requireEditor&&requireBrowserLsp){
+    const readonly=await evalJS(`(async()=>{
+      const c=window.theia?.container;
+      if(!c)throw Error('Theia container unavailable');
+      const key=[...(c._bindingDictionary?._map?.keys?.()??[])].find(k=>
+        typeof k==='function'&&k.prototype?.executeCommand&&
+        k.prototype?.registerCommand&&k.prototype?.getCommand);
+      if(!key)throw Error('Native Theia command service missing');
+      return await c.get(key).executeCommand(
+        'skillStudio.internal.interfaceReadonlySourceAcceptance');
+    })()`);
+    if(readonly?.syntheticOnly!==true||
+       readonly?.scheme!=='skill-studio-dependency'||
+       readonly?.languageId!=='json'||readonly?.sourceUnchanged!==true||
+       readonly?.editorColumn!==1||
+       !readonly?.virtualPath?.includes('/schemas/source-probe.schema.json'))
+      throw Error("Native Theia readonly Interface Schema source/Preview failed: "+
+        JSON.stringify(readonly));
+    console.log("STUDIO_INTERFACE_SCHEMA_NATIVE_READONLY_CHROMIUM_PASS",
+      JSON.stringify(readonly));
+  }
   if(requireEditor)
     console.log("THEIA_BROWSER_HOST_V1ALPHA5_ACCEPTANCE_PASS");
   else
