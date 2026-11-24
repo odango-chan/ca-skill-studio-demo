@@ -116,6 +116,61 @@ function validate(manifest,{sourceSha,sourceStatus,sourceRef,languageVersion,pro
       if(!seen.has(skill+"/"+required))fail("Missing required "+skill+"/"+required);
   return manifest;
 }
+// Seed only a missing default lock. An existing settings.json is the user's
+// explicit configuration and is NEVER rewritten, even if ca-client is absent.
+async function persistExampleInterfaceIfAbsent(vscode,root,prepared){
+  const fs=vscode.workspace.fs;
+  const settingsUri=vscode.Uri.joinPath(root,".vscode","settings.json");
+  const exists=async uri=>{
+    try{await fs.stat(uri);return true;}
+    catch(error){if(error?.code==="FileNotFound")return false;throw error;}
+  };
+  if(await exists(settingsUri))return false;
+  const persisted=await writeImmutableSnapshot(vscode,root,prepared.files);
+  if(persisted.snapshotDigest!==prepared.snapshotDigest)
+    fail("Example Interface Package snapshot digest mismatch");
+  // A second startup/import task may have created user settings meanwhile.
+  if(await exists(settingsUri))return false;
+  await fs.createDirectory(vscode.Uri.joinPath(root,".vscode"));
+  await fs.writeFile(settingsUri,exampleWorkspaceSettingsContent(prepared));
+  return true;
+}
+
+// Safe one-time migration for a previously opened CURRENT Example after an
+// online Studio upgrade. Never replace sources, settings or ordinary projects.
+// Stale legacy Example data is intentionally left for explicit Replace Example.
+export async function ensureOpenedExampleInterface(vscode,extensionUri,storageUri){
+  const root=vscode.Uri.joinPath(storageUri,EXAMPLE_PROJECT_NAME);
+  const folders=vscode.workspace.workspaceFolders??[];
+  if(vscode.workspace.workspaceFile||folders.length!==1||
+     folders[0]?.uri?.toString?.()!==root.toString())
+    return {status:"NOT_EXAMPLE"};
+  const fs=vscode.workspace.fs;
+  const settingsUri=vscode.Uri.joinPath(root,".vscode","settings.json");
+  try{await fs.stat(settingsUri);return {status:"PRESERVED"};}
+  catch(error){if(error?.code!=="FileNotFound")throw error;}
+  const procedure=vscode.Uri.joinPath(root,"skills","establish-pdu-session",
+    "assurance","procedure.yaml");
+  const contract=vscode.Uri.joinPath(root,"skills","establish-pdu-session",
+    "assurance","contract.yaml");
+  const [procedureText,contractText]=await Promise.all([procedure,contract].map(async uri=>{
+    try{return decoder.decode(await fs.readFile(uri));}
+    catch(error){if(error?.code==="FileNotFound")return "";throw error;}
+  }));
+  if(!/^\s*start\s*:/m.test(procedureText)||
+     !/^\s*nodes\s*:/m.test(procedureText)||
+     /^\s*apiVersion\s*:/m.test(procedureText)||
+     !/^\s*requestSchema\s*:/m.test(contractText))
+    return {status:"LEGACY_OR_UNKNOWN"};
+  const prepared=await prepareExampleInterfaceDependency(
+    await readBundledResource(vscode,vscode.Uri.joinPath(extensionUri,
+      "samples","v1alpha5","interface-package",EXAMPLE_INTERFACE_ARCHIVE+".b64"))
+  );
+  const seeded=await persistExampleInterfaceIfAbsent(vscode,root,prepared);
+  return {status:seeded?"SEEDED":"PRESERVED",
+    id:prepared.declaration.id,snapshotDigest:prepared.snapshotDigest};
+}
+
 export async function seedExampleProject(vscode,extensionUri,storageUri,
   {replaceExisting=false,onProgress=()=>{}}={}){
   let phase="initial";
@@ -213,18 +268,9 @@ export async function seedExampleProject(vscode,extensionUri,storageUri,
     // replaced Example receives a pinned snapshot + .vscode/settings.json.
     // Existing user settings are never rewritten on a non-replacing reopen;
     // this also respects users who intentionally removed ca-client.
-    const settingsUri=vscode.Uri.joinPath(root,".vscode","settings.json");
-    let exampleDependencySeeded=false;
-    if(!(await exists(settingsUri))){
-      phase="persist-example-interface-snapshot";
-      const persisted=await writeImmutableSnapshot(vscode,root,exampleInterface.files);
-      if(persisted.snapshotDigest!==exampleInterface.snapshotDigest)
-        fail("Example Interface Package snapshot digest mismatch");
-      phase="write-example-project-settings";
-      await fs.createDirectory(vscode.Uri.joinPath(root,".vscode"));
-      await fs.writeFile(settingsUri,exampleWorkspaceSettingsContent(exampleInterface));
-      exampleDependencySeeded=true;
-    }
+    phase="persist-example-interface-lock";
+    const exampleDependencySeeded=await persistExampleInterfaceIfAbsent(
+      vscode,root,exampleInterface);
 
     if(replacedExisting){
       phase="verify-replaced-example";
