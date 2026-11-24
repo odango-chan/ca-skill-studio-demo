@@ -284,6 +284,40 @@ try{
     return false;
   })()`);
   await sleep(300);
+  // Non-failing diagnostic of the real browser-side GitHub Release download
+  // path. A CI origin is not the production Pages origin, and CORS failure must
+  // remain BLOCKED rather than silently falling back to an unpinned URL.
+  const releaseBrowserProbe=await evalJS(`(async()=>{
+    const tagUrl='https://api.github.com/repos/odango-chan/ca-client-tools/releases/tags/v1.1.0';
+    const expected='sha256:cbd8fad939844cda5474f33f18d3cdc015c69dd8c1dc3908e84bd5273ce6e71b';
+    try{
+      const response=await fetch(tagUrl,{mode:'cors',credentials:'omit',
+        headers:{Accept:'application/vnd.github+json'},
+        signal:AbortSignal.timeout(8500)});
+      if(!response.ok)return {state:'BLOCKED',phase:'release',http:response.status};
+      const info=await response.json();
+      const asset=info.assets?.find(x=>x.name==='ca-client-tools_interface_1.1.0.zip');
+      if(info.tag_name!=='v1.1.0'||!asset?.url)
+        return {state:'BLOCKED',phase:'exact-release-asset'};
+      const binary=await fetch(asset.url,{mode:'cors',credentials:'omit',
+        headers:{Accept:'application/octet-stream'},
+        signal:AbortSignal.timeout(8500)});
+      const contentType=binary.headers.get('content-type')||'';
+      if(!binary.ok||contentType.includes('json'))
+        return {state:'BLOCKED',phase:'binary-response',
+          http:binary.status,contentType};
+      const bytes=new Uint8Array(await binary.arrayBuffer());
+      const hash=new Uint8Array(await crypto.subtle.digest('SHA-256',bytes));
+      const digest='sha256:'+Array.from(hash,b=>b.toString(16).padStart(2,'0')).join('');
+      return {state:bytes.length===asset.size&&digest===expected?'PASS':'BLOCKED',
+        phase:'archive-digest',bytes:bytes.length,assetBytes:asset.size,
+        sha256Match:digest===expected,contentType};
+    }catch(error){
+      return {state:'BLOCKED',phase:'browser-network-or-CORS',
+        reason:String(error?.message??error)};
+    }
+  })()`);
+  console.log("STUDIO_INTERFACE_RELEASE_BROWSER_CORS_PROBE",JSON.stringify(releaseBrowserProbe));
   const diagnostics=await evalJS(`({
     htmlClass:document.documentElement.className,
     bodyStyle:document.body?.getAttribute('style'),
