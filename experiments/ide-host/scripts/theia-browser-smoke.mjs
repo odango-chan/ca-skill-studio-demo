@@ -2005,20 +2005,23 @@ try{
       });
       if(agentStart.result?.value!==true)throw Error("Skill Package Agent entry is unavailable");
       const agentApproval=await waitForDialogButton(["发送并生成提案"]);
+      await command("Input.dispatchMouseEvent",{type:"mouseMoved",x:agentApproval.x,y:agentApproval.y});
       await command("Input.dispatchMouseEvent",{type:"mousePressed",x:agentApproval.x,y:agentApproval.y,button:"left",clickCount:1});
       await command("Input.dispatchMouseEvent",{type:"mouseReleased",x:agentApproval.x,y:agentApproval.y,button:"left",clickCount:1});
-      let agentReady=false;
+      let agentReady=false, lastAgentActivity;
       const agentDeadline=Date.now()+140000;
       while(!agentReady && Date.now()<agentDeadline){
         const activity=await command("Runtime.evaluate",{
           contextId:aiContextId,returnByValue:true,
           expression:`({
+            status:document.getElementById('status').textContent,
             log:document.getElementById('agentActivity').textContent,
             candidate:document.getElementById('candidateSource').textContent,
             busy:!document.getElementById('cancel').disabled
           })`
         });
         const value=activity.result?.value;
+        lastAgentActivity=value;
         agentReady=value?.log.includes("读取本轮资料")&&value.candidate.includes("ai-authoring-smoke-node")&&!value.busy;
         if(!agentReady)await sleep(100);
       }
@@ -2028,7 +2031,13 @@ try{
          catalogMessage.includes("CONTEXT ITEM")||!selectedContext?.includes("label: assurance/contract.yaml")||
          selectedContext.includes("label: assurance/predicates.yaml")||
          ![4,5].includes(gatewayRequests.length))
-        throw Error("Agent did not select and read only the disclosed Package resource");
+        throw Error("Agent did not select and read only the disclosed Package resource: "+JSON.stringify({
+          ready: agentReady, requestCount: gatewayRequests.length,
+          hasCatalog: Boolean(catalogMessage?.includes("assurance/contract.yaml")),
+          hasSelectedContract: Boolean(selectedContext?.includes("label: assurance/contract.yaml")),
+          status: lastAgentActivity?.status, busy: lastAgentActivity?.busy,
+          hasCandidate: Boolean(lastAgentActivity?.candidate)
+        }));
       console.log("STUDIO_PACKAGE_AGENT_BOUND_CONTEXT_CHROMIUM_PASS");
       // F4 disposal gate: close the specific AI Editor Tab in Theia's
       // actual main shell. A history inspection must not leave the Webview
@@ -2046,6 +2055,54 @@ try{
       );
       if(closedAiTab?.closed!==true)
         throw Error("F4 session Editor Tab did not dispose cleanly: "+JSON.stringify(closedAiTab));
+      await nativeCommand("skillStudio.openProcedure",identity.defaultProcedure);
+      const nativeChatStart=await evalJS(`(async()=>{
+        const c=window.theia.container;
+        const keys=[...c._bindingDictionary._map.keys()];
+        const service=k=>keys.find(key=>String(key)==='Symbol('+k+')');
+        const chat=c.get(service('ChatService')),agents=c.get(service('ChatAgentService'));
+        const agent=agents.getAgents().find(item=>item.id==='SkillStudio');
+        if(!agent)return false;
+        const session=chat.createSession('panel',undefined,agent);
+        const invocation=await chat.sendRequest(session.id,{text:'Prepare a Package candidate in native AI Chat'});
+        if(!invocation)return false;
+        window.__studioNativeAiAcceptance=null;
+        void invocation.responseCompleted.then(response=>{window.__studioNativeAiAcceptance=response.response.asString();});
+        return true;
+      })()`);
+      if(!nativeChatStart)throw Error("Native Theia SkillStudio agent did not start");
+      const nativeApproval=await waitForDialogButton(["发送并生成提案"]);
+      await command("Input.dispatchMouseEvent",{type:"mouseMoved",x:nativeApproval.x,y:nativeApproval.y});
+      await command("Input.dispatchMouseEvent",{type:"mousePressed",x:nativeApproval.x,y:nativeApproval.y,button:"left",clickCount:1});
+      await command("Input.dispatchMouseEvent",{type:"mouseReleased",x:nativeApproval.x,y:nativeApproval.y,button:"left",clickCount:1});
+      let nativeReply;
+      const nativeDeadline=Date.now()+140000;
+      while(!nativeReply && Date.now()<nativeDeadline){
+        nativeReply=await evalJS('window.__studioNativeAiAcceptance');
+        if(!nativeReply)await sleep(100);
+      }
+      if(!nativeReply?.includes("AI Authoring mock proposal") || !nativeReply.includes("Compiler Check"))
+        throw Error("Native Theia SkillStudio reply did not report the candidate: "+nativeReply);
+      // Opening the review must replay the candidate without starting a new model request.
+      const nativeRequests=gatewayRequests.length;
+      await nativeCommand("skillStudio.openAiAuthoring");
+      let nativeReview;
+      for(let attempt=0;attempt<80;attempt++){
+        nativeReview=await readAiView();
+        if(nativeReview?.candidateSource.includes("ai-authoring-smoke-node"))break;
+        await sleep(100);
+      }
+      if(!nativeReview?.candidateSource.includes("ai-authoring-smoke-node") ||
+         gatewayRequests.length!==nativeRequests) throw Error("Native Chat candidate was lost before Studio review");
+      await evalJS(`(async()=>{
+        const c=window.theia.container;
+        const key=[...c._bindingDictionary._map.keys()].find(k=>
+          typeof k==='function'&&k.prototype?.getWidgets&&k.prototype?.closeWidget);
+        const shell=c.get(key);
+        const widget=shell.getWidgets('main').find(w=>w.title?.label==='AI Procedure Authoring');
+        if(widget)await shell.closeWidget(widget.id);
+      })()`);
+      console.log("STUDIO_NATIVE_SKILL_CHAT_GATEWAY_REVIEW_CHROMIUM_PASS");
       console.log("STUDIO_AI_AUTHORING_REFINEMENT_HISTORY_CHROMIUM_PASS",JSON.stringify({
         modelRequests:2,sessionRevisions:2,repeatedDisclosure:true,
         refinementUsesSemanticHistory:true,historicalApplyBlocked:true
@@ -2287,6 +2344,43 @@ try{
         });
       }catch{}
       await new Promise(resolve=>positiveGateway.close(resolve));
+    }
+  }
+  if(requireEditor){
+    const nativeSidebar=await evalJS(`(async()=>{
+      const c=window.theia.container;
+      const keys=[...c._bindingDictionary._map.keys()];
+      const commandKey=keys.find(k=>typeof k==='function'&&k.prototype?.executeCommand&&k.prototype?.getCommand);
+      const shellKey=keys.find(k=>typeof k==='function'&&k.prototype?.getWidgets&&k.prototype?.activateWidget);
+      const commands=c.get(commandKey),shell=c.get(shellKey);
+      const find=()=>shell.getWidgets('right').find(item=>item.id==='chat-view-widget');
+      if(!find()?.isVisible)await commands.executeCommand('aiChat:toggle');
+      return {visible:find()?.isVisible===true,groups:window.__skillStudioFixedEditorLayout().tabBarCount};
+    })()`);
+    if(nativeSidebar?.visible!==true||nativeSidebar.groups!==1)
+      throw Error("Theia native AI Chat did not open in the existing right sidebar: "+JSON.stringify(nativeSidebar));
+    console.log("STUDIO_NATIVE_SKILL_CHAT_SIDEBAR_CHROMIUM_PASS");
+    if(!externalUrl){
+      // In the static build, the safety notice must remain visible at both
+      // widths without covering any part of the real native Chat sidebar.
+      for(const width of [1440, 960]){
+        await command("Emulation.setDeviceMetricsOverride",{width,height:900,deviceScaleFactor:1,mobile:false});
+        const noteLayout=await evalJS(`new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(()=>{
+          const note=document.getElementById('skill-studio-preview-warning');
+          const chat=document.getElementById('chat-view-widget');
+          const warning=note?.getBoundingClientRect(),sidebar=chat?.getBoundingClientRect();
+          if(!warning||!sidebar){resolve(null);return;}
+          const overlaps=warning.left<sidebar.right&&warning.right>sidebar.left&&
+            warning.top<sidebar.bottom&&warning.bottom>sidebar.top;
+          resolve({visible:warning.width>0&&warning.height>0&&getComputedStyle(note).visibility==='visible',
+            docked:note.closest('#skill-studio-workspace-mode')!==null,overlaps,
+            sidebarVisible:sidebar.width>0&&sidebar.height>0});
+        })))`);
+        if(!noteLayout?.visible||!noteLayout.docked||noteLayout.overlaps||!noteLayout.sidebarVisible)
+          throw Error("Static safety notice overlapped or disappeared next to native AI Chat at "+width+"px: "+
+            JSON.stringify(noteLayout));
+      }
+      console.log("STUDIO_NATIVE_CHAT_WARNING_NO_OVERLAP_CHROMIUM_PASS");
     }
   }
   if(requireEditor&&requireBrowserLsp){
