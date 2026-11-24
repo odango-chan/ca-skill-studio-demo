@@ -19,6 +19,7 @@ const PREVIEW_VIEW_ID = 'skillStudio.preview';
 const PREVIEW_WIDGET_ID = 'plugin-view:skillStudio.preview';
 
 const AI_WORKBENCH_VIEW = 'skillStudio.aiAuthoring';
+const STUDIO_CHAT_AGENT = Symbol('StudioChatAgent');
 
 function isAiWorkbench(widget: Widget | undefined) {
     return (widget as (Widget & { viewType?: string }) | undefined)?.viewType === AI_WORKBENCH_VIEW;
@@ -142,8 +143,10 @@ function addWorkspaceModeControl(app: FrontendApplication, commands: CommandRegi
 
 export default new ContainerModule((bind, unbind, isBound, rebind) => {
     rebind(EditorPreviewManager).to(StudioEditorManager).inSingletonScope();
-    bind(Agent).toDynamicValue(({ container }) =>
+    bind<ChatAgent>(STUDIO_CHAT_AGENT).toDynamicValue(({ container }) =>
         createStudioChatAgent(container.get(CommandRegistry))).inSingletonScope();
+    bind(Agent).toService(STUDIO_CHAT_AGENT);
+    bind(ChatAgent).toService(STUDIO_CHAT_AGENT);
 
     // Theia does not expose VS Code's generated workbench.view.extension.*
     // commands through its extension host. Reveal the contributed secondary
