@@ -240,6 +240,16 @@
         "configuration": "./dist/grammars/markdown/language-configuration.json"
       },
       {
+        "id": "json",
+        "aliases": [
+          "JSON",
+          "json"
+        ],
+        "extensions": [
+          ".json"
+        ]
+      },
+      {
         "id": "yaml",
         "aliases": [
           "YAML",
