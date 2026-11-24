@@ -10,6 +10,8 @@ import {acquireUpload,acquireMcp,acquireGit,acquireBuiltin}
 import {readGitHubPinnedFile} from "./acquisition-transports.mjs";
 import {decodeBase64,sha256} from "./dependency-snapshot.mjs";
 import {decodeInterfacePackageZip} from "./interface-package-zip.mjs";
+import {localSchemaReference,isSkillSchema} from "./schema-editor.mjs";
+import {projectJsonSchema,resolveSchemaPointer} from "../../../../site/schema-projection.mjs";
 import {projectDependencyReadiness,projectLockedToolCatalog}
   from "./dependency-catalog-projection.mjs";
 const aliasPattern=/^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/;
@@ -177,6 +179,35 @@ export function registerDependencyIntegration(vscode,context,{onLockChanged=()=>
     }
     refresh();
   })??{dispose(){}});
+  // Definition is derived from the verified in-memory snapshot only; never
+  // resolve an arbitrary remote $ref or reinterpret a mutable workspace file.
+  const definitionProvider={
+    async provideDefinition(document,position){
+      if(document.uri.scheme!=="skill-studio-dependency"||
+         !isSkillSchema(document.uri.path))return null;
+      const projection=projectJsonSchema(document.getText());
+      if(projection.state==="SOURCE_ONLY")return null;
+      const line=document.lineAt(position.line).text;
+      const candidate=projection.allRefs.find(item=>{
+        if(item.line!==position.line+1||typeof item.reference!=="string")return false;
+        const at=line.indexOf(item.reference);
+        return at>=0&&position.character>=at&&
+          position.character<=at+item.reference.length;
+      });
+      if(!candidate)return null;
+      const target=localSchemaReference(document.uri,candidate.reference);
+      if(!target||!previews.has(target.uri.path))return null;
+      const targetDoc=await vscode.workspace.openTextDocument(target.uri);
+      const resolved=resolveSchemaPointer(targetDoc.getText(),target.pointer);
+      if(!resolved)return null;
+      return new vscode.Location(target.uri,new vscode.Position(resolved.line-1,0));
+    }
+  };
+  if(typeof vscode.languages?.registerDefinitionProvider==="function")
+    context.subscriptions.push(vscode.languages.registerDefinitionProvider([
+      {scheme:"skill-studio-dependency",language:"json"},
+      {scheme:"skill-studio-dependency",language:"yaml"}
+    ],definitionProvider));
   context.subscriptions.push(vscode.workspace.registerTextDocumentContentProvider(
     "skill-studio-dependency",{
       provideTextDocumentContent(uri){return previews.get(uri.path)??"";}
