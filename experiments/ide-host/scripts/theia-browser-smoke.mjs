@@ -2012,6 +2012,53 @@ try{
       );
       if(closedAiTab?.closed!==true)
         throw Error("F4 session Editor Tab did not dispose cleanly: "+JSON.stringify(closedAiTab));
+      await nativeCommand("skillStudio.openProcedure",identity.defaultProcedure);
+      const nativeChatStart=await evalJS(`(async()=>{
+        const c=window.theia.container;
+        const keys=[...c._bindingDictionary._map.keys()];
+        const service=k=>keys.find(key=>String(key)==='Symbol('+k+')');
+        const chat=c.get(service('ChatService')),agents=c.get(service('ChatAgentService'));
+        const agent=agents.getAgents().find(item=>item.id==='SkillStudio');
+        if(!agent)return false;
+        const session=chat.createSession('panel',undefined,agent);
+        const invocation=await chat.sendRequest(session.id,{text:'Prepare a Package candidate in native AI Chat'});
+        if(!invocation)return false;
+        window.__studioNativeAiAcceptance=null;
+        void invocation.responseCompleted.then(response=>{window.__studioNativeAiAcceptance=response.response.asString();});
+        return true;
+      })()`);
+      if(!nativeChatStart)throw Error("Native Theia SkillStudio agent did not start");
+      const nativeApproval=await waitForDialogButton(["发送并生成提案"]);
+      await command("Input.dispatchMouseEvent",{type:"mousePressed",x:nativeApproval.x,y:nativeApproval.y,button:"left",clickCount:1});
+      await command("Input.dispatchMouseEvent",{type:"mouseReleased",x:nativeApproval.x,y:nativeApproval.y,button:"left",clickCount:1});
+      let nativeReply;
+      const nativeDeadline=Date.now()+140000;
+      while(!nativeReply && Date.now()<nativeDeadline){
+        nativeReply=await evalJS('window.__studioNativeAiAcceptance');
+        if(!nativeReply)await sleep(100);
+      }
+      if(!nativeReply?.includes("AI Authoring mock proposal") || !nativeReply.includes("Compiler Check"))
+        throw Error("Native Theia SkillStudio reply did not report the candidate: "+nativeReply);
+      // Opening the review must replay the candidate without starting a new model request.
+      const nativeRequests=gatewayRequests.length;
+      await nativeCommand("skillStudio.openAiAuthoring");
+      let nativeReview;
+      for(let attempt=0;attempt<80;attempt++){
+        nativeReview=await readAiView();
+        if(nativeReview?.candidateSource.includes("ai-authoring-smoke-node"))break;
+        await sleep(100);
+      }
+      if(!nativeReview?.candidateSource.includes("ai-authoring-smoke-node") ||
+         gatewayRequests.length!==nativeRequests) throw Error("Native Chat candidate was lost before Studio review");
+      await evalJS(`(async()=>{
+        const c=window.theia.container;
+        const key=[...c._bindingDictionary._map.keys()].find(k=>
+          typeof k==='function'&&k.prototype?.getWidgets&&k.prototype?.closeWidget);
+        const shell=c.get(key);
+        const widget=shell.getWidgets('main').find(w=>w.title?.label==='AI Procedure Authoring');
+        if(widget)await shell.closeWidget(widget.id);
+      })()`);
+      console.log("STUDIO_NATIVE_SKILL_CHAT_GATEWAY_REVIEW_CHROMIUM_PASS");
       console.log("STUDIO_AI_AUTHORING_REFINEMENT_HISTORY_CHROMIUM_PASS",JSON.stringify({
         modelRequests:2,sessionRevisions:2,repeatedDisclosure:true,
         refinementUsesSemanticHistory:true,historicalApplyBlocked:true
@@ -2254,6 +2301,21 @@ try{
       }catch{}
       await new Promise(resolve=>positiveGateway.close(resolve));
     }
+  }
+  if(requireEditor){
+    const nativeSidebar=await evalJS(`(async()=>{
+      const c=window.theia.container;
+      const keys=[...c._bindingDictionary._map.keys()];
+      const commandKey=keys.find(k=>typeof k==='function'&&k.prototype?.executeCommand&&k.prototype?.getCommand);
+      const shellKey=keys.find(k=>typeof k==='function'&&k.prototype?.getWidgets&&k.prototype?.activateWidget);
+      const commands=c.get(commandKey),shell=c.get(shellKey);
+      const find=()=>shell.getWidgets('right').find(item=>item.id==='chat-view-widget');
+      if(!find()?.isVisible)await commands.executeCommand('aiChat:toggle');
+      return {visible:find()?.isVisible===true,groups:window.__skillStudioFixedEditorLayout().tabBarCount};
+    })()`);
+    if(nativeSidebar?.visible!==true||nativeSidebar.groups!==1)
+      throw Error("Theia native AI Chat did not open in the existing right sidebar: "+JSON.stringify(nativeSidebar));
+    console.log("STUDIO_NATIVE_SKILL_CHAT_SIDEBAR_CHROMIUM_PASS");
   }
   if(requireEditor)
     console.log("THEIA_BROWSER_HOST_V1ALPHA5_ACCEPTANCE_PASS");

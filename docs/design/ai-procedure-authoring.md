@@ -20,6 +20,10 @@ This document defines the first AI-assisted authoring capability for Skill Studi
 
 双宿主验收需要覆盖同一份未保存的 Procedure、搜索和读取、首次候选失败后修订、准确的 Compiler 结果、显式 Apply、原生 Undo 与 Console 切换。宿主构建、模拟模型与实际断网模型分别记录。浏览器端使用公开演示环境和已配置的 Gateway，Agent 会话目前以宿主会话为单位。
 
+### Theia 原生 AI Chat 入口
+
+Theia 宿主通过原生右侧 AI Chat 注册 `@SkillStudio`。该入口将当前任务交给同一个 Studio Host，使用当前 Procedure 及默认允许的 Package 上下文。模型调用仍使用已配置的 Gateway，发送前由 Studio 显示披露确认。聊天中返回提案摘要和 Compiler 结果，可从 AI Workbench 打开同一个候选继续审阅。写入与 Undo 仍由原生编辑器处理。桌面扩展继续保有独立入口。
+
 ## 1. Approved product decisions
 
 | Decision | P1 baseline |

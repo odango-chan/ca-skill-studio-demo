@@ -1,3 +1,6 @@
+import { Agent } from '@theia/ai-core/lib/common/agent';
+import { ChatAgent, ChatAgentLocation } from '@theia/ai-chat/lib/common/chat-agents';
+import { MutableChatRequestModel, TextChatResponseContentImpl } from '@theia/ai-chat/lib/common/chat-model';
 import { ContainerModule, decorate, injectable } from '@theia/core/shared/inversify';
 import { FrontendApplicationContribution } from '@theia/core/lib/browser/frontend-application-contribution';
 import type { FrontendApplication } from '@theia/core/lib/browser/frontend-application';
@@ -35,6 +38,51 @@ class StudioEditorManager extends EditorManager {
 }
 decorate(injectable(), StudioEditorManager);
 
+interface StudioAgentResult {
+    summary?: string;
+    compilerState?: string;
+    canApply?: boolean;
+    cancelled?: boolean;
+    error?: string;
+}
+
+function createStudioChatAgent(commands: CommandRegistry): ChatAgent {
+    return {
+        id: 'SkillStudio',
+        name: 'SkillStudio',
+        description: 'Propose and check a change to the active Skill Procedure. Studio confirms disclosure and owns Apply and Undo.',
+        locations: [ChatAgentLocation.Panel],
+        variables: [], prompts: [], languageModelRequirements: [], agentSpecificVariables: [], functions: [],
+        async invoke(request: MutableChatRequestModel) {
+            const id = crypto.randomUUID();
+            const response = request.response;
+            const token = response.cancellationToken;
+            const task = request.request.text.replace(/^\s*@SkillStudio(?=\s|$)\s*/, '').trim();
+            if (token.isCancellationRequested) return;
+            const cancellation = token.onCancellationRequested(() => {
+                void commands.executeCommand('skillStudio.internal.cancelNativeAgent', id).catch(() => undefined);
+            });
+            try {
+                response.addProgressMessage({ content: '正在读取当前 Procedure，检查发送范围。' });
+                const result = await commands.executeCommand<StudioAgentResult>('skillStudio.internal.runNativeAgent', id, task);
+                if (token.isCancellationRequested || result?.cancelled) return;
+                if (!result?.summary) {
+                    response.response.addContent(new TextChatResponseContentImpl(result?.error || 'Studio 没有返回候选。'));
+                } else {
+                    response.response.addContent(new TextChatResponseContentImpl(
+                        result.summary + '\n\nCompiler Check · ' + (result.compilerState || 'UNAVAILABLE') +
+                        '\n\n点击顶部 AI Workbench 查看 Change Set 和 Diff。' +
+                        (result.canApply ? '审阅确认后可应用到当前文件。' : '当前候选仅供审阅。')
+                    ));
+                }
+                response.complete();
+            } finally {
+                cancellation.dispose();
+            }
+        }
+    };
+}
+
 function addWorkspaceModeControl(app: FrontendApplication, commands: CommandRegistry) {
     const shell = app.shell;
     const control = new Widget({ node: document.createElement('nav') });
@@ -71,6 +119,11 @@ function addWorkspaceModeControl(app: FrontendApplication, commands: CommandRegi
         control.node.appendChild(button);
         return button;
     });
+    const chat = document.createElement('button');
+    chat.type = 'button';
+    chat.textContent = 'AI Chat';
+    chat.onclick = () => { void commands.executeCommand('aiChat:toggle'); };
+    control.node.appendChild(chat);
     const update = () => {
         const current = shell.getCurrentWidget('main');
         const active = isAiWorkbench(current) ? 0 :
@@ -89,6 +142,8 @@ function addWorkspaceModeControl(app: FrontendApplication, commands: CommandRegi
 
 export default new ContainerModule((bind, unbind, isBound, rebind) => {
     rebind(EditorManager).to(StudioEditorManager).inSingletonScope();
+    bind(Agent).toDynamicValue(({ container }) =>
+        createStudioChatAgent(container.get(CommandRegistry))).inSingletonScope();
 
     // Theia does not expose VS Code's generated workbench.view.extension.*
     // commands through its extension host. Reveal the contributed secondary

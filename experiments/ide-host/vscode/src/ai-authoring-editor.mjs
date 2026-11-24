@@ -662,26 +662,55 @@ export function registerAiAuthoringEditor(vscode, context, { getActiveDocument, 
     return vscode.workspace.openTextDocument(selected);
   }
 
-  async function open({ pick = true } = {}) {
-    try {
-      const document = await resolveProcedureDocument({ pick });
-      if (!document) return false;
-      const key = document.uri.toString();
-      const existing = views.get(key);
-      lastDocument = document;
-      if (existing) return existing.reveal(document);
-      const view = createAuthoringView(vscode, context, {
+  function getView(document) {
+    const key = document.uri.toString();
+    let view = views.get(key);
+    if (!view) {
+      view = createAuthoringView(vscode, context, {
         document, compilerIntegration, getSyntheticFixture: () => syntheticFixture,
         onDispose: () => views.delete(key),
       });
-      const opened = view.reveal();
       views.set(key, view);
-      return opened;
+    }
+    lastDocument = document;
+    return view;
+  }
+
+  async function open({ pick = true } = {}) {
+    try {
+      const document = await resolveProcedureDocument({ pick });
+      return document ? getView(document).reveal(document) : false;
     } catch (error) {
       void vscode.window.showWarningMessage("AI Procedure Authoring： " + String(error?.message ?? error));
       return false;
     }
   }
+
+  const nativeRuns = new Map();
+  const nativeTask = vscode.commands.registerCommand("skillStudio.internal.runNativeAgent", async (id, task) => {
+    if (typeof id !== "string" || !/^[a-zA-Z0-9-]{1,100}$/.test(id) ||
+        typeof task !== "string" || !task.trim() || task.length > 4000 ||
+        nativeRuns.has(id)) throw new Error("请输入 1–4000 字符的 Agent 任务。");
+    const run = { cancelled: false, view: null };
+    nativeRuns.set(id, run);
+    try {
+      const document = await resolveProcedureDocument({ pick: false });
+      if (run.cancelled) return { cancelled: true };
+      if (!document) throw new Error("请先在 Console 打开要处理的 Procedure。");
+      run.view = getView(document);
+      return await run.view.runNativeTask(document, task.trim(), () => run.cancelled);
+    } finally {
+      nativeRuns.delete(id);
+    }
+  });
+  const cancelNativeTask = vscode.commands.registerCommand("skillStudio.internal.cancelNativeAgent", id => {
+    const run = nativeRuns.get(id);
+    if (run) {
+      run.cancelled = true;
+      run.view?.cancelNativeTask();
+    }
+  });
+  context.subscriptions.push(nativeTask, cancelNativeTask);
 
   const gatewayTokenCommand = vscode.commands.registerCommand("skillStudio.setAiGatewayToken", async () => {
     try {
@@ -741,6 +770,8 @@ function createAuthoringView(vscode, context, {
   const revisionFor = createPackageRevisionTracker();
   let panel = null;
   let session = null;
+  let webviewReady = false;
+  let nativeRun = null;
 
   const outbound = [];
   let flushing = false;
@@ -749,7 +780,7 @@ function createAuthoringView(vscode, context, {
     if (flushing) return;
     flushing = true;
     try {
-      while (panel?.visible && outbound.length) {
+      while (webviewReady && panel?.visible && outbound.length) {
         const target = panel;
         const message = outbound[0];
         if (!await target.webview.postMessage(message) || panel !== target) break;
@@ -763,7 +794,12 @@ function createAuthoringView(vscode, context, {
   }
 
   function post(message) {
-    if (!panel || !session || session.disposed) return;
+    if (!session || session.disposed) return;
+    if (nativeRun && (message.type === "proposal" || message.type === "error")) {
+      nativeRun.result = message.type === "proposal"
+        ? { summary: message.summary, compilerState: message.compilerState, canApply: message.canApply }
+        : { error: message.message };
+    }
     outbound.push(message);
     void flush();
   }
@@ -910,7 +946,7 @@ function createAuthoringView(vscode, context, {
     }
   }
 
-  async function handleGenerate(message) {
+  async function handleGenerate(message, cancelled = () => false) {
     const activeSession = session;
     const contextStamp = activeSession?.contextRequestId;
     const isCurrent = () => isCurrentAuthoringSession(session, activeSession) &&
@@ -1050,7 +1086,10 @@ function createAuthoringView(vscode, context, {
       return;
     }
 
-    if (!isCurrent()) return;
+    if (!isCurrent() || cancelled()) {
+      if (isCurrent()) activeSession.generating = false;
+      return;
+    }
     const controller = new AbortController();
     activeSession.controller = controller;
     post({ type: "status", message: "正在请求模型并校验语义提案…", busy: true });
@@ -1525,9 +1564,50 @@ function createAuthoringView(vscode, context, {
     }
   }
 
+  function ensureSession(currentDocument) {
+    if (!session) {
+      session = {
+        document: currentDocument,
+        sessionId: globalThis.crypto.randomUUID(),
+        context: null,
+        history: createSessionProposalHistory(),
+        pending: null,
+        latest: null,
+        controller: null,
+        disposed: false,
+        generating: false,
+        applying: false,
+        choosingModel: false,
+        contextRequestId: 0,
+      };
+    }
+    session.document = currentDocument;
+  }
+
+  async function runNativeTask(currentDocument, task, cancelled) {
+    if (nativeRun || session?.generating || session?.applying || session?.choosingModel) {
+      throw new Error("当前 Procedure 已有 AI 操作正在进行。");
+    }
+    ensureSession(currentDocument);
+    const run = { result: null };
+    nativeRun = run;
+    try {
+      if (!panel) outbound.length = 0;
+      await refreshContext();
+      if (cancelled()) return { cancelled: true };
+      if (run.result?.error) return run.result;
+      const selectedIds = session?.context?.resources.filter(item => item.selected).map(item => item.id) ?? [];
+      await handleGenerate({ type: "runAgent", task, selectedIds }, cancelled);
+      return cancelled() ? { cancelled: true } :
+        run.result ?? { error: "本次任务结束，未生成候选修改。" };
+    } finally {
+      nativeRun = null;
+    }
+  }
+
   function reveal(currentDocument = document) {
+    ensureSession(currentDocument);
     if (panel) {
-      session.document = currentDocument;
       panel.reveal(vscode.ViewColumn.One, false);
       void flush();
       return true;
@@ -1538,20 +1618,6 @@ function createAuthoringView(vscode, context, {
       vscode.ViewColumn.One,
       { enableScripts: true, retainContextWhenHidden: true },
     );
-    session = {
-      document,
-      sessionId: globalThis.crypto.randomUUID(),
-      context: null,
-      history: createSessionProposalHistory(),
-      pending: null,
-      latest: null,
-      controller: null,
-      disposed: false,
-      generating: false,
-      applying: false,
-      choosingModel: false,
-      contextRequestId: 0,
-    };
     const reviewMediaRoot = vscode.Uri.joinPath(context.extensionUri, "media");
     panel.webview.options = {
       enableScripts:true,
@@ -1570,8 +1636,12 @@ function createAuthoringView(vscode, context, {
     const incoming = panel.webview.onDidReceiveMessage(async (message) => {
       if (!message || typeof message.type !== "string") return;
       if (message.type === "console") await vscode.commands.executeCommand("skillStudio.openConsole");
-      else if (message.type === "ready" || message.type === "refresh") await refreshContext();
-      else if (message.type === "generate" || message.type === "refine" || message.type === "runAgent") await handleGenerate(message);
+      else if (message.type === "ready") {
+        webviewReady = true;
+        if (session.contextRequestId === 0) await refreshContext();
+        else await flush();
+      } else if (message.type === "refresh" && !nativeRun) await refreshContext();
+      else if (!nativeRun && ["generate", "refine", "runAgent"].includes(message.type)) await handleGenerate(message);
       else if (message.type === "inspectHistory") await handleInspectHistory(message);
       else if (message.type === "chooseModel") await handleChooseModel();
       else if (message.type === "cancel") {
@@ -1593,6 +1663,7 @@ function createAuthoringView(vscode, context, {
       visibility.dispose();
       disposed.dispose();
       panel = null;
+      webviewReady = false;
       session = null;
       onDispose();
     });
@@ -1600,5 +1671,7 @@ function createAuthoringView(vscode, context, {
     return true;
   }
 
-  return { reveal };
+  return { reveal, runNativeTask,
+    cancelNativeTask() { if (nativeRun) session?.controller?.abort(); },
+  };
 }
