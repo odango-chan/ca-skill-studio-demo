@@ -17,6 +17,8 @@ import {
 import { parseDocument, isMap, isScalar, isSeq } from "yaml";
 import {schemaArgumentCompletions}
   from "../../../../../language/schema-argument-completions.mjs";
+import {schemaValuePathCompletions}
+  from "../../../../../language/schema-value-path-completions.mjs";
 import { LanguageDiagnosticSession } from "../../../../../language/lsp/session.js";
 import {
   buildSkillSymbolIndex,
@@ -891,6 +893,10 @@ connection.onCompletion(params => {
     value.snapshot,document,prefix,offset,lineStart,params.position.line
   );
   if(schemaCompletions!==null)return schemaCompletions;
+  const pathCompletions=schemaValuePathCompletions(
+    value.snapshot,document,prefix,offset,lineStart,params.position.line
+  );
+  if(pathCompletions!==null)return pathCompletions;
   const currentCompletions = currentGrammarCompletions(value,document,prefix,offset,lineStart);
   if(currentCompletions!==null)return currentCompletions;
 
