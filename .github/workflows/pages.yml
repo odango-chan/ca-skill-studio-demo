@@ -90,33 +90,36 @@ jobs:
           npm ci --prefix experiments/ide-host/lsp-browser/client --omit=dev --no-audit --no-fund
           npm ci --prefix experiments/ide-host/lsp-browser/server --no-audit --no-fund
           node experiments/ide-host/scripts/build-ide-spike.mjs
-      - name: Checkout pinned CA Skill Compiler v2.0.2 source
+      - name: Checkout pinned CA Skill Compiler v2.1.0 source
         if: github.event_name == 'pull_request' || github.ref == 'refs/heads/main' || github.ref == 'refs/heads/spike/ide-extension-theia-host'
         uses: actions/checkout@v4
         with:
           repository: odango-chan/ca-skill-compiler
-          ref: e98a7b26acabfa2a5e1587974ab9be5742e70bf7
+          ref: b67fbb56c34d15b8d5a0903c8a7ca93d608f8f65
           path: compiler-source
           persist-credentials: false
-      - name: Verify pinned CA Skill Compiler v2.0.2 source identity
-        if: github.event_name == 'pull_request' || github.ref == 'refs/heads/main' || github.ref == 'refs/heads/spike/ide-extension-theia-host'
-        working-directory: compiler-source
-        run: test "$(git rev-parse HEAD)" = "e98a7b26acabfa2a5e1587974ab9be5742e70bf7"
-      - name: Go 1.26.6 for the pinned Compiler WASM build
-        if: github.event_name == 'pull_request' || github.ref == 'refs/heads/main' || github.ref == 'refs/heads/spike/ide-extension-theia-host'
-        uses: actions/setup-go@v5
-        with:
-          go-version: "1.26.6"
-      - name: Build pinned Compiler v2.0.2 Go/WASM Core
+      - name: Verify pinned CA Skill Compiler v2.1.0 source identity
         if: github.event_name == 'pull_request' || github.ref == 'refs/heads/main' || github.ref == 'refs/heads/spike/ide-extension-theia-host'
         working-directory: compiler-source
         run: |
-          mkdir -p dist
-          GOWORK=off CGO_ENABLED=0 GOOS=js GOARCH=wasm go build -o dist/skillc.wasm ./cmd/skillc-wasm
-          cp "$(go env GOROOT)/lib/wasm/wasm_exec.js" dist/wasm_exec.js
+          test "$(git rev-parse HEAD)" = "b67fbb56c34d15b8d5a0903c8a7ca93d608f8f65"
+          grep -F 'const CompilerVersion = "v2.1.0"' internal/compiler/version.go
+      - name: Download and verify official Compiler v2.1.0 Worker bundle
+        if: github.event_name == 'pull_request' || github.ref == 'refs/heads/main' || github.ref == 'refs/heads/spike/ide-extension-theia-host'
+        working-directory: compiler-source
+        run: |
+          set -euo pipefail
+          mkdir -p dist ../ide-source/experiments/ide-host/vscode/dist
+          release="https://github.com/odango-chan/ca-skill-compiler/releases/download/v2.1.0"
+          curl -fsSL "$release/SHA256SUMS" -o dist/SHA256SUMS
+          curl -fsSL "$release/skillc-v2.1.0-web-worker.tar.gz" -o dist/skillc-v2.1.0-web-worker.tar.gz
+          (cd dist && grep -F "skillc-v2.1.0-web-worker.tar.gz" SHA256SUMS | sha256sum --check)
+          tar -xzf dist/skillc-v2.1.0-web-worker.tar.gz -C dist
+          test -s dist/skillc.wasm
+          test -s dist/wasm_exec.js
           cp dist/skillc.wasm ../ide-source/experiments/ide-host/vscode/dist/skillc.wasm
           cp dist/wasm_exec.js ../ide-source/experiments/ide-host/vscode/dist/wasm_exec.js
-          sha256sum dist/skillc.wasm
+          cp docs/design/fixtures/registration-development-request.json ../ide-source/experiments/ide-host/vscode/dist/authoring-development-build-request.json
       - name: Stage prepared Compiler Worker and WASM assets
         if: github.event_name == 'pull_request' || github.ref == 'refs/heads/main' || github.ref == 'refs/heads/spike/ide-extension-theia-host'
         working-directory: ide-source
