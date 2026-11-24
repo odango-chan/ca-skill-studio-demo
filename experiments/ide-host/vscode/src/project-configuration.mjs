@@ -37,7 +37,7 @@ export function validateProjectConfiguration(settings) {
   for(const dep of settings.dependencies){
     if(!isRecord(dep)||typeof dep.id!=="string"||
        dep.id.length>80||!identifier.test(dep.id)||ids.has(dep.id)||
-       !["tool-catalog","schema-bundle"].includes(dep.kind)||
+       !["tool-catalog","schema-bundle","interface-package"].includes(dep.kind)||
        !isRecord(dep.source))
       fail("invalid or duplicated dependency declaration");
     ids.add(dep.id);
