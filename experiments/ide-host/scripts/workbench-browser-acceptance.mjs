@@ -1075,9 +1075,27 @@ export async function runWorkbenchAcceptance({
        !currentLanguageFeatures.procedureOutline?.includes("run-script")||
        !currentLanguageFeatures.procedureOutline?.includes("await-event")||
        !currentLanguageFeatures.procedureOutline?.includes("timeout-handler")||
+       !currentLanguageFeatures.interfaceToolCompletion?.includes(
+         "ca-client::openamsm.smf.mas.sc.query")||
+       !currentLanguageFeatures.interfaceArgumentCompletion?.includes("supi")||
+       !currentLanguageFeatures.interfaceArgumentCompletion?.includes("pduSessionId")||
+       !currentLanguageFeatures.interfaceNativeArgumentCompletion?.includes("supi")||
+       !currentLanguageFeatures.interfaceNativeArgumentCompletion?.includes("pduSessionId")||
+       currentLanguageFeatures.interfaceArgumentCompletionDetails?.length!==2||
+       currentLanguageFeatures.interfaceNativeArgumentCompletionDetails?.length!==2||
+       currentLanguageFeatures.interfaceArgumentCompletionDetails?.some(item=>
+         !String(item.detail??"").includes("AUTH_NOT_CHECKED")||
+         !String(item.insertText??"").endsWith(": "))||
        currentLanguageFeatures.ownerQualification!=="NOT_QUALIFIED")
       throw Error("Native current language-provider acceptance failed: "+
         JSON.stringify(currentLanguageFeatures));
+    console.log("STUDIO_EXAMPLE_INTERFACE_SCHEMA_COMPLETION_CHROMIUM",JSON.stringify({
+      tool:currentLanguageFeatures.interfaceToolCompletion,
+      arguments:currentLanguageFeatures.interfaceArgumentCompletion,
+      nativeArguments:currentLanguageFeatures.interfaceNativeArgumentCompletion,
+      details:currentLanguageFeatures.interfaceArgumentCompletionDetails,
+      nativeDetails:currentLanguageFeatures.interfaceNativeArgumentCompletionDetails
+    }));
     // Provider fixture cleanup and Webview focus changes can update Theia's
     // visible editor list asynchronously. Focus the exact native Source
     // before checking its real editor decorations and rendered colors.
