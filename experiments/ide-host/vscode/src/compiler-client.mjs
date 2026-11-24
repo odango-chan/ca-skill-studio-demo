@@ -1,4 +1,4 @@
-// Request/response transport to the pinned Compiler v2.0.2 Go/WASM Worker.
+// Request/response transport to the released Compiler v2.1.0 Go/WASM Worker.
 // Browser hosts use Web Worker; Node extension hosts use worker_threads.
 // All filesystem access and BuildRequest assembly remain in the extension host.
 function workerResourceUrl(uri) {
@@ -21,7 +21,8 @@ function workerResourceUrl(uri) {
 export function createCompilerWorkerClient(vscode, context, {
   WorkerCtor = globalThis.Worker,
   NodeWorkerCtor = null,
-  timeoutMs = 60000
+  timeoutMs = 60000,
+  developmentTimeoutMs = 120000
 } = {}) {
   let worker = null;
   let nextId = 0;
@@ -57,7 +58,7 @@ export function createCompilerWorkerClient(vscode, context, {
     if (typeof WorkerCtor === "function") {
       const uri = vscode.Uri.joinPath(context.extensionUri, "dist", "compiler-worker.js");
       const current = new WorkerCtor(workerResourceUrl(uri), {
-        name: "skill-studio-compiler-v1alpha5"
+        name: "skill-studio-compiler-v2.1.0"
       });
       worker = current;
       current.addEventListener("error", event => {
@@ -85,7 +86,7 @@ export function createCompilerWorkerClient(vscode, context, {
         throw new Error("Node Compiler Worker requires file-backed extension assets.");
       }
       const current = new NativeWorker(workerUri.fsPath, {
-        name: "skill-studio-compiler-v1alpha5",
+        name: "skill-studio-compiler-v2.1.0",
         workerData: { wasmPath: wasmUri.fsPath },
       });
       worker = current;
@@ -99,19 +100,21 @@ export function createCompilerWorkerClient(vscode, context, {
       return current;
     }
 
-    throw new Error("This host provides neither Web Worker nor Node worker_threads support for Compiler v2.0.2.");
+    throw new Error("This host provides neither Web Worker nor Node worker_threads support for Compiler v2.1.0.");
   }
 
   async function requestNow(command, request) {
     const current = await ensureWorker();
     const id = ++nextId;
+    const requestTimeout=command==="buildDevelopment"||command==="verifyDevelopment"
+      ?developmentTimeoutMs:timeoutMs;
     return new Promise((resolve, reject) => {
       const timer = setTimeout(() => {
-        const error = new Error("Compiler Worker timed out after " + timeoutMs + " ms");
+        const error = new Error("Compiler Worker timed out after " + requestTimeout + " ms");
         pending.delete(id);
         reject(error);
         failWorker(error, current);
-      }, timeoutMs);
+      }, requestTimeout);
       pending.set(id, { resolve, reject, timer });
       try {
         current.postMessage({ id, command, request });
@@ -125,7 +128,7 @@ export function createCompilerWorkerClient(vscode, context, {
   }
 
   function request(command, request) {
-    if (!["check", "build", "inspect", "verifyArtifact"].includes(command)) {
+    if (!["check", "build", "inspect", "verifyArtifact", "buildDevelopment", "verifyDevelopment"].includes(command)) {
       return Promise.reject(new Error("Unsupported Compiler command: " + command));
     }
     // Go/WASM calls are synchronous inside either Worker type. Serialize
