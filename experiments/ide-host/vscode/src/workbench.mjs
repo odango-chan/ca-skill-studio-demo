@@ -1354,9 +1354,14 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
             if(start<0)throw Error("v1alpha5 completion probe anchor missing: "+needle);
             const position=document.positionAt(start+
               (offsetInNeedle??needle.length));
-            const result=await languageClient.provideCompletion(
-              document.uri.toString(),position);
-            return labels(result);
+            try{
+              const result=await languageClient.provideCompletion(
+                document.uri.toString(),position);
+              return labels(result);
+            }catch(error){
+              throw Error("LSP completion probe failed at "+JSON.stringify(needle)+": "+
+                String(error?.message??error));
+            }
           };
           const contractGate=await complete(contractDocument,"check.precondition",6);
           const schemaPath=await complete(contractDocument,"schemas/request.schema.yaml",8);
