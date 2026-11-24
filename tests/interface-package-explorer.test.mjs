@@ -50,7 +50,7 @@ function fixture({workspace=false}={}){
       },
       async openTextDocument(uri){
         const text=providers.get(uri.scheme).provideTextDocumentContent(uri);
-        return {uri,version:1,languageId:'json',
+        return {uri,version:1,languageId:workspace?'plaintext':'json',
           getText(){return text;},
           lineAt(i){return {text:text.split('\n')[i]};}};
       }
