@@ -311,9 +311,10 @@ export async function runPackageOverviewAcceptance({command,evalJS,sleep,require
     definition:1,assurance:3,schemas:1,references:1
   });
 
-  // Dependencies must be a real section in the same native TreeView in both
-  // backend and browser-only Theia. It starts collapsed and expands to the
-  // owner-provided empty state; no second Dependencies view is permitted.
+  // Dependencies must remain a real section in the same native TreeView
+  // in both Theia hosts. The built-in Example now has ONE verified, pinned,
+  // read-only ca-client Interface; it must not display the old empty state.
+  // No second Dependencies view or Compiler authorization is implied.
   // Skills are expanded above it, so reveal the lower native TreeView rows
   // before querying visibility rather than treating off-screen as missing.
   await evalJS(`(()=>{
@@ -342,16 +343,19 @@ export async function runPackageOverviewAcceptance({command,evalJS,sleep,require
   if(!String(dependenciesRow.toggleClass??'').includes('theia-mod-collapsed'))
     throw Error('Dependencies must be collapsed by default: '+JSON.stringify(dependenciesRow));
   await clickVisibleToggle(dependenciesRow,'Dependencies section');
-  let dependencyEmptyState=null;
+  let pinnedInterfaceRow=null;
   for(let attempt=0;attempt<40;attempt++){
     rows=await readTreeRows();
-    dependencyEmptyState=rows.find(row=>row.visible&&
-      row.text.includes('No dependencies'));
-    if(dependencyEmptyState)break;
+    pinnedInterfaceRow=rows.find(row=>row.visible&&
+      row.text.includes('ca-client')&&
+      row.text.includes('urn:wtlab:ca-client-tools:openamsm-sbi-interface@1.1.0')&&
+      row.text.includes('SNAPSHOT_VERIFIED')&&
+      row.text.includes('Compiler NOT_LINKED'));
+    if(pinnedInterfaceRow)break;
     await sleep(100);
   }
-  if(!dependencyEmptyState)
-    throw Error('Expanded Dependencies section did not show its real empty state: '+
+  if(!pinnedInterfaceRow)
+    throw Error('Default Example must show its one exact verified, unqualified Interface dependency: '+
       JSON.stringify(rows));
   const expandedDependencies=rows.find(row=>row.visible&&
     row.text.includes('Dependencies')&&
@@ -376,7 +380,10 @@ export async function runPackageOverviewAcceptance({command,evalJS,sleep,require
   const compositeEvidence={
     dependenciesVisible:true,
     dependenciesCollapsedByDefault:true,
-    dependenciesExpandedToOwnerEmptyState:true,
+    dependenciesExpandedToPinnedInterface:true,
+    exampleInterfaceAlias:'ca-client',
+    exampleInterfaceStatus:'SNAPSHOT_VERIFIED',
+    exampleInterfaceCompiler:'NOT_LINKED',
     dependenciesCanCollapseAgain:true
   };
   if(!requireEditor){
