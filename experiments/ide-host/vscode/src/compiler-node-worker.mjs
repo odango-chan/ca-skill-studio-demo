@@ -1,4 +1,4 @@
-// Node extension-host adapter for the same pinned Go/WASM Compiler used by the browser Worker.
+// Node extension-host adapter for the same released Compiler v2.1.0 WASM used by the browser Worker.
 import { parentPort, workerData } from "node:worker_threads";
 import { readFile } from "node:fs/promises";
 import { createRequire } from "node:module";
@@ -22,10 +22,12 @@ const boot = (async () => {
     if (typeof globalThis.skillcCheck === "function" &&
         typeof globalThis.skillcBuild === "function" &&
         typeof globalThis.skillcInspectDependencies === "function" &&
-        typeof globalThis.skillcVerifyArtifact === "function") return;
+        typeof globalThis.skillcVerifyArtifact === "function" &&
+        typeof globalThis.skillcBuildDevelopment === "function" &&
+        typeof globalThis.skillcVerifyDevelopment === "function") return;
     await new Promise(resolve => setTimeout(resolve, 10));
   }
-  throw new Error("Pinned Go/WASM Compiler did not expose its v1alpha5 callbacks.");
+  throw new Error("Pinned Go/WASM Compiler v2.1.0 did not expose its frozen and Development callbacks.");
 })();
 void boot.catch(() => undefined);
 
@@ -36,11 +38,24 @@ parentPort.on("message", async message => {
       throw new Error("Invalid Compiler Worker request ID.");
     }
     await boot;
-    if (!["check", "build", "inspect", "verifyArtifact"].includes(command)) {
+    if (!["check", "build", "inspect", "verifyArtifact", "buildDevelopment", "verifyDevelopment"].includes(command)) {
       throw new Error("Unsupported Compiler Worker command.");
     }
     if (command === "verifyArtifact") {
       const result = String(globalThis.skillcVerifyArtifact(JSON.stringify(request)));
+      parentPort.postMessage({ id, result });
+      return;
+    }
+    if (command === "verifyDevelopment") {
+      if (!request || typeof request !== "object" || !request.request || !request.result)
+        throw new Error("VerifyDevelopment requires the original request and its BuildDevelopment result.");
+      const result = String(globalThis.skillcVerifyDevelopment(
+        JSON.stringify(request.request),JSON.stringify(request.result)));
+      parentPort.postMessage({ id, result });
+      return;
+    }
+    if (command === "buildDevelopment") {
+      const result = JSON.parse(globalThis.skillcBuildDevelopment(JSON.stringify(request)));
       parentPort.postMessage({ id, result });
       return;
     }
