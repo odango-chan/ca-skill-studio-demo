@@ -5,6 +5,7 @@
 import {parseDocument,isMap,isSeq,isScalar} from 'yaml';
 import {decodeBase64} from './dependency-snapshot.mjs';
 import {indexV1Alpha4ToolCatalogCallables} from '../../../../site/package-audit.mjs';
+import {projectSchemaPropertyTree} from "../../../../language/schema-path-projection.mjs";
 
 const DIALECT='https://json-schema.org/draft/2020-12/schema';
 const decoder=new TextDecoder('utf-8',{fatal:true});
@@ -101,10 +102,16 @@ export function projectLockedInterfaceCompletionHints(snapshot){
     if(!schemaPath||!fileMap.has(schemaPath))continue;
     const properties=schemaProperties(fileMap.get(schemaPath),schemaId);
     if(!properties)continue;
+    const outputId=string(member(member(contract,"outputSchema"),"$ref"),1024);
+    const outputPath=outputId?schemaById.get(outputId):null;
+    const outputProperties=outputPath&&fileMap.has(outputPath)
+      ?projectSchemaPropertyTree(fileMap.get(outputPath),{expectedId:outputId})
+      :null;
     output.push({
       id:snapshot.id+'::'+operation.id,
       dependencyId:snapshot.id,kind:operation.kind,
       inputSchemaId:schemaId,argumentProperties:properties,
+      ...(outputProperties?{outputSchemaId:outputId,outputProperties}:{}),
       trust:'DECLARATION_ONLY'
     });
     if(output.length>=128)break;
