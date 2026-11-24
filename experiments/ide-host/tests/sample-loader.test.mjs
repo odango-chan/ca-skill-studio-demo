@@ -2,7 +2,8 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {readFileSync} from "node:fs";
 import {posix} from "node:path";
-import {seedExampleProject} from "../vscode/src/sample-loader.mjs";
+import {seedExampleProject,ensureOpenedExampleInterface}
+  from "../vscode/src/sample-loader.mjs";
 import {loadVerifiedSnapshot} from "../vscode/src/dependency-service.mjs";
 import {projectLockedInterfaceCompletionHints}
   from "../vscode/src/interface-schema-completion.mjs";
@@ -304,4 +305,44 @@ test("User Example settings/dependency removal are preserved on non-replacing im
   const reopened=await seedExampleProject(h.vscode,uri("/extension"),uri("/global-storage"));
   assert.equal(reopened.exampleDependencySeeded,false);
   assert.deepEqual(h.files.get(path),custom);
+});
+
+test("Already opened current Example upgrades its missing default lock without replacing Source",async()=>{
+  const h=host();
+  await seedExampleProject(h.vscode,uri("/extension"),uri("/global-storage"));
+  const originalProcedure=new TextEncoder().encode(
+    decode(h.files.get(procedurePath))+"\n# User local comment\n");
+  h.files.set(procedurePath,originalProcedure);
+  h.files.delete(root+"/.vscode/settings.json");
+  h.workspace.workspaceFolders=[{uri:uri(root)}];
+  const migrated=await ensureOpenedExampleInterface(
+    h.vscode,uri("/extension"),uri("/global-storage"));
+  assert.equal(migrated.status,"SEEDED");
+  assert.deepEqual(h.files.get(procedurePath),originalProcedure);
+  const settings=JSON.parse(decode(h.files.get(root+"/.vscode/settings.json")));
+  assert.equal(settings["connectionAgent.skillStudio.dependencies"][0].id,"ca-client");
+  assert.equal(settings["connectionAgent.skillStudio.dependencyLock"].entries[0]
+    .snapshotDigest,migrated.snapshotDigest);
+  const reopened=await ensureOpenedExampleInterface(
+    h.vscode,uri("/extension"),uri("/global-storage"));
+  assert.equal(reopened.status,"PRESERVED");
+});
+test("Example-only migration refuses unrelated workspaces, legacy sources and user configuration",async()=>{
+  const h=host();
+  await seedExampleProject(h.vscode,uri("/extension"),uri("/global-storage"));
+  h.files.delete(root+"/.vscode/settings.json");
+  h.workspace.workspaceFolders=[{uri:uri("/other-user-project")}];
+  assert.equal((await ensureOpenedExampleInterface(h.vscode,
+    uri("/extension"),uri("/global-storage"))).status,"NOT_EXAMPLE");
+  assert.equal(h.files.has(root+"/.vscode/settings.json"),false);
+  h.workspace.workspaceFolders=[{uri:uri(root)}];
+  h.files.set(procedurePath,new TextEncoder().encode(
+    "apiVersion: connectionagent.io/v1alpha1\nkind: Procedure\n"));
+  assert.equal((await ensureOpenedExampleInterface(h.vscode,
+    uri("/extension"),uri("/global-storage"))).status,"LEGACY_OR_UNKNOWN");
+  assert.equal(h.files.has(root+"/.vscode/settings.json"),false);
+  h.files.set(root+"/.vscode/settings.json",new TextEncoder().encode('{"editor.fontSize":18}'));
+  assert.equal((await ensureOpenedExampleInterface(h.vscode,
+    uri("/extension"),uri("/global-storage"))).status,"PRESERVED");
+  assert.equal(decode(h.files.get(root+"/.vscode/settings.json")),'{"editor.fontSize":18}');
 });
