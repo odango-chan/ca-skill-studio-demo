@@ -776,12 +776,16 @@ function createAuthoringView(vscode, context, {
 
   const outbound = [];
   let flushing = false;
+  const theia = (typeof STUDIO_THEIA_HOST !== "undefined" && STUDIO_THEIA_HOST) ||
+    vscode.env?.uriScheme === "theia";
 
   async function flush() {
     if (flushing) return;
     flushing = true;
     try {
-      while (webviewReady && panel?.visible && outbound.length) {
+      // Theia can report a retained Review tab as inactive during native
+      // sidebar/dialog focus changes while its Webview still accepts messages.
+      while (webviewReady && panel && (panel.visible || theia) && outbound.length) {
         const target = panel;
         const message = outbound[0];
         if (!await target.webview.postMessage(message) || panel !== target) break;
