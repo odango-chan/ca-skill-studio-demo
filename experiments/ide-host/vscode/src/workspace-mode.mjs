@@ -23,18 +23,15 @@ export function registerWorkspaceMode(vscode, context, { authoring, showWelcome 
         const document = vscode.window.activeTextEditor?.document ??
           consoleEditor?.document ?? authoring.getDocument();
         if (document) {
-          // Reveal the original buffer, including its editor selection. A
-          // closed tab can be reopened through the normal native source path.
-          if (consoleEditor?.document === document && !document.isClosed) {
-            await vscode.window.showTextDocument(document, {
-              viewColumn: vscode.ViewColumn.One, preview: false,
-              selection: consoleEditor.selection,
-            });
-          } else {
-            await openNativeSource(vscode, document.uri, {
-              viewColumn: vscode.ViewColumn.One, preview: false, preserveFocus: false,
-            });
-          }
+          const options = {
+            viewColumn: vscode.ViewColumn.One, preview: false, preserveFocus: false,
+            ...(consoleEditor?.document === document && !document.isClosed
+              && consoleEditor.selection ? { selection: consoleEditor.selection } : {}),
+          };
+          // Theia's native source opener preserves the editor contribution
+          // used by Preview and the semantic-token decoration renderer.
+          if (document.isUntitled) await vscode.window.showTextDocument(document, options);
+          else await openNativeSource(vscode, document.uri, options);
         } else if (await showWelcome() !== true) {
           return false;
         }

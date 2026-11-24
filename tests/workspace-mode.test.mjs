@@ -39,6 +39,7 @@ function harness(saved) {
       },
     },
     commands: {
+      executeCommand: async (...args) => opened.push(args),
       registerCommand(id, handler) {
         commands.set(id, handler);
         return { dispose() {} };
@@ -67,9 +68,11 @@ test("defaults to AI and restores the same dirty native buffer and AI view", asy
 
   host.vscode.window.activeTextEditor = undefined;
   assert.equal(await host.commands.get("skillStudio.openConsole")(), true);
-  assert.equal(host.opened[0][0], host.document);
-  assert.deepEqual(host.opened[0][1], { viewColumn: 1, preview: false, selection: host.editor.selection });
-  assert.equal(host.opened[0][0].getText(), "# unsaved");
+  assert.deepEqual(host.opened[0], ["vscode.openWith", host.document.uri, "default", {
+    viewColumn: 1, preview: false, preserveFocus: false, selection: host.editor.selection,
+  }]);
+  assert.equal(host.editor.document.getText(), "# unsaved");
+  assert.equal(host.editor.document.isDirty, true);
   assert.equal(host.preferences.get("skillStudio.workspaceMode"), "console");
 
   host.vscode.window.activeTextEditor = host.editor;
