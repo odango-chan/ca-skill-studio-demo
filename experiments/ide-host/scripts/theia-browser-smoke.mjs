@@ -678,6 +678,47 @@ try{
     throw Error("The explicit example import did not open its project and 5GC Procedure: "+
       JSON.stringify(startupDiagnostics).slice(0,3200));
   }
+  const studioCommand=(id,...args)=>evalJS(`(() => {
+    const c=window.theia.container;
+    const key=[...c._bindingDictionary._map.keys()].find(k=>
+      typeof k==='function'&&k.prototype?.executeCommand&&k.prototype?.getCommand);
+    return c.get(key).executeCommand(${JSON.stringify(id)},...${JSON.stringify(args)});
+  })()`);
+  const readWorkspaceMode=()=>evalJS(`(() => {
+    const nav=document.getElementById('skill-studio-workspace-mode');
+    return { mode:nav?.querySelector('[aria-pressed="true"]')?.textContent,
+      switching:!!nav?.querySelector('button:disabled'),
+      groups:window.__skillStudioFixedEditorLayout?.().tabBarCount };
+  })()`);
+  const switchWorkspaceMode=async label=>{
+    const clicked=await evalJS(`(() => {
+      const button=[...document.querySelectorAll('#skill-studio-workspace-mode button')]
+        .find(item=>item.textContent===${JSON.stringify(label)});
+      if(!button || !button.getClientRects().length) return false;
+      button.click();
+      return true;
+    })()`);
+    if(!clicked)throw Error("Missing top-level Studio mode control: "+label);
+    for(let attempt=0;attempt<100;attempt++){
+      const state=await readWorkspaceMode();
+      if(state?.mode===label && !state.switching && state.groups===1)return;
+      await sleep(100);
+    }
+    throw Error("Mode switch did not preserve one editor group: "+
+      JSON.stringify({label,actual:await readWorkspaceMode()}));
+  };
+  if(requireEditor){
+    let initialMode;
+    for(let attempt=0;attempt<100;attempt++){
+      initialMode=await readWorkspaceMode();
+      if(initialMode?.mode==='AI Workbench' && initialMode.groups===1)break;
+      await sleep(100);
+    }
+    if(initialMode?.mode!=='AI Workbench' || initialMode.groups!==1)
+      throw Error("Fresh Studio profile did not open AI Workbench: "+JSON.stringify(initialMode));
+    await switchWorkspaceMode('Console');
+    console.log("STUDIO_WORKSPACE_MODE_DEFAULT_CHROMIUM_PASS");
+  }
   const afterImport=await evalJS(`(async()=>{
     const names=[];let opfsError=null;
     try{
@@ -1363,35 +1404,6 @@ try{
     phaseEvidence:workbenchEvidence?.phaseEvidence??null,
     languageServiceStatus:workbenchEvidence?.languageServiceStatus??null
   }));
-  const studioCommand=(id,...args)=>evalJS(`(() => {
-    const c=window.theia.container;
-    const key=[...c._bindingDictionary._map.keys()].find(k=>
-      typeof k==='function'&&k.prototype?.executeCommand&&k.prototype?.getCommand);
-    return c.get(key).executeCommand(${JSON.stringify(id)},...${JSON.stringify(args)});
-  })()`);
-  const readWorkspaceMode=()=>evalJS(`(() => {
-    const nav=document.getElementById('skill-studio-workspace-mode');
-    return { mode:nav?.querySelector('[aria-pressed="true"]')?.textContent,
-      switching:!!nav?.querySelector('button:disabled'),
-      groups:window.__skillStudioFixedEditorLayout?.().tabBarCount };
-  })()`);
-  const switchWorkspaceMode=async label=>{
-    const clicked=await evalJS(`(() => {
-      const button=[...document.querySelectorAll('#skill-studio-workspace-mode button')]
-        .find(item=>item.textContent===${JSON.stringify(label)});
-      if(!button || !button.getClientRects().length) return false;
-      button.click();
-      return true;
-    })()`);
-    if(!clicked)throw Error("Missing top-level Studio mode control: "+label);
-    for(let attempt=0;attempt<100;attempt++){
-      const state=await readWorkspaceMode();
-      if(state?.mode===label && !state.switching && state.groups===1)return;
-      await sleep(100);
-    }
-    throw Error("Mode switch did not preserve one editor group: "+
-      JSON.stringify({label,actual:await readWorkspaceMode()}));
-  };
   if(requireEditor){
     await studioCommand("skillStudio.openProcedure",identity.defaultProcedure);
     const sourceState=action=>evalJS(`(() => {

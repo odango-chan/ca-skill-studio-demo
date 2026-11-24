@@ -7,9 +7,12 @@ export function registerWorkspaceMode(vscode, context, { authoring, showWelcome 
   let mode = context.globalState.get(preferenceKey) === "console" ? "console" : "ai";
   let consoleEditor;
   let switching = false;
+  let waitForProcedure;
 
   async function select(next, { startup = false } = {}) {
     if (switching) return false;
+    waitForProcedure?.dispose();
+    waitForProcedure = undefined;
     switching = true;
     try {
       if (next === "ai") {
@@ -55,9 +58,14 @@ export function registerWorkspaceMode(vscode, context, { authoring, showWelcome 
   return {
     restore() {
       // Let the existing Welcome/Example flow establish a project and source.
-      if (mode === "ai" && isProcedurePath(vscode.window.activeTextEditor?.document.uri.path)) {
+      if (mode !== "ai") return Promise.resolve(false);
+      if (isProcedurePath(vscode.window.activeTextEditor?.document.uri.path)) {
         return select("ai", { startup: true });
       }
+      waitForProcedure = vscode.window.onDidChangeActiveTextEditor(editor => {
+        if (isProcedurePath(editor?.document.uri.path)) void select("ai", { startup: true });
+      });
+      context.subscriptions.push(waitForProcedure);
       return Promise.resolve(false);
     },
   };

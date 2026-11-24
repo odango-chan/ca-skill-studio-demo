@@ -14,11 +14,16 @@ function harness(saved) {
   const editor = { document, selection: { anchor: 3 } };
   const opened = [];
   const panels = [];
+  let onEditor;
   const vscode = {
     ViewColumn: { One: 1 },
     Uri: { joinPath: (_, ...parts) => parts.join("/") },
     window: {
       activeTextEditor: editor,
+      onDidChangeActiveTextEditor(listener) {
+        onEditor = listener;
+        return { dispose() { onEditor = undefined; } };
+      },
       showWarningMessage: message => assert.fail(message),
       showTextDocument: async (...args) => opened.push(args),
       createWebviewPanel: (kind, title, column, options) => {
@@ -46,7 +51,11 @@ function harness(saved) {
   };
   const authoring = registerAiAuthoringEditor(vscode, context);
   const mode = registerWorkspaceMode(vscode, context, { authoring, showWelcome: () => false });
-  return { commands, preferences, vscode, document, editor, opened, panels, mode };
+  function activateEditor(editor) {
+    vscode.window.activeTextEditor = editor;
+    onEditor?.(editor);
+  }
+  return { commands, preferences, vscode, document, editor, opened, panels, mode, activateEditor };
 }
 
 test("defaults to AI and restores the same dirty native buffer and AI view", async () => {
@@ -85,4 +94,15 @@ test("a saved Console choice is respected and switching Procedures retains their
   assert.deepEqual(host.panels.map(panel => panel.column), [1, 1]);
   assert.deepEqual(host.panels[0].reveals, [[1, false]]);
   assert.deepEqual(host.panels[1].reveals, []);
+});
+
+test("a fresh workspace opens AI when its first Procedure becomes available", async () => {
+  const host = harness();
+  host.activateEditor(undefined);
+  assert.equal(await host.mode.restore(), false);
+  host.activateEditor(host.editor);
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(host.panels.length, 1);
+  host.activateEditor(host.editor);
+  assert.equal(host.panels[0].reveals.length, 0);
 });
