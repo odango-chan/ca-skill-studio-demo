@@ -33,6 +33,9 @@ export function registerProjectWelcome(vscode,context){
     importing:"Loading example project…",completed:"Example project opened",failed:"Example project failed to load"
   };
   function setImportStatus({state,message,completed,total}={}){
+    lastImportStatus={state:state??null,message:message??null,
+      completed:Number.isSafeInteger(completed)?completed:null,
+      total:Number.isSafeInteger(total)?total:null};
     if(!panel||!["loading","success","error"].includes(state))return;
     // This is a Webview message, not a replacement page load, so the spinner
     // and keyboard focus remain stable while the importer is running.
