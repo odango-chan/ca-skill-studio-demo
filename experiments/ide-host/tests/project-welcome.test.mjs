@@ -136,6 +136,17 @@ test("Welcome can be explicitly reopened while an existing project workspace is 
 });
 
 
+test("Welcome diagnostics retain the last Example import failure when the panel is hidden",()=>{
+  const h=setupWelcome("en",[{uri:{toString(){return "file:///project";}}}],false);
+  h.handle.setImportStatus({state:"error",
+    message:"persist-example-interface-lock: Pinned dependency manifest unreadable: missing"});
+  assert.deepEqual(h.handle.getDiagnostics().lastImportStatus,{
+    state:"error",
+    message:"persist-example-interface-lock: Pinned dependency manifest unreadable: missing",
+    completed:null,total:null
+  });
+});
+
 test("retired Procedure-AST authoring commands are not exposed in the current host",()=>{
   const manifest=JSON.parse(readFileSync(
     new URL("../vscode/package.json",import.meta.url),"utf8"));
