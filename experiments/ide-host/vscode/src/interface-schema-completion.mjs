@@ -26,6 +26,10 @@ function schemaProperties(raw,exportId){
   if(!isMap(root)||string(member(root,'$id'),1024)!==exportId||
      string(member(root,'$schema'),128)!==DIALECT||
      string(member(root,'type'))!=='object')return null;
+  // A composed root may narrow/override properties. Never offer a partial
+  // parameter signature unless the whole surface is statically plain.
+  if(['$ref','allOf','oneOf','anyOf','not','if','then','else'].some(k=>
+    member(root,k)!==undefined))return null;
   const properties=member(root,'properties');
   // Do not invent an interface from an absent/unknown object shape.
   if(!isMap(properties)||properties.items.length>256)return null;
