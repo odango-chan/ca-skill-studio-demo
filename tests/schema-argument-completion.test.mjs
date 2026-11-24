@@ -251,3 +251,17 @@ test('an earlier-stage route bypass cannot authorize producer output suggestions
   assert.deepEqual(pathCompletion(cyclic,enriched,
     '        payload: read.observation.output.'),[]);
 });
+
+
+test('Wait TIMEOUT path bypassing producer stage suppresses output suggestions',async()=>{
+  const hints=projectLockedInterfaceCompletionHints(await locked());
+  const enriched=hints.map(h=>({...h,outputProperties:[
+    {name:'status',type:'string',description:'',children:null}
+  ]}));
+  const waitBypass=pathProcedure.replace(
+    '  read:\n    observation:',
+    '  read:\n    wait:\n      event:\n        source: AMF\n        service: Nsmf_PDUSession\n        operation: UpdateSMContext\n      timeout: PT30S\n      routes:\n        TIMEOUT: update\n    observation:'
+  );
+  assert.deepEqual(pathCompletion(waitBypass,enriched,
+    '        payload: read.observation.output.'),[]);
+});
