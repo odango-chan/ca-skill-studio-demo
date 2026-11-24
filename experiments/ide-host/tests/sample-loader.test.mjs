@@ -3,19 +3,28 @@ import assert from "node:assert/strict";
 import {readFileSync} from "node:fs";
 import {posix} from "node:path";
 import {seedExampleProject} from "../vscode/src/sample-loader.mjs";
+import {loadVerifiedSnapshot} from "../vscode/src/dependency-service.mjs";
+import {projectLockedInterfaceCompletionHints}
+  from "../vscode/src/interface-schema-completion.mjs";
+import {EXAMPLE_INTERFACE_ALIAS,EXAMPLE_INTERFACE_DIGEST}
+  from "../vscode/src/example-interface-dependency.mjs";
 
 const sampleRoot="site/samples/v1alpha5/";
 const candidate=JSON.parse(readFileSync(sampleRoot+"files.json","utf8"));
 const uri=path=>({scheme:"file",path,toString(){return "file://"+path;}});
 const joinPath=(base,...paths)=>uri(posix.normalize(posix.join(base.path,...paths)));
 
-function host(candidateOverride=null,{files:seedFiles=[],folders:seedFolders=[]}={}){
+function host(candidateOverride=null,{
+  files:seedFiles=[],folders:seedFolders=[],bundledZipOverride=null
+}={}){
   const files=new Map(seedFiles.map(([path,value])=>[path,new Uint8Array(value)]));
   const folders=new Set(["/global-storage",...seedFolders]);
   const workspace={workspaceFolders:[],fs:{
     async readFile(target){
       if(target.path==="/extension/samples/v1alpha5/files.json")
         return new TextEncoder().encode(JSON.stringify(candidateOverride??candidate));
+      if(target.path.endsWith("interface-package/ca-client-tools_interface_1.1.0.zip.b64")&&
+         bundledZipOverride!==null)return new TextEncoder().encode(bundledZipOverride);
       if(target.path.startsWith("/extension/samples/v1alpha5/"))
         return new Uint8Array(readFileSync(sampleRoot+target.path.slice("/extension/samples/v1alpha5/".length)));
       const value=files.get(target.path);
@@ -116,8 +125,32 @@ test("Example imports only the pinned CA-SL v1alpha5 Skills into skills/",async(
   assert.equal(result.skillsRoot.path,skillRoot);
   assert.equal(result.procedure.path,procedurePath);
   assert.equal(result.procedures["establish-pdu-session-mas"].path,masProcedurePath);
-  assert.equal(h.files.size,total+1,"26 Skill files plus the Example README are imported");
+  assert.equal(h.files.size,total+10,
+    "26 Skills + README + 7 exact release files + manifest + workspace lock");
   assert.ok(h.files.has(procedurePath));
+  assert.equal(result.exampleDependencySeeded,true);
+  assert.equal(result.exampleDependencyId,EXAMPLE_INTERFACE_ALIAS);
+  const settingsPath=root+"/.vscode/settings.json";
+  const settings=JSON.parse(decode(h.files.get(settingsPath)));
+  const deps=settings["connectionAgent.skillStudio.dependencies"];
+  const locks=settings["connectionAgent.skillStudio.dependencyLock"].entries;
+  assert.equal(deps.length,1);
+  assert.equal(locks.length,1);
+  assert.equal(deps[0].id,EXAMPLE_INTERFACE_ALIAS);
+  assert.equal(deps[0].kind,"interface-package");
+  assert.equal(deps[0].source.contentDigest,EXAMPLE_INTERFACE_DIGEST);
+  assert.equal(deps[0].source.origin.repository,"odango-chan/ca-client-tools");
+  assert.equal(deps[0].source.origin.tag,"v1.1.0");
+  assert.equal(deps[0].source.bundledExample,true);
+  assert.equal(locks[0].snapshotDigest,result.exampleDependencySnapshotDigest);
+  const resolved=await loadVerifiedSnapshot(h.vscode,uri(root),locks[0]);
+  assert.equal(resolved.files.length,7);
+  const hints=projectLockedInterfaceCompletionHints(resolved);
+  assert.ok(hints.some(x=>x.id==="ca-client::openamsm.smf.mas.sc.query"&&
+    x.argumentProperties.some(p=>p.name==="supi"&&p.required)&&
+    x.argumentProperties.some(p=>p.name==="pduSessionId")));
+  assert.equal(h.files.has(root+"/lib"),false);
+
   assert.ok(h.files.has(masProcedurePath));
   assert.ok(h.files.has(skillRoot+"/modify-pdu-session-mas/assurance/procedure.yaml"));
   assert.ok(h.files.has(skillRoot+"/release-pdu-session-mas/assurance/procedure.yaml"));
@@ -154,6 +187,8 @@ test("Existing Example stays untouched unless replacement is explicitly requeste
   assert.equal(kept.replacedExisting,false);
   assert.equal(kept.skipped,4);
   assert.equal(kept.created,total-4);
+  assert.equal(kept.exampleDependencySeeded,true,
+    "adding the new default lock must not overwrite existing user Skill sources");
   assert.equal(decode(h.files.get(root+"/README.md")),"old Example README");
   assert.match(decode(h.files.get(procedurePath)),/ue-requested-pdu-session-establishment/);
   assert.ok(h.files.has(root+"/archive/legacy-v0.2/old.txt"));
@@ -166,9 +201,9 @@ test("Existing Example stays untouched unless replacement is explicitly requeste
   assert.equal(replaced.created,total);
   assert.equal(replaced.skipped,0);
   assert.equal(replaced.readmeUpdated,true);
-  assert.equal(h.files.size,total+1);
+  assert.equal(h.files.size,total+10);
   assert.deepEqual((await h.vscode.workspace.fs.readDirectory(uri(root)))
-    .map(([name])=>name).sort(),["README.md","skills"],
+    .map(([name])=>name).sort(),[".skill-studio",".vscode","README.md","skills"],
     "replacement keeps the active root but removes every retired root entry");
   assert.deepEqual((await h.vscode.workspace.fs.readDirectory(uri(skillRoot)))
     .map(([name])=>name).sort(),["establish-pdu-session","establish-pdu-session-mas","modify-pdu-session-mas","release-pdu-session-mas"].sort(),
@@ -208,6 +243,8 @@ test("Progress covers the v1alpha5 import and a non-replacing reload preserves l
   assert.equal(second.skipped,total);
   assert.equal(second.created,0);
   assert.equal(second.replacedExisting,false);
+  assert.equal(second.exampleDependencySeeded,false,
+    "reopen must never overwrite the existing Example lock/settings");
   assert.deepEqual(h.files.get(first.procedure.path),userProcedure,
     "a non-replacing reload never overwrites a user-edited Procedure");
   assert.deepEqual(h.files.get(root+"/README.md"),userReadme,
@@ -236,4 +273,35 @@ test("Malformed or falsely qualified v1alpha5 manifests refuse all writes",async
     assert.equal(h.files.size,0);
     assert.equal([...h.folders].some(path=>path.startsWith(root)),false);
   }
+});
+
+test("Corrupted bundled release fails before any Example write, including replacement",async()=>{
+  const h=host(null,{bundledZipOverride:"invalid-base64"});
+  await assert.rejects(seedExampleProject(h.vscode,uri("/extension"),uri("/global-storage")),
+    /verify-pinned-example-interface/);
+  assert.equal(h.files.size,0);
+  assert.ok(!h.folders.has(root));
+  const existing=host(null,{
+    files:[[root+"/notes.txt",new TextEncoder().encode("keep me")]],
+    folders:[root],
+    bundledZipOverride:"invalid-base64"
+  });
+  await assert.rejects(seedExampleProject(existing.vscode,uri("/extension"),uri("/global-storage"),
+    {replaceExisting:true}),/verify-pinned-example-interface/);
+  assert.equal(decode(existing.files.get(root+"/notes.txt")),"keep me");
+});
+
+test("User Example settings/dependency removal are preserved on non-replacing import",async()=>{
+  const h=host();
+  await seedExampleProject(h.vscode,uri("/extension"),uri("/global-storage"));
+  const path=root+"/.vscode/settings.json";
+  const custom=new TextEncoder().encode(JSON.stringify({
+    "connectionAgent.skillStudio.dependencies":[],
+    "connectionAgent.skillStudio.dependencyLock":{version:"skillc.lock/v0.1",entries:[]},
+    "editor.fontSize":17
+  }));
+  h.files.set(path,custom);
+  const reopened=await seedExampleProject(h.vscode,uri("/extension"),uri("/global-storage"));
+  assert.equal(reopened.exampleDependencySeeded,false);
+  assert.deepEqual(h.files.get(path),custom);
 });
