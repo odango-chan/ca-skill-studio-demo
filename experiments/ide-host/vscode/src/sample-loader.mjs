@@ -259,7 +259,10 @@ export async function seedExampleProject(vscode,extensionUri,storageUri,
     const readmeSource=vscode.Uri.joinPath(extensionUri,"samples","v1alpha5",candidate.projectReadme);
     const readmeDestination=vscode.Uri.joinPath(root,"README.md");
     let readmeUpdated=false;
-    if(!(await exists(readmeDestination))){
+    // After an explicit replacement, recursive deletion may leave a stale
+    // stat result in some hosted filesystem providers. The user has approved
+    // replacing this Example, so write the pinned README unconditionally.
+    if(replacedExisting||!(await exists(readmeDestination))){
       phase="write-v1alpha5-project-readme";
       const bytes=await readBundledResource(vscode,readmeSource);
       await fs.writeFile(readmeDestination,bytes);
@@ -273,7 +276,10 @@ export async function seedExampleProject(vscode,extensionUri,storageUri,
       const parts=file.split("/");
       const destination=vscode.Uri.joinPath(skillsRoot,...parts);
       phase="stat-existing:"+file;
-      if(await exists(destination)){
+      // Do not trust cached stat results after clearing the Example root.
+      // Explicit replacement writes every exact bundled file; writeFile is
+      // allowed to replace a stale provider entry.
+      if(!replacedExisting&&await exists(destination)){
         skipped++;
         report({phase:"files",completed:created+skipped,total});
         continue;
@@ -284,8 +290,13 @@ export async function seedExampleProject(vscode,extensionUri,storageUri,
       if(!(bytes instanceof Uint8Array))fail("Unrecognized v1alpha5 sample file");
       if(parts.length>1)
         await fs.createDirectory(vscode.Uri.joinPath(skillsRoot,...parts.slice(0,-1)));
-      try{await fs.stat(destination);fail("v1alpha5 sample file changed during import");}
-      catch(error){if(error?.code!=="FileNotFound")throw error;}
+      // For a confirmed replacement, stale stat cache entries are expected
+      // after recursive deletion; this is an intentional overwrite of the
+      // exact pinned Example bytes, not an unconfirmed concurrent import.
+      if(!replacedExisting){
+        try{await fs.stat(destination);fail("v1alpha5 sample file changed during import");}
+        catch(error){if(error?.code!=="FileNotFound")throw error;}
+      }
       phase="write-v1alpha5-file:"+file;
       await fs.writeFile(destination,bytes);
       created++;

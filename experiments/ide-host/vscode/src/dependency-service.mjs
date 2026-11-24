@@ -67,7 +67,11 @@ export async function loadVerifiedSnapshot(vscode,workspaceRoot,lockEntry){
   let manifest;
   try{manifest=JSON.parse(dec.decode(await fs.readFile(pathFor(vscode,root,"manifest.json"))));}
   catch(error){
-    fail(missing(error)?"BLOCKED":"ERROR","Pinned dependency manifest unreadable: "+
+    // Preserve FileNotFound so writeImmutableSnapshot can distinguish a
+    // stale positive stat result from an existing but corrupt immutable
+    // snapshot. Other read/parse failures remain fail-closed.
+    if(missing(error))throw error;
+    fail("ERROR","Pinned dependency manifest unreadable: "+
       String(error?.message??error));
   }
   if(manifest.version!=="skillc.snapshot-store/v0.1"||
