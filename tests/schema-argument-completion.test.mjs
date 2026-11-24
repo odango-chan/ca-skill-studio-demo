@@ -121,6 +121,11 @@ test('completed arguments suppress duplicates; enum values come from Schema',asy
   assert.deepEqual(values.map(v=>v.label),['DETAILED']);
   assert.equal(values[0].textEdit.newText,'"DETAILED"');
 });
+test('composed input Schemas do not produce misleading partial parameter suggestions',async()=>{
+  const hints=projectLockedInterfaceCompletionHints(
+    await locked({allOf:[{properties:{supi:{type:'integer'}}}]}));
+  assert.equal(hints.length,0);
+});
 test('wrong dialect or absent Tool does not invent input fields',async()=>{
   await assert.rejects(
     ()=>locked({$schema:'https://json-schema.org/draft/2019-09/schema'}),
