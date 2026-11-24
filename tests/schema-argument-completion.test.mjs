@@ -128,7 +128,7 @@ test('wrong dialect or absent Tool does not invent input fields',async()=>{
     'ca-client::other.read');
   assert.equal(completion(unrelated,hints),null);
   const changedStage=document.replace('observation:', 'operation:');
-  assert.deepEqual(completion(changedStage,hints),[]);
+  assert.equal(completion(changedStage,hints),null);
   const absent=completion(document,[]);
   assert.equal(absent.length,0);
 });
