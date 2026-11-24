@@ -15,6 +15,8 @@ import {
   SKILL_SEMANTIC_TOKEN_MODIFIERS
 } from "../../../../../language/semantic-tokens.mjs";
 import { parseDocument, isMap, isScalar, isSeq } from "yaml";
+import {schemaArgumentCompletions}
+  from "../../../../../language/schema-argument-completions.mjs";
 import { LanguageDiagnosticSession } from "../../../../../language/lsp/session.js";
 import {
   buildSkillSymbolIndex,
@@ -882,6 +884,10 @@ connection.onCompletion(params => {
   const starts = lineStarts(document.text);
   const lineStart = starts[params.position.line];
   const prefix = document.text.slice(lineStart, offset);
+  const schemaCompletions=schemaArgumentCompletions(
+    value.snapshot,document,prefix,offset,lineStart,params.position.line
+  );
+  if(schemaCompletions!==null)return schemaCompletions;
   const currentCompletions = currentGrammarCompletions(value,document,prefix,offset,lineStart);
   if(currentCompletions!==null)return currentCompletions;
 
