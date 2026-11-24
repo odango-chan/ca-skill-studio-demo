@@ -10,6 +10,16 @@
 
 This document defines the first AI-assisted authoring capability for Skill Studio. It is a Studio editing feature, not a CA-SL language extension, Compiler feature, Host capability or Runtime feature.
 
+## Skill Package Agent · 双宿主交付方案
+
+线上 Theia Browser-Only 和桌面 VS Code 安装版使用同一 Studio 扩展、Agent 会话界面与 Host 工具。Agent 以当前 Package 为工作范围，能够围绕同一个任务读取获准的 Package 上下文、生成候选、根据检查结果修订，并在同一界面审阅变更。Console 继续使用现有原生编辑器。开发顺序如下。
+
+1. 在共享 Webview 中加入任务入口与可取消的执行记录。第一阶段沿用显式披露确认和现有 Gateway JSON 协议，先从获准目录中选择相关文件，再按选中的文件内容生成候选，对完整 Compiler FAIL 中目标 Procedure 的错误代码最多自动修订一次。实际 Apply 继续走现有 Host 验证和 WorkspaceEdit。保留单次提案入口供独立测试和手动审阅。
+2. 验证 Theia 1.76 的 Agent 框架在 Browser-Only 中的依赖与运行边界，并评估对已获授权 Package 上下文进行多轮内容搜索和动态读取。会话支持跟进与引导，输出继续进入同一个审阅和 Apply 链路。
+3. 两个宿主分别在真实编辑器里验收相同任务。桌面版另用本机模型和 loopback Gateway 在禁用外网的环境中验收，模型和 Gateway 需要独立安装。联网时可另接 VS Code 的原生 Agent 工具入口。
+
+双宿主验收需要覆盖同一份未保存的 Procedure、搜索和读取、首次候选失败后修订、准确的 Compiler 结果、显式 Apply、原生 Undo 与 Console 切换。宿主构建、模拟模型与实际断网模型分别记录。浏览器端使用公开演示环境和已配置的 Gateway，Agent 会话目前以宿主会话为单位。
+
 ## 1. Approved product decisions
 
 | Decision | P1 baseline |

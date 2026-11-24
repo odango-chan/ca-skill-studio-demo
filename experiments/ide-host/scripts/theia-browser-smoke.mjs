@@ -1506,6 +1506,11 @@ try{
         try{
           const body=JSON.parse(Buffer.concat(chunks).toString("utf8"));
           gatewayRequests.push({body,headers:req.headers});
+          const catalogRequest=body.messages?.[0]?.content?.startsWith("Choose the Package resources");
+          const catalog=catalogRequest ? JSON.parse(body.messages[1].content).catalog : [];
+          const response=catalogRequest
+            ? {resourceIds:catalog.filter(item=>item.kind==="contract").map(item=>item.id)}
+            : mockProposal;
           res.writeHead(200,{
             "Content-Type":"application/json",
             "Access-Control-Allow-Origin":"*",
@@ -1517,7 +1522,7 @@ try{
             model:body.model,
             choices:[{
               index:0,
-              message:{role:"assistant",content:JSON.stringify(mockProposal)},
+              message:{role:"assistant",content:JSON.stringify(response)},
               finish_reason:"stop"
             }],
             usage:{prompt_tokens:1,completion_tokens:1,total_tokens:2}
@@ -1954,6 +1959,43 @@ try{
       }
       if(!historicalReadOnly)
         throw Error("F4 historical inspection did not revoke Compiler Apply authority");
+      const agentStart=await command("Runtime.evaluate",{
+        contextId:aiContextId,returnByValue:true,
+        expression:`(()=>{
+          const button=document.getElementById('runAgent');
+          if(!button || button.disabled)return false;
+          document.getElementById('task').value='Find the relevant Package contract and prepare a candidate';
+          button.click();
+          return true;
+        })()`
+      });
+      if(agentStart.result?.value!==true)throw Error("Skill Package Agent entry is unavailable");
+      const agentApproval=await waitForDialogButton(["发送并生成提案"]);
+      await command("Input.dispatchMouseEvent",{type:"mousePressed",x:agentApproval.x,y:agentApproval.y,button:"left",clickCount:1});
+      await command("Input.dispatchMouseEvent",{type:"mouseReleased",x:agentApproval.x,y:agentApproval.y,button:"left",clickCount:1});
+      let agentReady=false;
+      const agentDeadline=Date.now()+140000;
+      while(!agentReady && Date.now()<agentDeadline){
+        const activity=await command("Runtime.evaluate",{
+          contextId:aiContextId,returnByValue:true,
+          expression:`({
+            log:document.getElementById('agentActivity').textContent,
+            candidate:document.getElementById('candidateSource').textContent,
+            busy:!document.getElementById('cancel').disabled
+          })`
+        });
+        const value=activity.result?.value;
+        agentReady=value?.log.includes("读取本轮资料")&&value.candidate.includes("ai-authoring-smoke-node")&&!value.busy;
+        if(!agentReady)await sleep(100);
+      }
+      const catalogMessage=gatewayRequests[2]?.body.messages[1].content;
+      const selectedContext=gatewayRequests[3]?.body.messages[1].content;
+      if(!agentReady||!catalogMessage?.includes("assurance/contract.yaml")||
+         catalogMessage.includes("CONTEXT ITEM")||!selectedContext?.includes("label: assurance/contract.yaml")||
+         selectedContext.includes("label: assurance/predicates.yaml")||
+         ![4,5].includes(gatewayRequests.length))
+        throw Error("Agent did not select and read only the disclosed Package resource");
+      console.log("STUDIO_PACKAGE_AGENT_BOUND_CONTEXT_CHROMIUM_PASS");
       // F4 disposal gate: close the specific AI Editor Tab in Theia's
       // actual main shell. A history inspection must not leave the Webview
       // focused while the subsequent independent native Undo fixture runs.

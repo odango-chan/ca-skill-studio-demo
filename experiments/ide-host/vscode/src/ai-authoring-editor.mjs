@@ -2,7 +2,7 @@ import {
   buildContextPack,
   MAX_CONTEXT_PACK_BYTES,
 } from "../../../../authoring/core/context-pack.mjs";
-import { createProcedureAgent } from "../../../../authoring/core/procedure-agent.mjs";
+import { createProcedureAgent, buildCompilerRepairTask } from "../../../../authoring/core/procedure-agent.mjs";
 import { createGatewayModelClient, listGatewayModels, validateModelId } from "../../../../authoring/core/gateway-client.mjs";
 import { createChangeSet } from "../../../../authoring/core/change-set.mjs";
 import { createSessionProposalHistory, buildRefinementTask } from "../../../../authoring/core/proposal-history.mjs";
@@ -549,8 +549,11 @@ export function renderAiAuthoringHtml(nonce, assets = {}) {
     "const byId=id=>document.getElementById(id);",
     "let busy=false,canApply=false,contextReady=false,hasCurrentProposal=false,previewSequence=0;",
     "function status(text,kind){const el=byId('status');el.textContent=text||'';el.className='status '+(kind||'');}",
-    "function setBusy(value){busy=value;byId('generate').disabled=value||!window.gatewayConfigured||!contextReady;byId('cancel').disabled=!value;byId('refresh').disabled=value;byId('chooseModel').disabled=value;byId('apply').disabled=value||!canApply;byId('refine').disabled=value||!hasCurrentProposal;}",
+    "function setBusy(value){busy=value;byId('generate').disabled=value||!window.gatewayConfigured||!contextReady;byId('runAgent').disabled=byId('generate').disabled;byId('cancel').disabled=!value;byId('refresh').disabled=value;byId('chooseModel').disabled=value;byId('apply').disabled=value||!canApply;byId('refine').disabled=value||!hasCurrentProposal;}",
     "function clear(el){while(el.firstChild)el.removeChild(el.firstChild);}",
+    "let showAgentActivity=false;",
+    "function addActivity(text){if(!showAgentActivity||!text)return;const log=byId('agentActivity');const item=document.createElement('li');item.textContent=text;log.appendChild(item);while(log.children.length>40)log.firstChild.remove();}",
+    "byId('runAgent').addEventListener('click',()=>{const task=byId('task').value.trim();if(!task)return;showAgentActivity=true;addActivity(task);const selectedIds=[...document.querySelectorAll('#sources input:checked')].map(item=>item.value);clearProposal();vscode.postMessage({type:'runAgent',task,selectedIds});});",
     "function clearProposal(){canApply=false;hasCurrentProposal=false;byId('refine').disabled=true;previewSequence++;clear(byId('plan'));clear(byId('assumptions'));clear(byId('blockers'));clear(byId('groups'));byId('proposalSummary').textContent='';byId('currentSource').textContent='';byId('candidateSource').textContent='';byId('patchState').textContent='尚未生成';byId('patchError').textContent='';byId('compilerStatus').textContent='Compiler Check: NOT_RUN';byId('apply').disabled=true;byId('discard').disabled=true;clear(byId('flowChanges'));clear(byId('diffRows'));clear(byId('diagnostics'));byId('diffSummary').textContent='尚未生成候选 Diff。';byId('validationIdentity').textContent='';byId('revisionInfo').textContent='尚未生成';window.skillStudioAiYamlDiff?.clear();byId('monacoDiffNotice').textContent='生成候选后加载只读 Monaco Diff。';byId('monacoDiffControls').hidden=true;window.skillStudioAiFlowCompare?.clear();byId('flowCompareNotice').textContent='生成提案后显示真实 React Flow 对比。';byId('flowFocusInfo').hidden=true;}",
     "function addList(id,items){const root=byId(id);clear(root);if(!items||!items.length)return;const ul=document.createElement('ul');for(const value of items){const li=document.createElement('li');li.textContent=value;ul.appendChild(li);}root.appendChild(ul);}",
     "const reviewTabs=['plan','flow','diff','validation'];",
@@ -579,7 +582,7 @@ export function renderAiAuthoringHtml(nonce, assets = {}) {
     "byId('chooseModel').addEventListener('click',()=>vscode.postMessage({type:'chooseModel'}));",
     "byId('apply').addEventListener('click',()=>{const groupIds=[...document.querySelectorAll('[data-group-id]:checked')].map(item=>item.dataset.groupId);vscode.postMessage({type:'apply',groupIds});});",
     "byId('discard').addEventListener('click',()=>vscode.postMessage({type:'discard'}));",
-    "window.addEventListener('message',event=>{const message=event.data||{};if(message.type==='context')renderContext(message);else if(message.type==='status'){status(message.message,message.kind);if(message.busy!==undefined)setBusy(message.busy);}else if(message.type==='busy'){setBusy(message.busy===true);}else if(message.type==='proposal')renderProposal(message);else if(message.type==='history')renderHistory(message.history);else if(message.type==='historyInspect'){renderProposal(message);status('正在查看历史修订 #'+message.historyNumber+'；此版本不可应用。','warning');}else if(message.type==='preview'&&message.requestId===previewSequence){byId('candidateSource').textContent=message.candidateSource||'';byId('compilerStatus').textContent='Compiler '+(message.compilerVersion||'v2.0.2')+' Check: '+(message.compilerState||'NOT_RUN');byId('patchState').textContent=message.patchState||'PREVIEW ONLY';byId('patchError').textContent=message.patchError||'';renderReviewData(message);canApply=message.canApply===true;byId('apply').disabled=busy||!canApply;status(canApply?'Compiler PASS；可应用当前选中组。':'当前选中组仍为 PREVIEW ONLY。',canApply?'':'warning');}else if(message.type==='error'){if(message.contextUnavailable===true){contextReady=false;clear(byId('sources'));clearProposal();}status(message.message,'error');setBusy(false);}else if(message.type==='applied'){canApply=false;byId('apply').disabled=true;byId('discard').disabled=true;status('已应用到原生编辑器缓冲区；尚未保存。Compiler Check: '+(message.compilerCheck||'UNAVAILABLE')+'。');}else if(message.type==='discarded'){clearProposal();status('提案已丢弃。');}});",
+    "window.addEventListener('message',event=>{const message=event.data||{};if(['status','error','proposal'].includes(message.type))addActivity(message.message||message.summary);if(message.type==='context')renderContext(message);else if(message.type==='status'){status(message.message,message.kind);if(message.busy!==undefined)setBusy(message.busy);}else if(message.type==='busy'){setBusy(message.busy===true);}else if(message.type==='proposal')renderProposal(message);else if(message.type==='history')renderHistory(message.history);else if(message.type==='historyInspect'){renderProposal(message);status('正在查看历史修订 #'+message.historyNumber+'；此版本不可应用。','warning');}else if(message.type==='preview'&&message.requestId===previewSequence){byId('candidateSource').textContent=message.candidateSource||'';byId('compilerStatus').textContent='Compiler '+(message.compilerVersion||'v2.0.2')+' Check: '+(message.compilerState||'NOT_RUN');byId('patchState').textContent=message.patchState||'PREVIEW ONLY';byId('patchError').textContent=message.patchError||'';renderReviewData(message);canApply=message.canApply===true;byId('apply').disabled=busy||!canApply;status(canApply?'Compiler PASS；可应用当前选中组。':'当前选中组仍为 PREVIEW ONLY。',canApply?'':'warning');}else if(message.type==='error'){if(message.contextUnavailable===true){contextReady=false;clear(byId('sources'));clearProposal();}status(message.message,'error');setBusy(false);}else if(message.type==='applied'){canApply=false;byId('apply').disabled=true;byId('discard').disabled=true;status('已应用到原生编辑器缓冲区；尚未保存。Compiler Check: '+(message.compilerCheck||'UNAVAILABLE')+'。');}else if(message.type==='discarded'){clearProposal();status('提案已丢弃。');}});",
     "vscode.postMessage({type:'ready'});",
   ].join("\n");
   return [
@@ -592,7 +595,7 @@ export function renderAiAuthoringHtml(nonce, assets = {}) {
     "</head><body>",
     "<header class=\"topbar\"><div class=\"heading\"><strong>AI Procedure Authoring</strong><small id=\"packageInfo\">读取当前 Package…</small></div><div class=\"top-actions\"><span aria-current=\"true\">AI Workbench</span><button id=\"openConsole\" class=\"secondary\">Console</button><span id=\"modelLabel\" class=\"compiler\">当前模型：读取中…</span><button id=\"chooseModel\" class=\"secondary\" title=\"从 Gateway 选择模型或手动输入模型 ID\">选择模型</button><span class=\"compiler\">CA-SL v1alpha5 · FROZEN / RELEASED</span><button id=\"refresh\" class=\"secondary\">刷新上下文</button></div></header>",
     "<main>",
-    "<section class=\"card changeset-panel\" aria-label=\"修改请求与 Change Set\"><h2>修改请求</h2><textarea id=\"task\" maxlength=\"4000\" placeholder=\"描述希望如何修改当前 Procedure。模型只提出语义修改，不直接写文件或执行 Tool。\"></textarea><p class=\"note\"><strong>发送前确认：</strong>只有明确批准后，选中的上下文才发往 Gateway；模型密钥不会进入 Studio。</p><div class=\"actions\"><button id=\"generate\">生成修改提案</button><button id=\"cancel\" class=\"secondary\" disabled>取消请求</button></div><h3>完善当前提案</h3><textarea id=\"refineTask\" maxlength=\"1600\" placeholder=\"描述希望如何改进上一版提案。将重新披露上下文、生成完整新版本，不会直接修改文件。\"></textarea><button id=\"refine\" class=\"secondary\" disabled>Refine proposal · 创建新版本</button><hr><h3>本次会话的提案历史</h3><div id=\"revisionTimeline\" class=\"revision-list\" aria-live=\"polite\">本次会话尚无提案修订。</div><hr><div class=\"top-actions spread\"><h2>Change Set</h2><span id=\"revisionInfo\" class=\"kind\">尚未生成</span></div><div id=\"patchState\" class=\"kind\">尚未生成</div><div id=\"patchError\" class=\"note error\"></div><p class=\"note\">每组不可拆分；取消选中会重新生成候选并运行 Compiler Check。</p><div id=\"groups\" class=\"group-list\"></div><div class=\"actions\"><button id=\"apply\" disabled>应用选中修改</button><button id=\"discard\" class=\"secondary\" disabled>丢弃提案</button></div></section>",
+    "<section class=\"card changeset-panel\" aria-label=\"修改请求与 Change Set\"><h2>Skill Package Agent</h2><ol id=\"agentActivity\" class=\"revision-list\" role=\"log\" aria-label=\"Agent 执行记录\"></ol><textarea id=\"task\" maxlength=\"4000\" placeholder=\"描述希望如何修改当前 Procedure。模型只提出语义修改，不直接写文件或执行 Tool。\"></textarea><p class=\"note\"><strong>发送前确认：</strong>只有明确批准后，选中的上下文才发往 Gateway；模型密钥不会进入 Studio。</p><div class=\"actions\"><button id=\"runAgent\" disabled>运行 Agent</button><button id=\"generate\" class=\"secondary\">生成单次提案</button><button id=\"cancel\" class=\"secondary\" disabled>取消请求</button></div><h3>完善当前提案</h3><textarea id=\"refineTask\" maxlength=\"1600\" placeholder=\"描述希望如何改进上一版提案。将重新披露上下文、生成完整新版本，不会直接修改文件。\"></textarea><button id=\"refine\" class=\"secondary\" disabled>Refine proposal · 创建新版本</button><hr><h3>本次会话的提案历史</h3><div id=\"revisionTimeline\" class=\"revision-list\" aria-live=\"polite\">本次会话尚无提案修订。</div><hr><div class=\"top-actions spread\"><h2>Change Set</h2><span id=\"revisionInfo\" class=\"kind\">尚未生成</span></div><div id=\"patchState\" class=\"kind\">尚未生成</div><div id=\"patchError\" class=\"note error\"></div><p class=\"note\">每组不可拆分；取消选中会重新生成候选并运行 Compiler Check。</p><div id=\"groups\" class=\"group-list\"></div><div class=\"actions\"><button id=\"apply\" disabled>应用选中修改</button><button id=\"discard\" class=\"secondary\" disabled>丢弃提案</button></div></section>",
     "<section class=\"card context-panel\" aria-label=\"上下文\"><details id=\"contextPanel\" open><summary>上下文来源 · 发送范围</summary><div id=\"contextMeta\" class=\"context-meta\">读取当前 Procedure…</div><div class=\"note\">当前 Procedure 是唯一写入目标；Contract、Predicate、Schema 和已验证依赖为只读参考。Script / Reference 须逐任务选择。以下列表仅决定将发送给模型的内容。</div><div id=\"gatewayNotice\" class=\"note warning\"></div><div id=\"sources\" class=\"source-list\"></div></details></section>",
     "<section class=\"card review-panel\" aria-label=\"AI 修改审阅工作台\"><div class=\"top-actions spread\"><h2>修改工作区</h2><span class=\"compiler\">只读审阅 · Source 唯一真源</span></div><nav class=\"review-tabs\" role=\"tablist\" aria-label=\"审阅视图\"><button type=\"button\" id=\"tab-plan\" role=\"tab\" aria-controls=\"view-plan\" aria-selected=\"true\" tabindex=\"0\">Plan</button><button type=\"button\" id=\"tab-flow\" role=\"tab\" aria-controls=\"view-flow\" aria-selected=\"false\" tabindex=\"-1\">Flow Changes</button><button type=\"button\" id=\"tab-diff\" role=\"tab\" aria-controls=\"view-diff\" aria-selected=\"false\" tabindex=\"-1\">YAML Diff</button><button type=\"button\" id=\"tab-validation\" role=\"tab\" aria-controls=\"view-validation\" aria-selected=\"false\" tabindex=\"-1\">Validation</button></nav><section id=\"view-plan\" class=\"review-view\" role=\"tabpanel\" aria-labelledby=\"tab-plan\"><div id=\"proposalSummary\" class=\"summary\"></div><div class=\"subsection\"><h3>执行计划</h3><div id=\"plan\" class=\"review-placeholder\">先描述要修改的 Procedure。</div></div><div class=\"subsection\"><h3>假设</h3><div id=\"assumptions\"></div></div><div id=\"blockers\" class=\"subsection\" aria-label=\"阻塞项\"></div></section><section id=\"view-flow\" class=\"review-view\" role=\"tabpanel\" aria-labelledby=\"tab-flow\" hidden><p class=\"note\">当前 Source 与所选 Change Set 候选均由 Studio 的同一 v1alpha5 源码投影和 ELK 构图；图形仅供审阅，不代表 Compiler / Runtime 资格。</p><div id=\"flowCompareNotice\" class=\"note ai-flow-fallback\">生成提案后显示 React Flow 对比。失败时保留下方语义摘要。</div><div id=\"flowCompareCanvas\" class=\"ai-flow-container\" aria-label=\"当前与候选 Procedure 只读流程图对比\"></div><div id=\"flowFocusInfo\" class=\"ai-flow-focus\" hidden role=\"status\"></div><h3>原子修改组 · 语义摘要</h3><div id=\"flowChanges\" class=\"review-placeholder\">生成提案后显示节点及路由变化。</div></section><section id=\"view-diff\" class=\"review-view\" role=\"tabpanel\" aria-labelledby=\"tab-diff\" hidden><p class=\"note\">Host 生成的 YAML 候选预览：逐行对比当前缓冲区与所选修改组生成的精确 YAML 候选。红色为移除、绿色为新增。模型不能直接提供替换 YAML。</p><div id=\"diffSummary\" class=\"diff-head\">尚未生成候选 Diff。</div><div id=\"monacoDiffNotice\" class=\"note\" role=\"status\">生成候选后加载只读 Monaco Diff。</div><div id=\"monacoDiffControls\" class=\"monaco-controls\" hidden><label for=\"monacoDiffMode\">显示方式</label><select id=\"monacoDiffMode\"><option value=\"side-by-side\">左右对比</option><option value=\"inline\">行内对比</option></select><button id=\"monacoDiffPrevious\" class=\"secondary\" type=\"button\">上一处变化</button><button id=\"monacoDiffNext\" class=\"secondary\" type=\"button\">下一处变化</button></div><div id=\"monacoDiffSurface\" class=\"monaco-diff\" aria-label=\"Monaco 原文与候选只读对比\" hidden></div><div id=\"diffRows\" class=\"diff-grid\" aria-label=\"源文件与候选文件逐行差异\"></div><details id=\"fullSourceDisclosure\"><summary class=\"note\">查看完整原文与候选文本</summary><div class=\"source-preview\"><div><h4>当前 YAML</h4><pre id=\"currentSource\"></pre></div><div><h4>候选 YAML</h4><pre id=\"candidateSource\"></pre></div></div></details></section><section id=\"view-validation\" class=\"review-view\" role=\"tabpanel\" aria-labelledby=\"tab-validation\" hidden><div id=\"compilerStatus\" class=\"compiler\">Compiler Check: NOT_RUN</div><div id=\"validationIdentity\" class=\"context-meta\"></div><div id=\"diagnostics\" class=\"review-placeholder\">等待对选中候选执行正式 Compiler Check。</div><p class=\"note\">Compiler 静态校验不代表 Owner、Runtime 或真实 5GC 资格；Wait 另需可信 IngressCatalog。</p></section></section>",
     "</main><footer class=\"status\"><span id=\"status\">正在初始化…</span><span>仅修改当前 Procedure 缓冲区 · 不自动保存 · 每个候选都必须通过 Compiler v2.0.2 Check；Wait 还需要可信 IngressCatalog 绑定</span></footer>",
@@ -925,6 +928,7 @@ function createAuthoringView(vscode, context, {
       return;
     }
     const refining = message.type === "refine";
+    const runAgent = message.type === "runAgent";
     const prior = refining ? activeSession.latest : null;
     if (refining && (!prior || !isLiveDocumentRevision(activeSession.document, prior) ||
         prior.packageGeneration !== activeSession.context.generation)) {
@@ -1003,7 +1007,9 @@ function createAuthoringView(vscode, context, {
     );
     const detail = [
       "目标语言：CA-SL v1alpha5",
-      refining ? "模式：Refine proposal，重新生成完整新版本" : "模式：生成新提案",
+      refining ? "模式：Refine proposal，重新生成完整新版本" :
+        runAgent ? "模式：Agent。先发送下列文件目录，之后只发送 Agent 选中的内容。若需修订，会附上 Procedure 的 Compiler 错误代码，最多修订一次。" :
+          "模式：生成新提案",
       "Procedure：assurance/procedure.yaml",
       "上下文总量：" + contextPack.byteCount + " bytes",
       "将发送的来源：",
@@ -1059,89 +1065,122 @@ function createAuthoringView(vscode, context, {
         sessionId: activeSession.sessionId,
       });
       const agent = createProcedureAgent({ modelClient });
-      const proposalResult = await agent.propose({
-        task,
-        contextPack: contextPack.pack,
-        contextManifest: contextPack.manifest,
-        contextDisclosureAccepted: true,
-        signal: controller.signal,
-        maxTokens: 2048,
-      });
-      if (!isCurrent()) return;
-      post({ type: "status", message: "已收到模型响应，正在生成 Source Patch 候选…", busy: true });
-      const current = await collectAuthoringState(document);
-      if (!isCurrent()) return;
-      if (document.version !== initial.procedure.version ||
-        current.generation !== initial.generation ||
-        document.getText() !== initial.procedure.text) {
-        await refreshContext();
-        if (isCurrentAuthoringSession(session, activeSession)) {
-          post({ type: "error", message: "模型响应期间 Package 或 Procedure 已变化。提案已丢弃，没有应用任何修改。" });
-        }
-        return;
+      if (runAgent) {
+        post({ type: "status", message: "Agent 正在已授权的 Package 文件目录中查找任务所需资料…", busy: true });
+        contextPack = await agent.selectContext({
+          task, pack: contextPack.pack, manifest: contextPack.manifest,
+          contextDisclosureAccepted: true, signal: controller.signal,
+        });
+        if (!isCurrent() || controller.signal.aborted) return;
+        const labels = contextPack.manifest.map(item => item.label);
+        post({ type: "status", message: "读取本轮资料 · " + labels.join("、"), busy: true });
       }
+      const evaluate = async request => {
+        const proposalResult = await agent.propose({
+          task: request,
+          contextPack: contextPack.pack,
+          contextManifest: contextPack.manifest,
+          contextDisclosureAccepted: true,
+          signal: controller.signal,
+          maxTokens: 2048,
+        });
+        if (!isCurrent() || controller.signal.aborted) return null;
+        post({ type: "status", message: "已收到模型响应，正在生成 Source Patch 候选…", busy: true });
+        const current = await collectAuthoringState(document);
+        if (!isCurrent() || controller.signal.aborted) return null;
+        if (document.version !== initial.procedure.version ||
+          current.generation !== initial.generation ||
+          document.getText() !== initial.procedure.text) {
+          await refreshContext();
+          if (isCurrentAuthoringSession(session, activeSession)) {
+            post({ type: "error", message: "模型响应期间 Package 或 Procedure 已变化。提案已丢弃，没有应用任何修改。" });
+          }
+          return null;
+        }
 
-      const changeSet = createChangeSet({
-        proposalResult,
-        hostBase: {
-          documentUri: document.uri.toString(),
-          documentVersion: document.version,
-          packageGeneration: initial.generation,
-          sourceDigest: "sha256:" + contextPack.manifest[0].digest,
-        },
-      });
-      let patchPlan = null;
-      let patchError = null;
-      let candidateSource = null;
-      let candidateDigest = null;
-      if (proposalResult.proposal.blockers.length === 0 &&
-        proposalResult.proposal.operations.length > 0) {
+        const changeSet = createChangeSet({
+          proposalResult,
+          hostBase: {
+            documentUri: document.uri.toString(),
+            documentVersion: document.version,
+            packageGeneration: initial.generation,
+            sourceDigest: "sha256:" + contextPack.manifest[0].digest,
+          },
+        });
+        let patchPlan = null;
+        let patchError = null;
+        let candidateSource = null;
+        let candidateDigest = null;
+        if (proposalResult.proposal.blockers.length === 0 &&
+          proposalResult.proposal.operations.length > 0) {
+          try {
+            patchPlan = await planV1Alpha5Patch({
+              source: document.getText(),
+              changeSet,
+              currentDocumentUri: document.uri.toString(),
+              currentDocumentVersion: document.version,
+              currentPackageGeneration: initial.generation,
+            });
+            if (!isCurrent() || controller.signal.aborted) return null;
+            const preview = await materializeAcceptedPatchGroups({
+              source: document.getText(),
+              plan: patchPlan,
+              acceptedGroupIds: patchPlan.groups.map((group) => group.id),
+            });
+            if (!isCurrent() || controller.signal.aborted) return null;
+            candidateSource = preview.source;
+            candidateDigest = preview.digest;
+          } catch (error) {
+            if (!isCurrent() || controller.signal.aborted) return null;
+            patchError = String(error?.message ?? error);
+          }
+        }
+        if (!isCurrent() || controller.signal.aborted) return null;
+        const waitGate = containsWaitMutation(changeSet.operations);
+        let compilerCheck = null;
+        let compilerCheckError = null;
+        if (patchPlan && candidateSource !== null && candidateDigest) {
+          post({ type: "status", message: "正在校验精确候选的 Compiler Check…", busy: true });
+          try {
+            compilerCheck = await createAuthoringCompilerCheck({
+              compilerIntegration,
+              state: initial,
+              document,
+              changeSet,
+              candidateSource,
+              candidateDigest,
+            });
+          } catch (error) {
+            compilerCheckError = String(error?.message ?? error);
+          }
+        }
+        if (!isCurrent() || controller.signal.aborted) return null;
+        return { proposalResult, changeSet, patchPlan, patchError, candidateSource,
+          candidateDigest, waitGate, compilerCheck, compilerCheckError };
+      };
+      let result = await evaluate(task);
+      if (!result || !isCurrent() || controller.signal.aborted) return;
+      const repairTask = runAgent && !result.waitGate
+        ? buildCompilerRepairTask(task, result.changeSet, result.compilerCheck)
+        : null;
+      if (repairTask) {
+        post({ type: "status", message: "Compiler Check 未通过。Agent 正根据错误代码修订候选…", busy: true });
         try {
-          patchPlan = await planV1Alpha5Patch({
-            source: document.getText(),
-            changeSet,
-            currentDocumentUri: document.uri.toString(),
-            currentDocumentVersion: document.version,
-            currentPackageGeneration: initial.generation,
-          });
-          if (!isCurrent()) return;
-          const preview = await materializeAcceptedPatchGroups({
-            source: document.getText(),
-            plan: patchPlan,
-            acceptedGroupIds: patchPlan.groups.map((group) => group.id),
-          });
-          if (!isCurrent()) return;
-          candidateSource = preview.source;
-          candidateDigest = preview.digest;
+          const revision = await evaluate(repairTask);
+          if (!revision || !isCurrent() || controller.signal.aborted) return;
+          if (revision.patchPlan && revision.candidateSource !== null) result = revision;
+          else post({ type: "status", message: "修订未生成可审阅的候选，保留上一版。" });
         } catch (error) {
-          if (!isCurrent()) return;
-          patchError = String(error?.message ?? error);
+          if (!isCurrent() || controller.signal.aborted) return;
+          post({ type: "status", message: "Agent 修订失败，保留上一版候选。" });
         }
       }
-      if (!isCurrent()) return;
+      const { proposalResult, changeSet, patchPlan, patchError, candidateSource,
+        candidateDigest, waitGate, compilerCheck, compilerCheckError } = result;
       const flowChanges = createAuthoringFlowChanges(changeSet,patchPlan);
       const flowGraph = patchPlan && candidateSource !== null
         ? createAiFlowReviewOrFallback(initial,document.getText(),candidateSource,flowChanges)
         : null;
-      const waitGate = containsWaitMutation(changeSet.operations);
-      let compilerCheck = null;
-      let compilerCheckError = null;
-      if (patchPlan && candidateSource !== null && candidateDigest) {
-        post({ type: "status", message: "正在校验精确候选的 Compiler Check…", busy: true });
-        try {
-          compilerCheck = await createAuthoringCompilerCheck({
-            compilerIntegration,
-            state: initial,
-            document,
-            changeSet,
-            candidateSource,
-            candidateDigest,
-          });
-        } catch (error) {
-          compilerCheckError = String(error?.message ?? error);
-        }
-      }
-      if (!isCurrent()) return;
       const canApply = isAuthoringApplyAllowed({
         patchPlan,
         changeSet,
@@ -1240,6 +1279,7 @@ function createAuthoringView(vscode, context, {
       if (isCurrent()) {
         if (activeSession.controller === controller) activeSession.controller = null;
         activeSession.generating = false;
+        if (controller.signal.aborted) post({ type: "status", message: "已停止 Agent 任务。" });
         // Do not overwrite a Proposal or error with a generic terminal status.
         post({ type: "busy", busy: false });
       }
@@ -1531,7 +1571,7 @@ function createAuthoringView(vscode, context, {
       if (!message || typeof message.type !== "string") return;
       if (message.type === "console") await vscode.commands.executeCommand("skillStudio.openConsole");
       else if (message.type === "ready" || message.type === "refresh") await refreshContext();
-      else if (message.type === "generate" || message.type === "refine") await handleGenerate(message);
+      else if (message.type === "generate" || message.type === "refine" || message.type === "runAgent") await handleGenerate(message);
       else if (message.type === "inspectHistory") await handleInspectHistory(message);
       else if (message.type === "chooseModel") await handleChooseModel();
       else if (message.type === "cancel") {
