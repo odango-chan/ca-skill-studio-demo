@@ -252,6 +252,22 @@ export function registerDependencyIntegration(vscode,context,{onLockChanged=()=>
         vscode.TextEditorRevealType?.InCenter);
     }
   }
+  async function showReadonlyInterfaceSource(snapshot,path,text){
+    const uri=prepareToolCatalog(snapshot,path,text);
+    let document=await vscode.workspace.openTextDocument(uri);
+    const language=/\.ya?ml$/i.test(path)?"yaml":/\.json$/i.test(path)?"json":null;
+    if(language&&document.languageId!==language){
+      if(typeof vscode.languages?.setTextDocumentLanguage!=="function")
+        throw Error("Host cannot assign native source language to read-only dependency");
+      document=await vscode.languages.setTextDocumentLanguage(document,language);
+    }
+    await vscode.window.showTextDocument(document,{
+      viewColumn:vscode.ViewColumn.One,preview:true,preserveFocus:false
+    });
+    if(/\.schema\.(?:json|ya?ml)$/i.test(path))
+      await vscode.commands.executeCommand("skillStudio.showPreview",uri);
+    return {uri,document};
+  }
   async function openInterfaceFile(id,path){
     const root=await ensureRoot();
     const resolved=await resolveLockedDependencies(vscode,root);
@@ -270,20 +286,8 @@ export function registerDependencyIntegration(vscode,context,{onLockChanged=()=>
     }
     const target=snapshot.files.find(item=>item.path===path);
     if(!target)throw Error("Exported source is absent from immutable lock");
-    const uri=prepareToolCatalog(snapshot,path,
+    await showReadonlyInterfaceSource(snapshot,path,
       new TextDecoder("utf-8",{fatal:true}).decode(decodeBase64(target.bytes)));
-    let document=await vscode.workspace.openTextDocument(uri);
-    const language=/\.ya?ml$/i.test(path)?"yaml":/\.json$/i.test(path)?"json":null;
-    if(language&&document.languageId!==language){
-      if(typeof vscode.languages?.setTextDocumentLanguage!=="function")
-        throw Error("Host cannot assign native source language to read-only dependency");
-      document=await vscode.languages.setTextDocumentLanguage(document,language);
-    }
-    await vscode.window.showTextDocument(document,{
-      viewColumn:vscode.ViewColumn.One,preview:true,preserveFocus:false
-    });
-    if(/\.schema\.(?:json|ya?ml)$/i.test(path))
-      await vscode.commands.executeCommand("skillStudio.showPreview",uri);
   }
   async function askAlias(){
     return vscode.window.showInputBox({
@@ -412,6 +416,23 @@ export function registerDependencyIntegration(vscode,context,{onLockChanged=()=>
   command("skillStudio.refreshDependencies",async()=>{await ensureRoot();refresh();});
   command("skillStudio.inspectDependencyContract",inspect);
   command("skillStudio.openInterfaceExport",openInterfaceFile);
+  // Chromium-only acceptance surface. Synthetic content is never registered
+  // as a dependency, persisted as a lock or advertised as Owner-qualified.
+  command("skillStudio.internal.interfaceReadonlySourceAcceptance",async()=>{
+    const source=JSON.stringify({
+      $schema:"https://json-schema.org/draft/2020-12/schema",
+      $id:"urn:wtlab:skill-studio:synthetic-source-probe",
+      type:"object",properties:{supi:{type:"string"}}
+    },null,2);
+    const synthetic={id:"synthetic-readonly-probe",
+      snapshotDigest:"sha256:"+("d".repeat(64))};
+    const {uri,document}=await showReadonlyInterfaceSource(synthetic,
+      "schemas/source-probe.schema.json",source);
+    return {syntheticOnly:true,scheme:uri.scheme,
+      languageId:document.languageId,
+      sourceUnchanged:document.getText()===source,
+      virtualPath:uri.path,editorColumn:vscode.ViewColumn.One};
+  });
   command("skillStudio.addDependency",async()=>{
     const root=await ensureRoot();
     const type=await vscode.window.showQuickPick([
