@@ -1971,20 +1971,23 @@ try{
       });
       if(agentStart.result?.value!==true)throw Error("Skill Package Agent entry is unavailable");
       const agentApproval=await waitForDialogButton(["发送并生成提案"]);
+      await command("Input.dispatchMouseEvent",{type:"mouseMoved",x:agentApproval.x,y:agentApproval.y});
       await command("Input.dispatchMouseEvent",{type:"mousePressed",x:agentApproval.x,y:agentApproval.y,button:"left",clickCount:1});
       await command("Input.dispatchMouseEvent",{type:"mouseReleased",x:agentApproval.x,y:agentApproval.y,button:"left",clickCount:1});
-      let agentReady=false;
+      let agentReady=false, lastAgentActivity;
       const agentDeadline=Date.now()+140000;
       while(!agentReady && Date.now()<agentDeadline){
         const activity=await command("Runtime.evaluate",{
           contextId:aiContextId,returnByValue:true,
           expression:`({
+            status:document.getElementById('status').textContent,
             log:document.getElementById('agentActivity').textContent,
             candidate:document.getElementById('candidateSource').textContent,
             busy:!document.getElementById('cancel').disabled
           })`
         });
         const value=activity.result?.value;
+        lastAgentActivity=value;
         agentReady=value?.log.includes("读取本轮资料")&&value.candidate.includes("ai-authoring-smoke-node")&&!value.busy;
         if(!agentReady)await sleep(100);
       }
@@ -1994,7 +1997,13 @@ try{
          catalogMessage.includes("CONTEXT ITEM")||!selectedContext?.includes("label: assurance/contract.yaml")||
          selectedContext.includes("label: assurance/predicates.yaml")||
          ![4,5].includes(gatewayRequests.length))
-        throw Error("Agent did not select and read only the disclosed Package resource");
+        throw Error("Agent did not select and read only the disclosed Package resource: "+JSON.stringify({
+          ready: agentReady, requestCount: gatewayRequests.length,
+          hasCatalog: Boolean(catalogMessage?.includes("assurance/contract.yaml")),
+          hasSelectedContract: Boolean(selectedContext?.includes("label: assurance/contract.yaml")),
+          status: lastAgentActivity?.status, busy: lastAgentActivity?.busy,
+          hasCandidate: Boolean(lastAgentActivity?.candidate)
+        }));
       console.log("STUDIO_PACKAGE_AGENT_BOUND_CONTEXT_CHROMIUM_PASS");
       // F4 disposal gate: close the specific AI Editor Tab in Theia's
       // actual main shell. A history inspection must not leave the Webview
@@ -2029,6 +2038,7 @@ try{
       })()`);
       if(!nativeChatStart)throw Error("Native Theia SkillStudio agent did not start");
       const nativeApproval=await waitForDialogButton(["发送并生成提案"]);
+      await command("Input.dispatchMouseEvent",{type:"mouseMoved",x:nativeApproval.x,y:nativeApproval.y});
       await command("Input.dispatchMouseEvent",{type:"mousePressed",x:nativeApproval.x,y:nativeApproval.y,button:"left",clickCount:1});
       await command("Input.dispatchMouseEvent",{type:"mouseReleased",x:nativeApproval.x,y:nativeApproval.y,button:"left",clickCount:1});
       let nativeReply;
