@@ -863,7 +863,10 @@ function currentGrammarCompletions(value, document, prefix, offset, lineStart) {
     // Only list exact IDs explicitly supplied with the accepted snapshot.
     // These are source hints; membership, Scope and Effect are not inferred.
     const ids=[...new Set((value.snapshot.dependencyOperations??[])
-      .map(item=>item.id).filter(id=>typeof id==="string"&&id.includes("::")))];
+      .filter(item=>typeof item?.dependencyId==="string"&&
+        /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/.test(item.dependencyId)&&
+        typeof item.id==="string"&&/^[A-Za-z0-9_][A-Za-z0-9_.-]*$/.test(item.id))
+      .map(item=>item.dependencyId+"::"+item.id))];
     return make(ids,tool[2],offset-tool[2].length,CompletionItemKind.Reference,
       "Unverified imported reference; Compiler must check exact Owner/Capability");
   }
