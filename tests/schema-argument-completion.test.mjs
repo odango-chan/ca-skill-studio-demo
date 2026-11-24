@@ -126,9 +126,9 @@ test('wrong dialect or absent Tool does not invent input fields',async()=>{
   const hints=projectLockedInterfaceCompletionHints(await locked());
   const unrelated=document.replace('ca-client::context.smf.session.read',
     'ca-client::other.read');
-  assert.equal(completion(unrelated,hints),null);
+  assert.deepEqual(completion(unrelated,hints),[]);
   const changedStage=document.replace('observation:', 'operation:');
-  assert.equal(completion(changedStage,hints),null);
+  assert.deepEqual(completion(changedStage,hints),[]);
   const absent=completion(document,[]);
   assert.equal(absent.length,0);
 });
