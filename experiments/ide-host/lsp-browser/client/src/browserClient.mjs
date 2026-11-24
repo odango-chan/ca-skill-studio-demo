@@ -47,6 +47,7 @@ export function createSkillLanguageClient(vscode, context, handlers = {}) {
   let clientStopPromise = null;
   let client = null;
   let semanticTokenRegistration = null;
+  let completionRegistration = null;
   let semanticTokenChangeEmitter = null;
   let semanticTokenRenderer = null;
   let semanticTokenRefreshQueued = false;
@@ -204,6 +205,50 @@ export function createSkillLanguageClient(vscode, context, handlers = {}) {
     output.appendLine("Registered Theia semantic-token adapter from the canonical Skill Language catalog");
   }
 
+  // Theia 1.76's native LanguageClient adapter does not consistently expose
+  // LSP CompletionItems through the public editor provider API. Keep the Worker
+  // as the single completion engine and bridge its exact CompletionRequest into
+  // Theia's native CompletionItemProvider. VS Code uses its normal LSP adapter.
+  function registerTheiaCompletionProvider(){
+    if(!handlers.manualCompletionProvider||completionRegistration)return;
+    if(typeof vscode.languages?.registerCompletionItemProvider!=="function"){
+      output.appendLine("Native CompletionItemProvider API unavailable in this host");
+      return;
+    }
+    const provider={
+      async provideCompletionItems(document,position,cancellationToken,context){
+        if(stopped||terminalFailure||!started||cancellationToken?.isCancellationRequested)
+          return [];
+        try{
+          const result=await client.sendRequest(CompletionRequest.type,{
+            textDocument:{uri:document.uri.toString()},
+            position:{line:position.line,character:position.character},
+            context:{
+              triggerKind:context?.triggerKind??1,
+              ...(context?.triggerCharacter?{triggerCharacter:context.triggerCharacter}:{})
+            }
+          },cancellationToken);
+          if(cancellationToken?.isCancellationRequested)return [];
+          return Array.isArray(result)?result:result?.items??[];
+        }catch(error){
+          if(!stopped&&!terminalFailure)
+            output.appendLine("Theia Schema completion request failed: "+
+              String(error?.message??error));
+          return [];
+        }
+      }
+    };
+    completionRegistration=vscode.languages.registerCompletionItemProvider(
+      [
+        {scheme:"file",pattern:"**/*.yaml"},
+        {scheme:"file",pattern:"**/*.yml"}
+      ],
+      provider,":","/","."
+    );
+    handlers.onCompletionProviderRegistered?.({registered:true,transport:"browser-lsp-worker"});
+    output.appendLine("Registered Theia native YAML CompletionItemProvider over the shared Skill Language Worker");
+  }
+
   // Register the cross-language Definition adapter before LanguageClient
   // installs its generic providers. For a Python Skill entrypoint, the
   // Package index knows the authoritative YAML caller range; return that
@@ -331,6 +376,7 @@ export function createSkillLanguageClient(vscode, context, handlers = {}) {
         startPromise = client.start().then(() => {
           started = true;
           registerTheiaSemanticTokenProvider();
+          registerTheiaCompletionProvider();
           scheduleHeartbeat();
         });
       }
@@ -402,6 +448,8 @@ export function createSkillLanguageClient(vscode, context, handlers = {}) {
       } finally {
         crossLanguageDefinitionRegistration?.dispose?.();
         crossLanguageDefinitionRegistration=null;
+        completionRegistration?.dispose?.();
+        completionRegistration=null;
         semanticTokenRegistration?.dispose?.();
         semanticTokenRegistration=null;
         semanticTokenRenderer?.dispose?.();
