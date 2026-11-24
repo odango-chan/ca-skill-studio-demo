@@ -869,7 +869,7 @@ function currentGrammarCompletions(value, document, prefix, offset, lineStart) {
         /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/.test(item.dependencyId)&&
         typeof item.id==="string"&&/^[A-Za-z0-9_][A-Za-z0-9_.-]*$/.test(item.id))
       .map(item=>item.dependencyId+"::"+item.id))];
-    return make(ids,tool[2],offset-tool[2].length,CompletionItemKind.Reference,
+    return make(ids,tool[1],offset-tool[1].length,CompletionItemKind.Reference,
       "Unverified imported reference; Compiler must check exact Owner/Capability");
   }
 
