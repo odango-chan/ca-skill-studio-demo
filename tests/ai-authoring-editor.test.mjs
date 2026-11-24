@@ -114,6 +114,21 @@ test("Package revision is stable for identical content and advances for Procedur
   assert.equal(await revisionFor(changedProcedure, changedDependency), 3);
 });
 
+test("Package generations ignore read-only editor lifecycle but retain source and write-target identity", async () => {
+  const revisionFor = createPackageRevisionTracker();
+  const snapshot = packageSnapshot();
+  const deps = dependencyResolution();
+  const procedure = snapshot.documents.find(item => item.relativePath === "assurance/procedure.yaml");
+  const contract = snapshot.documents.find(item => item.relativePath === "assurance/contract.yaml");
+  assert.equal(await revisionFor(snapshot, deps), 1);
+  contract.version += 1;
+  assert.equal(await revisionFor(snapshot, deps), 1);
+  contract.text += "# unsaved context change\n";
+  assert.equal(await revisionFor(snapshot, deps), 2);
+  procedure.version += 1;
+  assert.equal(await revisionFor(snapshot, deps), 3);
+});
+
 test("AI Authoring Webview has a nonce-only script/style policy and no direct network path", () => {
   const html = renderAiAuthoringHtml("a".repeat(48));
   assert.match(html, /default-src 'none'/);

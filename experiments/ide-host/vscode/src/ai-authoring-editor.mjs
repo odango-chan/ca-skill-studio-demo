@@ -162,7 +162,10 @@ export function createPackageRevisionTracker() {
     if (typeof identity !== "string" || !identity) throw new TypeError("Package root identity is required");
     const documents = (snapshot.documents ?? []).map((item) => ({
       path: item.relativePath,
-      version: item.version,
+      // Closing or reopening read-only context can change its Host version
+      // without changing any compiler input. The write target still binds
+      // its exact native TextDocument revision in addition to its bytes.
+      ...(item.relativePath === "assurance/procedure.yaml" ? { version: item.version } : {}),
       text: item.text,
     })).sort((left, right) => left.path.localeCompare(right.path));
     const dependencies = (dependencyResolution.snapshots ?? [])
@@ -1029,7 +1032,7 @@ function createAuthoringView(vscode, context, {
         document.getText() !== initial.procedure.text) {
         activeSession.generating = false;
         await refreshContext();
-        if (isCurrent()) {
+        if (isCurrentAuthoringSession(session, activeSession)) {
           post({ type: "error", message: "生成期间 Package 或 Procedure 已变化。上下文已刷新，请重新检查后再生成。" });
         }
         return;
@@ -1071,7 +1074,7 @@ function createAuthoringView(vscode, context, {
         current.generation !== initial.generation ||
         document.getText() !== initial.procedure.text) {
         await refreshContext();
-        if (isCurrent()) {
+        if (isCurrentAuthoringSession(session, activeSession)) {
           post({ type: "error", message: "模型响应期间 Package 或 Procedure 已变化。提案已丢弃，没有应用任何修改。" });
         }
         return;
