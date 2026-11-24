@@ -35,7 +35,7 @@ for(const language of syntaxManifest.contributes?.languages??[]){
 }
 // Keep both host adapters for the same Go/WASM Compiler: classic Web Worker
 // for browser hosts and worker_threads for Node extension hosts. The pinned
-// wasm_exec.js and skillc.wasm are staged by the CI Go build step.
+// wasm_exec.js and skillc.wasm are staged from the checksum-verified Compiler v2.1.0 release bundle.
 await cp(join(root,"src/compiler-worker.js"),join(root,"dist/compiler-worker.js"));
 await cp(join(root,"src/compiler-node-worker.mjs"),join(root,"dist/compiler-node-worker.mjs"));
 // The pinned Markdown extension owns native Source language services; the shared Studio Preview Host owns rendering.
