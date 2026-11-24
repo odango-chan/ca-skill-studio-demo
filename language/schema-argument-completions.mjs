@@ -65,6 +65,7 @@ export function schemaArgumentCompletions(snapshot,document,prefix,offset,lineSt
     item.id===context.tool&&item.kind===context.stage&&
     item.trust==='DECLARATION_ONLY'&&Array.isArray(item.argumentProperties));
   // Never select one arbitrarily from duplicate or stale declarations.
+  if(matches.length===0)return null;
   if(matches.length!==1)return [];
   const hint=matches[0];
   const properties=hint.argumentProperties.filter(p=>
