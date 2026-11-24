@@ -762,9 +762,9 @@ export function auditPackage({
         "tools");
       return;
     }
-    if(declaration.kind!=="tool-catalog"){
+    if(!["tool-catalog","interface-package"].includes(declaration.kind)){
       add(diagnostics,path,source,node,"TOOL_DEPENDENCY_KIND_MISMATCH",
-        "Tool "+value+" requires a Tool Catalog dependency, but "+alias+
+        "Tool "+value+" requires a ToolCatalog or Interface Package dependency, but "+alias+
           " is declared as "+declaration.kind,
         {domain:"tools",category:"linking"});
       return;
