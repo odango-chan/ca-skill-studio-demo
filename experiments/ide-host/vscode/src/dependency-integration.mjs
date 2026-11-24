@@ -10,6 +10,7 @@ import {acquireUpload,acquireMcp,acquireGit,acquireBuiltin}
 import {readGitHubPinnedFile} from "./acquisition-transports.mjs";
 import {decodeBase64,sha256} from "./dependency-snapshot.mjs";
 import {decodeInterfacePackageZip} from "./interface-package-zip.mjs";
+import {readPinnedInterfaceRelease} from "./interface-release-acquisition.mjs";
 import {localSchemaReference,isSkillSchema} from "./schema-editor.mjs";
 import {projectJsonSchema,resolveSchemaPointer} from "../../../../site/schema-projection.mjs";
 import {projectDependencyReadiness,projectLockedToolCatalog}
@@ -311,10 +312,19 @@ export function registerDependencyIntegration(vscode,context,{onLockChanged=()=>
         publisher:imported.manifest.publisher},
       files:imported.files};
   }
+  async function acquireInterfaceRelease(source){
+    const acquired=await readPinnedInterfaceRelease(source);
+    const imported=await decodeInterfacePackageZip(acquired.bytes);
+    return {kind:"interface-package",
+      source:{...acquired.source,packageId:imported.manifest.packageId,
+        version:imported.manifest.version,publisher:imported.manifest.publisher},
+      files:imported.files};
+  }
   async function acquireSource(source){
     switch(source.type){
       case "builtin":return acquireBuiltin(source);
       case "interface-zip":return acquireInterfaceZip(source.upload);
+      case "interface-release":return acquireInterfaceRelease(source);
       case "git":{
         const token=await askSecret("skillStudio.git.github");
         return acquireGit({...source,
@@ -335,6 +345,24 @@ export function registerDependencyIntegration(vscode,context,{onLockChanged=()=>
   }
   async function acquireNew(type){
     if(type==="interface-zip")return acquireInterfaceZip();
+    if(type==="interface-release"){
+      const repository=await vscode.window.showInputBox({
+        prompt:"Pinned GitHub release repository (owner/name)",
+        value:"odango-chan/ca-client-tools"});
+      if(!repository)return null;
+      const tag=await vscode.window.showInputBox({
+        prompt:"Exact immutable release tag (never latest)",value:"v1.1.0"});
+      if(!tag)return null;
+      const asset=await vscode.window.showInputBox({
+        prompt:"Exact ZIP release asset filename",
+        value:"ca-client-tools_interface_1.1.0.zip"});
+      if(!asset)return null;
+      const expectedSha256=await vscode.window.showInputBox({
+        prompt:"Required SHA-256 from published SHA256SUMS (sha256:<64 lowercase hex>)",
+        placeHolder:"sha256:..."});
+      if(!expectedSha256)return null;
+      return acquireInterfaceRelease({repository,tag,asset,expectedSha256});
+    }
     if(type==="builtin")return acquireBuiltin({
       bundleId:"studio-example-toolcatalog",version:"1.0.0"});
     if(type==="upload"){
@@ -382,6 +410,7 @@ export function registerDependencyIntegration(vscode,context,{onLockChanged=()=>
     const root=await ensureRoot();
     const type=await vscode.window.showQuickPick([
       {label:"Import Interface Package ZIP (read-only Schemas / Tools)",value:"interface-zip"},
+      {label:"Import pinned GitHub Release Interface ZIP (tag + SHA-256)",value:"interface-release"},
       {label:"Upload current ToolCatalog YAML / JSON",value:"upload"},
       {label:"Git pinned Owner ToolCatalog",value:"git"},
       {label:"Built-in unqualified ToolCatalog example",value:"builtin"}
