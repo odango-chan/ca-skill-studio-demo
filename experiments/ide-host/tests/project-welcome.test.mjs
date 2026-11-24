@@ -137,7 +137,8 @@ test("Welcome can be explicitly reopened while an existing project workspace is 
 
 
 test("Welcome diagnostics retain the last Example import failure when the panel is hidden",()=>{
-  const h=setupWelcome("en",[{uri:{toString(){return "file:///project";}}}],false);
+  const h=setupWelcome("en");
+  h.handle.dispose();
   h.handle.setImportStatus({state:"error",
     message:"persist-example-interface-lock: Pinned dependency manifest unreadable: missing"});
   assert.deepEqual(h.handle.getDiagnostics().lastImportStatus,{
