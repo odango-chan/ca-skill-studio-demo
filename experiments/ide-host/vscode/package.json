@@ -50,6 +50,7 @@
     "onView:skillStudio.preview",
     "onCommand:skillStudio.showActivationDiagnostics",
     "onCommand:skillStudio.openAiAuthoring",
+    "onCommand:skillStudio.openConsole",
     "onCommand:skillStudio.setAiGatewayToken"
   ],
   "contributes": {
@@ -204,7 +205,12 @@
       },
       {
         "command": "skillStudio.openAiAuthoring",
-        "title": "%ai.authoring%",
+        "title": "AI Workbench",
+        "category": "SKILL Studio"
+      },
+      {
+        "command": "skillStudio.openConsole",
+        "title": "Console",
         "category": "SKILL Studio"
       },
       {
@@ -256,7 +262,6 @@
       "editor/title": [
         {
           "command": "skillStudio.openAiAuthoring",
-          "when": "resourceFilename == procedure.yaml",
           "group": "navigation@1"
         }
       ],

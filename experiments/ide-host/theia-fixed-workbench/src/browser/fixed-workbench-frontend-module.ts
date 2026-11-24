@@ -5,7 +5,7 @@ import { FrontendApplicationStateService } from '@theia/core/lib/browser/fronten
 import { CorePreferences } from '@theia/core/lib/common/core-preferences';
 import { MAIN_AREA_CLASS } from '@theia/core/lib/browser/shell/application-shell';
 import { TheiaDockPanel } from '@theia/core/lib/browser/shell/theia-dock-panel';
-import type { DockPanel } from '@lumino/widgets';
+import { Widget, type DockPanel } from '@theia/core/lib/browser/widgets/widget';
 import { CommandRegistry } from '@theia/core/lib/common/command';
 import { constrainMainEditorPanelOptions, isMainEditorPanelOptions, createPreviewAutoRevealPreference, hasVisualizableSourceEditor } from './fixed-editor-panel-policy.mjs';
 
@@ -13,6 +13,58 @@ import { constrainMainEditorPanelOptions, isMainEditorPanelOptions, createPrevie
 const PREVIEW_CONTAINER_WIDGET_ID = 'plugin-view-container:workbench.view.extension.skillStudioPreview';
 const PREVIEW_VIEW_ID = 'skillStudio.preview';
 const PREVIEW_WIDGET_ID = 'plugin-view:skillStudio.preview';
+
+function addWorkspaceModeControl(app: FrontendApplication, commands: CommandRegistry) {
+    const shell = app.shell;
+    const control = new Widget({ node: document.createElement('nav') });
+    control.id = 'skill-studio-workspace-mode';
+    control.node.setAttribute('aria-label', 'Skill Studio mode');
+    Object.assign(control.node.style, {
+        display: 'flex', gap: '4px', alignItems: 'center', padding: '3px 8px',
+        background: 'var(--theia-titleBar-activeBackground)'
+    });
+    const modes = [
+        { title: 'AI Workbench', command: 'skillStudio.openAiAuthoring' },
+        { title: 'Console', command: 'skillStudio.openConsole' }
+    ];
+    const buttons = modes.map(({ title, command }) => {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.textContent = title;
+        Object.assign(button.style, {
+            font: 'inherit', padding: '3px 10px', cursor: 'pointer',
+            color: 'var(--theia-button-secondaryForeground)', border: '1px solid transparent',
+            borderRadius: '3px'
+        });
+        button.onclick = async () => {
+            buttons.forEach(item => { item.disabled = true; });
+            try {
+                await commands.executeCommand(command);
+            } catch (error) {
+                console.warn('Skill Studio mode could not be opened:', error);
+            } finally {
+                buttons.forEach(item => { item.disabled = false; });
+                update();
+            }
+        };
+        control.node.appendChild(button);
+        return button;
+    });
+    const update = () => {
+        const current = shell.getCurrentWidget('main');
+        const active = current?.title.label === 'AI Procedure Authoring' ? 0 :
+            current && current.title.label !== 'SKILL Studio Welcome' ? 1 : -1;
+        buttons.forEach((button, index) => {
+            button.setAttribute('aria-pressed', String(index === active));
+            button.style.background = index === active
+                ? 'var(--theia-button-secondaryBackground)' : 'transparent';
+        });
+    };
+    const changed = shell.onDidChangeCurrentWidget(update);
+    void shell.addWidget(control, { area: 'top' });
+    update();
+    return { dispose() { changed.dispose(); control.dispose(); } };
+}
 
 export default new ContainerModule((bind, unbind, isBound, rebind) => {
     // Theia does not expose VS Code's generated workbench.view.extension.*
@@ -25,9 +77,11 @@ export default new ContainerModule((bind, unbind, isBound, rebind) => {
         let stopped = false;
         let added: { dispose(): void } | undefined;
         let changed: { dispose(): void } | undefined;
+        let modeControl: { dispose(): void } | undefined;
         return {
             onStart(app: FrontendApplication) {
                 const shell = app.shell;
+                modeControl = addWorkspaceModeControl(app, commands);
                 let storage: Storage | undefined;
                 try {
                     // sessionStorage belongs to this browser tab. A global
@@ -185,6 +239,7 @@ export default new ContainerModule((bind, unbind, isBound, rebind) => {
                 stopped = true;
                 added?.dispose();
                 changed?.dispose();
+                modeControl?.dispose();
             }
         };
     }).inSingletonScope();

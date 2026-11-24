@@ -484,6 +484,13 @@ export function registerPackageOverview(vscode,context,getActiveDocument=()=>nul
       treeReads,treeReadsByKind:{...treeReadsByKind}
     };
   }
-  return {refresh,revealPackages,getDiagnostics,
+  function getProcedureForDocument(document){
+    const uri=document.uri;
+    const pkg=packages.filter(item=>item.rootUri?.scheme===uri.scheme &&
+      item.rootUri.authority===uri.authority && uri.path.startsWith(item.rootPath+'/'))
+      .sort((a,b)=>b.rootPath.length-a.rootPath.length)[0];
+    return pkg?.files.find(file=>file.path==='assurance/procedure.yaml')?.uri;
+  }
+  return {refresh,revealPackages,getDiagnostics,getProcedureForDocument,
     dispose(){clearTimeout(timer);generation++;emitter.dispose?.();}};
 }

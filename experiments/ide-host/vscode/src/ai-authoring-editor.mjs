@@ -570,6 +570,7 @@ export function renderAiAuthoringHtml(nonce, assets = {}) {
     "byId(\'monacoDiffNext\').addEventListener(\'click\',()=>window.skillStudioAiYamlDiff?.jump(\'next\'));",
     "byId(\'generate\').addEventListener(\'click\',()=>{const task=byId('task').value.trim();const selectedIds=[...document.querySelectorAll('#sources input:checked')].map(item=>item.value);clearProposal();vscode.postMessage({type:'generate',task,selectedIds});});",
     "byId('refine').addEventListener('click',()=>{if(!hasCurrentProposal)return;const task=byId('refineTask').value.trim();if(!task){status('请填写完善提案的指令。','warning');return;}const selectedIds=[...document.querySelectorAll('#sources input:checked')].map(item=>item.value);clearProposal();vscode.postMessage({type:'refine',task,selectedIds});});",
+    "byId('openConsole').addEventListener('click',()=>vscode.postMessage({type:'console'}));",
     "byId('cancel').addEventListener('click',()=>vscode.postMessage({type:'cancel'}));",
     "byId('refresh').addEventListener('click',()=>{clearProposal();vscode.postMessage({type:'refresh'});});",
     "byId('chooseModel').addEventListener('click',()=>vscode.postMessage({type:'chooseModel'}));",
@@ -586,7 +587,7 @@ export function renderAiAuthoringHtml(nonce, assets = {}) {
     (flowCss ? "<link rel=\"stylesheet\" nonce=\"" + nonce + "\" href=\"" + flowCss + "\">" : "") +
     (monacoCss ? "<link rel=\"stylesheet\" nonce=\"" + nonce + "\" href=\"" + monacoCss + "\">" : "") +
     "</head><body>",
-    "<header class=\"topbar\"><div class=\"heading\"><strong>AI Procedure Authoring</strong><small id=\"packageInfo\">读取当前 Package…</small></div><div class=\"top-actions\"><span id=\"modelLabel\" class=\"compiler\">当前模型：读取中…</span><button id=\"chooseModel\" class=\"secondary\" title=\"从 Gateway 选择模型或手动输入模型 ID\">选择模型</button><span class=\"compiler\">CA-SL v1alpha5 · FROZEN / RELEASED</span><button id=\"refresh\" class=\"secondary\">刷新上下文</button></div></header>",
+    "<header class=\"topbar\"><div class=\"heading\"><strong>AI Procedure Authoring</strong><small id=\"packageInfo\">读取当前 Package…</small></div><div class=\"top-actions\"><span aria-current=\"true\">AI Workbench</span><button id=\"openConsole\" class=\"secondary\">Console</button><span id=\"modelLabel\" class=\"compiler\">当前模型：读取中…</span><button id=\"chooseModel\" class=\"secondary\" title=\"从 Gateway 选择模型或手动输入模型 ID\">选择模型</button><span class=\"compiler\">CA-SL v1alpha5 · FROZEN / RELEASED</span><button id=\"refresh\" class=\"secondary\">刷新上下文</button></div></header>",
     "<main>",
     "<section class=\"card changeset-panel\" aria-label=\"修改请求与 Change Set\"><h2>修改请求</h2><textarea id=\"task\" maxlength=\"4000\" placeholder=\"描述希望如何修改当前 Procedure。模型只提出语义修改，不直接写文件或执行 Tool。\"></textarea><p class=\"note\"><strong>发送前确认：</strong>只有明确批准后，选中的上下文才发往 Gateway；模型密钥不会进入 Studio。</p><div class=\"actions\"><button id=\"generate\">生成修改提案</button><button id=\"cancel\" class=\"secondary\" disabled>取消请求</button></div><h3>完善当前提案</h3><textarea id=\"refineTask\" maxlength=\"1600\" placeholder=\"描述希望如何改进上一版提案。将重新披露上下文、生成完整新版本，不会直接修改文件。\"></textarea><button id=\"refine\" class=\"secondary\" disabled>Refine proposal · 创建新版本</button><hr><h3>本次会话的提案历史</h3><div id=\"revisionTimeline\" class=\"revision-list\" aria-live=\"polite\">本次会话尚无提案修订。</div><hr><div class=\"top-actions spread\"><h2>Change Set</h2><span id=\"revisionInfo\" class=\"kind\">尚未生成</span></div><div id=\"patchState\" class=\"kind\">尚未生成</div><div id=\"patchError\" class=\"note error\"></div><p class=\"note\">每组不可拆分；取消选中会重新生成候选并运行 Compiler Check。</p><div id=\"groups\" class=\"group-list\"></div><div class=\"actions\"><button id=\"apply\" disabled>应用选中修改</button><button id=\"discard\" class=\"secondary\" disabled>丢弃提案</button></div></section>",
     "<section class=\"card context-panel\" aria-label=\"上下文\"><details id=\"contextPanel\" open><summary>上下文来源 · 发送范围</summary><div id=\"contextMeta\" class=\"context-meta\">读取当前 Procedure…</div><div class=\"note\">当前 Procedure 是唯一写入目标；Contract、Predicate、Schema 和已验证依赖为只读参考。Script / Reference 须逐任务选择。以下列表仅决定将发送给模型的内容。</div><div id=\"gatewayNotice\" class=\"note warning\"></div><div id=\"sources\" class=\"source-list\"></div></details></section>",
@@ -598,13 +599,10 @@ export function renderAiAuthoringHtml(nonce, assets = {}) {
   ].join("\n");
 }
 
-export function registerAiAuthoringEditor(vscode, context, { getActiveDocument, compilerIntegration } = {}) {
-  const revisionFor = createPackageRevisionTracker();
-  let panel = null;
-  let session = null;
+export function registerAiAuthoringEditor(vscode, context, { getActiveDocument, getPackageProcedure, compilerIntegration } = {}) {
+  const views = new Map();
+  let lastDocument;
   let syntheticFixture = null;
-  let syntheticFingerprint = null;
-  let syntheticGeneration = 0;
 
   function installSyntheticFixture({documentUri, original, trusted} = {}) {
     if (typeof process === "undefined" || !process.versions?.node) {
@@ -621,28 +619,25 @@ export function registerAiAuthoringEditor(vscode, context, { getActiveDocument, 
       throw new Error("Synthetic Editor Tab fixture and trusted Compiler source differ.");
     }
     syntheticFixture = { documentUri, original, trusted };
-    syntheticFingerprint = null;
-    syntheticGeneration = 0;
   }
 
   function clearSyntheticFixture() {
     syntheticFixture = null;
-    syntheticFingerprint = null;
-    syntheticGeneration = 0;
   }
 
-  function post(message) {
-    if (panel && session && !session.disposed) void panel.webview.postMessage(message);
-  }
-
-  async function resolveProcedureDocument() {
+  async function resolveProcedureDocument({ pick = true } = {}) {
     const active = vscode.window.activeTextEditor?.document ?? null;
     const workbenchDocument = getActiveDocument?.() ?? null;
+    if (active && !isProcedurePath(active.uri.path)) {
+      const procedure = getPackageProcedure?.(active);
+      if (procedure) return vscode.workspace.openTextDocument(procedure);
+    }
     const preferred = preferredProcedureDocument(active, workbenchDocument);
     if (preferred) return preferred;
     const matches = await vscode.workspace.findFiles(
       "**/assurance/procedure.yaml", "**/node_modules/**", 50
     );
+    if (!pick && matches.length !== 1) return null;
     if (matches.length === 0) throw new Error("当前 Workspace 中没有找到 assurance/procedure.yaml。");
     let selected = matches[0];
     if (matches.length > 1) {
@@ -661,6 +656,112 @@ export function registerAiAuthoringEditor(vscode, context, { getActiveDocument, 
     return vscode.workspace.openTextDocument(selected);
   }
 
+  async function open({ pick = true } = {}) {
+    try {
+      const document = await resolveProcedureDocument({ pick });
+      if (!document) return false;
+      const key = document.uri.toString();
+      const existing = views.get(key);
+      lastDocument = document;
+      if (existing) return existing.reveal(document);
+      const view = createAuthoringView(vscode, context, {
+        document, compilerIntegration, getSyntheticFixture: () => syntheticFixture,
+        onDispose: () => views.delete(key),
+      });
+      const opened = view.reveal();
+      views.set(key, view);
+      return opened;
+    } catch (error) {
+      void vscode.window.showWarningMessage("AI Procedure Authoring： " + String(error?.message ?? error));
+      return false;
+    }
+  }
+
+  const gatewayTokenCommand = vscode.commands.registerCommand("skillStudio.setAiGatewayToken", async () => {
+    try {
+      await configureAiGatewayToken(vscode, context.secrets);
+    } catch (error) {
+      void vscode.window.showErrorMessage("配置共享 AI Gateway 访问令牌失败：" + String(error?.message ?? error));
+    }
+  });
+  const gatewayAcceptanceCommand =
+    typeof process !== "undefined" && Boolean(process.versions?.node)
+      ? vscode.commands.registerCommand("skillStudio.internal.configureAiGatewayAcceptance",
+        async ({ gatewayUrl = "", modelId = "deepseek-v4.1-flash" } = {}) => {
+          // The acceptance fixture is staged only in isolated backend CI.
+          // No production installation can update settings via this command.
+          await vscode.workspace.fs.stat(vscode.Uri.joinPath(context.extensionUri,
+            "dist", "authoring-trusted-build-request.json"));
+          if (typeof gatewayUrl !== "string" || typeof modelId !== "string" ||
+              !/^[A-Za-z0-9][A-Za-z0-9._:/-]{0,255}$/.test(modelId)) {
+            throw new TypeError("Invalid AI Gateway acceptance configuration.");
+          }
+          if (gatewayUrl) {
+            const parsed = new URL(gatewayUrl);
+            if (parsed.protocol !== "http:" ||
+                !["127.0.0.1", "localhost", "[::1]"].includes(parsed.hostname) ||
+                parsed.username || parsed.password || parsed.search || parsed.hash ||
+                parsed.pathname === "/" || !parsed.pathname) {
+              throw new TypeError("AI Gateway acceptance may target only an HTTP loopback route.");
+            }
+          }
+          const settings = vscode.workspace.getConfiguration("connectionAgent.skillStudio.ai");
+          const target = vscode.ConfigurationTarget?.Global;
+          if (target === undefined || typeof settings?.update !== "function") {
+            throw new Error("Application-scoped AI Gateway settings cannot be updated by the acceptance host.");
+          }
+          await settings.update("gatewayUrl", gatewayUrl, target);
+          await settings.update("model", modelId, target);
+          return true;
+        })
+      : null;
+  context.subscriptions.push(gatewayTokenCommand);
+  if (gatewayAcceptanceCommand) context.subscriptions.push(gatewayAcceptanceCommand);
+  return Object.freeze({
+    open,
+    getDocument: () => lastDocument,
+    configureAiGatewayToken: () => configureAiGatewayToken(vscode, context.secrets),
+    ...(typeof process !== "undefined" && process.versions?.node
+      ? { installSyntheticFixture, clearSyntheticFixture }
+      : {}),
+  });
+}
+
+function createAuthoringView(vscode, context, {
+  document, compilerIntegration, getSyntheticFixture, onDispose,
+}) {
+  let syntheticFingerprint = null;
+  let syntheticGeneration = 0;
+  const revisionFor = createPackageRevisionTracker();
+  let panel = null;
+  let session = null;
+
+  const outbound = [];
+  let flushing = false;
+
+  async function flush() {
+    if (flushing) return;
+    flushing = true;
+    try {
+      while (panel?.visible && outbound.length) {
+        const target = panel;
+        const message = outbound[0];
+        if (!await target.webview.postMessage(message) || panel !== target) break;
+        outbound.shift();
+      }
+    } catch {
+      // A view transition can interrupt delivery. Retry when revealed.
+    } finally {
+      flushing = false;
+    }
+  }
+
+  function post(message) {
+    if (!panel || !session || session.disposed) return;
+    outbound.push(message);
+    void flush();
+  }
+
   async function collectAuthoringState(document) {
     if (!document || !isProcedurePath(document.uri.path)) {
       throw new Error("AI Authoring 只支持 assurance/procedure.yaml。");
@@ -668,6 +769,7 @@ export function registerAiAuthoringEditor(vscode, context, { getActiveDocument, 
     if (!Number.isSafeInteger(document.version) || document.version < 1) {
       throw new Error("当前 Procedure 没有可用的 TextDocument revision。");
     }
+    const syntheticFixture = getSyntheticFixture();
     if (syntheticFixture?.documentUri === document.uri.toString()) {
       const text = document.getText();
       if (syntheticFingerprint !== text) {
@@ -1378,150 +1480,80 @@ export function registerAiAuthoringEditor(vscode, context, { getActiveDocument, 
     }
   }
 
-  async function open() {
-    let document;
-    try {
-      document = await resolveProcedureDocument();
-      if (!document) return false;
-      if (panel) {
-        if (!session || session.document !== document) {
-          if (session) {
-            session.disposed = true;
-            session.controller?.abort();
-          }
-          session = {
-            document,
-            sessionId: globalThis.crypto.randomUUID(),
-            context: null,
-            history: createSessionProposalHistory(),
-            pending: null,
-            latest: null,
-            controller: null,
-            disposed: false,
-            generating: false,
-            applying: false,
-            choosingModel: false,
-            contextRequestId: 0,
-          };
-        }
-        panel.title = "AI Procedure Authoring";
-        panel.reveal(vscode.ViewColumn.Active, false);
-        await refreshContext();
-        return true;
-      }
-      panel = vscode.window.createWebviewPanel(
-        "skillStudio.aiAuthoring",
-        "AI Procedure Authoring",
-        vscode.ViewColumn.Active,
-        { enableScripts: true, retainContextWhenHidden: true },
-      );
-      session = {
-        document,
-        sessionId: globalThis.crypto.randomUUID(),
-        context: null,
-        history: createSessionProposalHistory(),
-        pending: null,
-        latest: null,
-        controller: null,
-        disposed: false,
-        generating: false,
-        applying: false,
-        choosingModel: false,
-        contextRequestId: 0,
-      };
-      const reviewMediaRoot = vscode.Uri.joinPath(context.extensionUri, "media");
-      panel.webview.options = {
-        enableScripts:true,
-        localResourceRoots:[reviewMediaRoot],
-      };
-      panel.webview.html = renderAiAuthoringHtml(nonceValue(), {
-        scriptUri: panel.webview.asWebviewUri(
-          vscode.Uri.joinPath(reviewMediaRoot,"ai-flow-compare.js")).toString(),
-        styleUri: panel.webview.asWebviewUri(
-          vscode.Uri.joinPath(reviewMediaRoot,"ai-flow-compare.css")).toString(),
-        monacoScriptUri: panel.webview.asWebviewUri(
-          vscode.Uri.joinPath(reviewMediaRoot,"ai-yaml-diff.js")).toString(),
-        monacoStyleUri: panel.webview.asWebviewUri(
-          vscode.Uri.joinPath(reviewMediaRoot,"ai-yaml-diff.css")).toString(),
-      });
-      context.subscriptions.push(panel.webview.onDidReceiveMessage(async (message) => {
-        if (!message || typeof message.type !== "string") return;
-        if (message.type === "ready" || message.type === "refresh") await refreshContext();
-        else if (message.type === "generate" || message.type === "refine") await handleGenerate(message);
-        else if (message.type === "inspectHistory") await handleInspectHistory(message);
-        else if (message.type === "chooseModel") await handleChooseModel();
-        else if (message.type === "cancel") {
-          session?.controller?.abort();
-          post({ type: "status", message: "正在取消模型请求…" });
-        } else if (message.type === "preview") await handlePreview(message);
-        else if (message.type === "apply") await handleApply(message);
-        else if (message.type === "discard") {
-          if (session) { session.pending = null; session.latest = null; }
-          post({ type: "discarded" });
-        }
-      }));
-      context.subscriptions.push(panel.onDidDispose(() => {
-        if (session) {
-          session.disposed = true;
-          session.controller?.abort();
-        }
-        panel = null;
-        session = null;
-      }));
-      context.subscriptions.push(panel);
+  function reveal(currentDocument = document) {
+    if (panel) {
+      session.document = currentDocument;
+      panel.reveal(vscode.ViewColumn.One, false);
+      void flush();
       return true;
-    } catch (error) {
-      void vscode.window.showWarningMessage("AI Procedure Authoring： " + String(error?.message ?? error));
-      return false;
     }
+    panel = vscode.window.createWebviewPanel(
+      "skillStudio.aiAuthoring",
+      "AI Procedure Authoring",
+      vscode.ViewColumn.One,
+      { enableScripts: true, retainContextWhenHidden: true },
+    );
+    session = {
+      document,
+      sessionId: globalThis.crypto.randomUUID(),
+      context: null,
+      history: createSessionProposalHistory(),
+      pending: null,
+      latest: null,
+      controller: null,
+      disposed: false,
+      generating: false,
+      applying: false,
+      choosingModel: false,
+      contextRequestId: 0,
+    };
+    const reviewMediaRoot = vscode.Uri.joinPath(context.extensionUri, "media");
+    panel.webview.options = {
+      enableScripts:true,
+      localResourceRoots:[reviewMediaRoot],
+    };
+    panel.webview.html = renderAiAuthoringHtml(nonceValue(), {
+      scriptUri: panel.webview.asWebviewUri(
+        vscode.Uri.joinPath(reviewMediaRoot,"ai-flow-compare.js")).toString(),
+      styleUri: panel.webview.asWebviewUri(
+        vscode.Uri.joinPath(reviewMediaRoot,"ai-flow-compare.css")).toString(),
+      monacoScriptUri: panel.webview.asWebviewUri(
+        vscode.Uri.joinPath(reviewMediaRoot,"ai-yaml-diff.js")).toString(),
+      monacoStyleUri: panel.webview.asWebviewUri(
+        vscode.Uri.joinPath(reviewMediaRoot,"ai-yaml-diff.css")).toString(),
+    });
+    const incoming = panel.webview.onDidReceiveMessage(async (message) => {
+      if (!message || typeof message.type !== "string") return;
+      if (message.type === "console") await vscode.commands.executeCommand("skillStudio.openConsole");
+      else if (message.type === "ready" || message.type === "refresh") await refreshContext();
+      else if (message.type === "generate" || message.type === "refine") await handleGenerate(message);
+      else if (message.type === "inspectHistory") await handleInspectHistory(message);
+      else if (message.type === "chooseModel") await handleChooseModel();
+      else if (message.type === "cancel") {
+        session?.controller?.abort();
+        post({ type: "status", message: "正在取消模型请求…" });
+      } else if (message.type === "preview") await handlePreview(message);
+      else if (message.type === "apply") await handleApply(message);
+      else if (message.type === "discard") {
+        if (session) { session.pending = null; session.latest = null; }
+        post({ type: "discarded" });
+      }
+    });
+    const visibility = panel.onDidChangeViewState(() => void flush());
+    const disposed = panel.onDidDispose(() => {
+      session.disposed = true;
+      session.controller?.abort();
+      outbound.length = 0;
+      incoming.dispose();
+      visibility.dispose();
+      disposed.dispose();
+      panel = null;
+      session = null;
+      onDispose();
+    });
+    context.subscriptions.push(panel);
+    return true;
   }
 
-  const command = vscode.commands.registerCommand("skillStudio.openAiAuthoring", open);
-  const gatewayTokenCommand = vscode.commands.registerCommand("skillStudio.setAiGatewayToken", async () => {
-    try {
-      await configureAiGatewayToken(vscode, context.secrets);
-    } catch (error) {
-      void vscode.window.showErrorMessage("配置共享 AI Gateway 访问令牌失败：" + String(error?.message ?? error));
-    }
-  });
-  const gatewayAcceptanceCommand =
-    typeof process !== "undefined" && Boolean(process.versions?.node)
-      ? vscode.commands.registerCommand("skillStudio.internal.configureAiGatewayAcceptance",
-        async ({ gatewayUrl = "", modelId = "deepseek-v4.1-flash" } = {}) => {
-          // The acceptance fixture is staged only in isolated backend CI.
-          // No production installation can update settings via this command.
-          await vscode.workspace.fs.stat(vscode.Uri.joinPath(context.extensionUri,
-            "dist", "authoring-trusted-build-request.json"));
-          if (typeof gatewayUrl !== "string" || typeof modelId !== "string" ||
-              !/^[A-Za-z0-9][A-Za-z0-9._:/-]{0,255}$/.test(modelId)) {
-            throw new TypeError("Invalid AI Gateway acceptance configuration.");
-          }
-          if (gatewayUrl) {
-            const parsed = new URL(gatewayUrl);
-            if (parsed.protocol !== "http:" ||
-                !["127.0.0.1", "localhost", "[::1]"].includes(parsed.hostname) ||
-                parsed.username || parsed.password || parsed.search || parsed.hash ||
-                parsed.pathname === "/" || !parsed.pathname) {
-              throw new TypeError("AI Gateway acceptance may target only an HTTP loopback route.");
-            }
-          }
-          const settings = vscode.workspace.getConfiguration("connectionAgent.skillStudio.ai");
-          const target = vscode.ConfigurationTarget?.Global;
-          if (target === undefined || typeof settings?.update !== "function") {
-            throw new Error("Application-scoped AI Gateway settings cannot be updated by the acceptance host.");
-          }
-          await settings.update("gatewayUrl", gatewayUrl, target);
-          await settings.update("model", modelId, target);
-          return true;
-        })
-      : null;
-  context.subscriptions.push(command, gatewayTokenCommand);
-  if (gatewayAcceptanceCommand) context.subscriptions.push(gatewayAcceptanceCommand);
-  return Object.freeze({
-    open,
-    configureAiGatewayToken: () => configureAiGatewayToken(vscode, context.secrets),
-    ...(typeof process !== "undefined" && process.versions?.node
-      ? { installSyntheticFixture, clearSyntheticFixture }
-      : {}),
-  });
+  return { reveal };
 }

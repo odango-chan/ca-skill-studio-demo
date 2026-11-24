@@ -1363,6 +1363,69 @@ try{
     phaseEvidence:workbenchEvidence?.phaseEvidence??null,
     languageServiceStatus:workbenchEvidence?.languageServiceStatus??null
   }));
+  const readWorkspaceMode=()=>evalJS(`(() => {
+    const nav=document.getElementById('skill-studio-workspace-mode');
+    return { mode:nav?.querySelector('[aria-pressed="true"]')?.textContent,
+      switching:!!nav?.querySelector('button:disabled'),
+      groups:window.__skillStudioFixedEditorLayout?.().tabBarCount };
+  })()`);
+  const switchWorkspaceMode=async label=>{
+    const clicked=await evalJS(`(() => {
+      const button=[...document.querySelectorAll('#skill-studio-workspace-mode button')]
+        .find(item=>item.textContent===${JSON.stringify(label)});
+      if(!button || !button.getClientRects().length) return false;
+      button.click();
+      return true;
+    })()`);
+    if(!clicked)throw Error("Missing top-level Studio mode control: "+label);
+    for(let attempt=0;attempt<100;attempt++){
+      const state=await readWorkspaceMode();
+      if(state?.mode===label && !state.switching && state.groups===1)return;
+      await sleep(100);
+    }
+    throw Error("Mode switch did not preserve one editor group: "+
+      JSON.stringify({label,actual:await readWorkspaceMode()}));
+  };
+  if(requireEditor){
+    const sourceState=action=>evalJS(`(() => {
+      const c=window.theia.container;
+      const key=[...c._bindingDictionary._map.keys()].find(k=>
+        typeof k==='function'&&k.prototype?.getWidgets&&k.prototype?.activateWidget);
+      const widget=c.get(key).getCurrentWidget('main');
+      const editor=widget?.editor?.getControl?.();
+      const model=editor?.getModel();
+      if(!model)return null;
+      if(${JSON.stringify(action)}==='edit'){
+        editor.pushUndoStop();
+        editor.executeEdits('mode-acceptance',[{
+          range:{startLineNumber:1,startColumn:1,endLineNumber:1,endColumn:1},
+          text:'# studio-mode-unsaved-sentinel\\n'
+        }]);
+        editor.pushUndoStop();
+      }
+      if(${JSON.stringify(action)}==='undo')editor.trigger('keyboard','undo',null);
+      return {uri:model.uri.toString(),text:model.getValue(),dirty:widget.saveable?.dirty};
+    })()`);
+    await switchWorkspaceMode('Console');
+    const original=await sourceState('read');
+    const dirty=await sourceState('edit');
+    if(!original || !dirty?.text.startsWith('# studio-mode-unsaved-sentinel'))
+      throw Error("Unable to prepare native unsaved Source for mode acceptance");
+    await switchWorkspaceMode('AI Workbench');
+    await switchWorkspaceMode('Console');
+    const restored=await sourceState('read');
+    if(restored?.uri!==dirty.uri || restored.text!==dirty.text ||
+        (dirty.dirty===true && restored.dirty!==true))
+      throw Error("Console round trip lost selected file or unsaved Source");
+    await sourceState('undo');
+    for(let attempt=0;attempt<40;attempt++){
+      if((await sourceState('read'))?.text===original.text)break;
+      await sleep(100);
+    }
+    if((await sourceState('read'))?.text!==original.text)
+      throw Error("Native Undo after mode round trip failed");
+    console.log("STUDIO_WORKSPACE_MODE_DIRTY_BUFFER_CHROMIUM_PASS");
+  }
   let aiAuthoringEvidence=null;
   if(requireEditor&&externalUrl){
     const nativeCommand=async(id,...args)=>evalJS(
@@ -1815,6 +1878,24 @@ try{
          !gatewayRequests[1].body.messages[1].content.includes("node.add"))
         throw Error("F4 expected two disclosed proposals and Host session revisions; calls="+
           gatewayRequests.length);
+      await command("Runtime.evaluate",{
+        contextId:aiContextId,returnByValue:true,
+        expression:"document.getElementById('refineTask').value='unsent refine draft'"
+      });
+      await switchWorkspaceMode('Console');
+      await switchWorkspaceMode('AI Workbench');
+      const resumed=await readAiView();
+      const retained=await command("Runtime.evaluate",{
+        contextId:aiContextId,returnByValue:true,
+        expression:"(()=>({history:document.querySelectorAll('#revisionTimeline .revision-entry').length,"+
+          "groups:document.querySelectorAll('#groups input:checked').length,"+
+          "refine:document.getElementById('refineTask')?.value}))()"
+      });
+      if(!resumed?.proposalSummary || !resumed.candidateSource ||
+          retained.result?.value?.history!==2 || retained.result.value.groups<1 ||
+          retained.result.value.refine!=='unsent refine draft')
+        throw Error("AI Workbench round trip lost proposal, candidate, groups, refine or history");
+      console.log("STUDIO_WORKSPACE_MODE_AI_STATE_CHROMIUM_PASS");
       const clickedHistory=await command("Runtime.evaluate",{
         contextId:aiContextId,returnByValue:true,
         expression:"(()=>{const buttons=[...document.querySelectorAll('#revisionTimeline .revision-entry button')];"+

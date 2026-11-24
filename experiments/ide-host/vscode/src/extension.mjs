@@ -18,6 +18,7 @@ import {openProjectFolder,isSingleFolderWorkspace,restorePendingExampleProject,P
 import {registerProjectWelcome} from "./project-welcome.mjs";
 
 import {registerWorkbench} from "./workbench.mjs";
+import {registerWorkspaceMode} from "./workspace-mode.mjs";
 import {registerAiAuthoringEditor} from "./ai-authoring-editor.mjs";
 import {registerSyntheticAuthoringAcceptance} from "./ai-authoring-acceptance.mjs";
 import {staticPreviewResourceUrl} from "./webview-resource-url.mjs";
@@ -192,8 +193,15 @@ export function activate(context){
   workbenchReady=workbench!==unavailableWorkbench;
   const authoringEditor=registerSafely("AI Authoring Editor",()=>registerAiAuthoringEditor(vscode,context,{
     getActiveDocument:()=>workbench?.getActiveDocument?.()??null,
+    getPackageProcedure:document=>packageOverview?.getProcedureForDocument?.(document),
     compilerIntegration
   }),null);
+  const workspaceMode=authoringEditor&&registerSafely("Workspace Mode",()=>
+    registerWorkspaceMode(vscode,context,{
+      authoring:authoringEditor,
+      showWelcome:()=>vscode.commands.executeCommand("skillStudio.showWelcome")
+    }));
+  void workspaceMode?.restore();
   registerSafely("Synthetic AI Authoring acceptance",()=>registerSyntheticAuthoringAcceptance(
     vscode,context,compilerIntegration,authoringEditor));
   registerSafely("Package diagnostic tests",()=>registerPackageDiagnosticTesting(vscode,context,{
