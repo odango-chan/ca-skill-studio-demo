@@ -361,7 +361,10 @@ export function registerDependencyIntegration(vscode,context,{onLockChanged=()=>
         value:"ca-client-tools_interface_1.1.0.zip"});
       if(!asset)return null;
       const expectedSha256=await vscode.window.showInputBox({
-        prompt:"Required SHA-256 from published SHA256SUMS (sha256:<64 lowercase hex>)",
+        prompt:"Required SHA-256 from release SHA256SUMS; default applies ONLY to ca-client-tools v1.1.0 (change it if repository/tag/asset changes)",
+        value:repository==="odango-chan/ca-client-tools"&&tag==="v1.1.0"&&
+          asset==="ca-client-tools_interface_1.1.0.zip"
+          ?"sha256:cbd8fad939844cda5474f33f18d3cdc015c69dd8c1dc3908e84bd5273ce6e71b":"",
         placeHolder:"sha256:..."});
       if(!expectedSha256)return null;
       return acquireInterfaceRelease({repository,tag,asset,expectedSha256});
