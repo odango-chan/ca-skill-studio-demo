@@ -21,7 +21,7 @@ const describeError=error=>({
   code:error?.code??null,
   message:String(error?.message??error)
 });
-async function clearDirectoryContents(vscode,fs,root){
+async function clearDirectoryContents(vscode,fs,root,{preserveVscode=false}={}){
   if(typeof fs.readDirectory!=="function")
     fail("Host file system cannot enumerate the existing Example directory");
   let entries;
@@ -34,11 +34,16 @@ async function clearDirectoryContents(vscode,fs,root){
     if(typeof name!=="string"||!name||name==="."||name===".."||
        name.includes("/")||name.includes("\\"))
       fail("Host file system returned an unsafe Example child name");
+    // .vscode/settings.json controls the active Theia workspace. Deleting
+    // it during an explicit Example replacement can restart the extension
+    // host and abort the import halfway through. Replace it at the very end.
+    if(preserveVscode&&name===".vscode")continue;
     const child=vscode.Uri.joinPath(root,name);
     await fs.delete(child,{recursive:true,useTrash:false});
   }
   const remaining=await fs.readDirectory(root);
-  if(remaining.length)
+  if(remaining.some(([name])=>!preserveVscode||name!==".vscode")||
+     remaining.length>(preserveVscode?1:0))
     fail("Existing Example contents remain after replacement cleanup: "+
       remaining.map(([name])=>name).join(", "));
   return entries.map(([name])=>name);
@@ -118,20 +123,36 @@ function validate(manifest,{sourceSha,sourceStatus,sourceRef,languageVersion,pro
 }
 // Seed only a missing default lock. An existing settings.json is the user's
 // explicit configuration and is NEVER rewritten, even if ca-client is absent.
-async function persistExampleInterfaceIfAbsent(vscode,root,prepared){
+async function persistExampleInterfaceIfAbsent(vscode,root,prepared,
+  {replaceSettings=false}={}){
   const fs=vscode.workspace.fs;
   const settingsUri=vscode.Uri.joinPath(root,".vscode","settings.json");
   const exists=async uri=>{
     try{await fs.stat(uri);return true;}
     catch(error){if(error?.code==="FileNotFound")return false;throw error;}
   };
-  if(await exists(settingsUri))return false;
+  if(!replaceSettings&&await exists(settingsUri))return false;
   const persisted=await writeImmutableSnapshot(vscode,root,prepared.files);
   if(persisted.snapshotDigest!==prepared.snapshotDigest)
     fail("Example Interface Package snapshot digest mismatch");
   // A second startup/import task may have created user settings meanwhile.
-  if(await exists(settingsUri))return false;
-  await fs.createDirectory(vscode.Uri.joinPath(root,".vscode"));
+  if(!replaceSettings&&await exists(settingsUri))return false;
+  const settingsFolder=vscode.Uri.joinPath(root,".vscode");
+  await fs.createDirectory(settingsFolder);
+  if(replaceSettings){
+    if(typeof fs.readDirectory!=="function")
+      fail("Cannot reset old Example workspace settings without directory enumeration");
+    for(const [name] of await fs.readDirectory(settingsFolder)){
+      if(name==="settings.json")continue;
+      if(typeof name!=="string"||!name||name==="."||name===".."||
+         name.includes("/")||name.includes("\"))
+        fail("Unsafe Example workspace settings child");
+      await fs.delete(vscode.Uri.joinPath(settingsFolder,name),
+        {recursive:true,useTrash:false});
+    }
+  }
+  // Replace the settings file only AFTER every Skill and immutable snapshot
+  // has been written; this is the final workspace-affecting I/O.
   await fs.writeFile(settingsUri,exampleWorkspaceSettingsContent(prepared));
   return true;
 }
@@ -220,7 +241,7 @@ export async function seedExampleProject(vscode,extensionUri,storageUri,
       // Keep that directory handle/path stable and remove only its children;
       // deleting the active workspace root itself is not a portable operation
       // across VS Code and Theia filesystem providers.
-      await clearDirectoryContents(vscode,fs,root);
+      await clearDirectoryContents(vscode,fs,root,{preserveVscode:true});
     }else{
       phase="create-project-layout";
       await fs.createDirectory(root);
@@ -270,7 +291,7 @@ export async function seedExampleProject(vscode,extensionUri,storageUri,
     // this also respects users who intentionally removed ca-client.
     phase="persist-example-interface-lock";
     const exampleDependencySeeded=await persistExampleInterfaceIfAbsent(
-      vscode,root,exampleInterface);
+      vscode,root,exampleInterface,{replaceSettings:replacedExisting});
 
     if(replacedExisting){
       phase="verify-replaced-example";
