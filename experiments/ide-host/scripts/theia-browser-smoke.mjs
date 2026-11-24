@@ -1605,7 +1605,8 @@ try{
             expression:"(()=>({title:document.title,"+
               "bodyText:document.body?.innerText??'',"+
               "csp:document.querySelector('meta[http-equiv=\"Content-Security-Policy\" i]')?.content??'',"+
-              "gatewayConfigured:document.body?.innerText.includes('已配置')===true,"+
+              "gatewayConfigured:document.getElementById('gatewayNotice')?.textContent.includes('已配置')===true,"+
+              "contextText:document.getElementById('contextPanel')?.textContent??'',"+
               "proposalSummary:document.getElementById('proposalSummary')?.textContent??'',"+
               "candidateSource:document.getElementById('candidateSource')?.textContent??'',"+
               "compilerStatus:document.getElementById('compilerStatus')?.textContent??'',"+
@@ -1620,6 +1621,10 @@ try{
               "validationText:document.getElementById('validationIdentity')?.textContent??'',"+
               "contextVisible:document.getElementById('contextPanel')?.open===true,"+
               "reviewPanelCount:document.querySelectorAll('.review-panel').length,"+
+              "chatComposer:document.querySelectorAll('#agentComposer textarea').length,"+
+              "composerCount:document.querySelectorAll('#agentComposer textarea').length,"+
+              "chatHasLog:document.querySelector('#agentActivity[role=log]')!==null,"+
+              "reviewOpen:document.getElementById('agentReview')?.hidden===false,"+
               "applyDisabled:document.getElementById('apply')?.disabled!==false"+
               "}))()"
           });
@@ -1650,10 +1655,10 @@ try{
         initialView=await readAiView();
         if(initialView){
           latest=[{title:initialView.title,bodyText:initialView.bodyText.slice(0,700)}];
-          const contextReady=initialView.bodyText.includes("上下文来源")&&
-            initialView.bodyText.includes("assurance/contract.yaml")&&
-            initialView.bodyText.includes("assurance/predicates.yaml")&&
-            initialView.bodyText.includes("schemas/establishment-request.schema.yaml");
+          const contextReady=initialView.contextText.includes("上下文来源")&&
+            initialView.contextText.includes("assurance/contract.yaml")&&
+            initialView.contextText.includes("assurance/predicates.yaml")&&
+            initialView.contextText.includes("schemas/establishment-request.schema.yaml");
           if(!contextReady||!initialView.gatewayConfigured)initialView=null;
         }
         if(!initialView)await sleep(100);
@@ -1661,6 +1666,7 @@ try{
       if(!initialView)
         throw Error("AI Procedure Authoring Editor Tab did not load the live Package context and configured Gateway: "+
           JSON.stringify(latest));
+      if(initialView.reviewOpen!==false)throw Error("Fresh Agent session must start with the chat surface");
       if(!initialView.csp.includes("default-src 'none'")||
          !initialView.csp.includes("connect-src 'none'")||
          !initialView.csp.includes("script-src 'nonce-"))
@@ -1670,7 +1676,7 @@ try{
       const clicked=await command("Runtime.evaluate",{
         contextId:aiContextId,
         returnByValue:true,
-        expression:"(()=>{const task=document.getElementById('task');const button=document.getElementById('generate');"+
+        expression:"(()=>{const task=document.getElementById('task');const button=document.getElementById('sendTask');document.getElementById('sendMode').value='generate';"+
           "if(!task||!button||button.disabled)return {ok:false,reason:'Generate control unavailable'};"+
           "task.value="+JSON.stringify(task)+";task.dispatchEvent(new Event('input',{bubbles:true}));"+
           "button.click();return {ok:true};})()"
@@ -1736,7 +1742,8 @@ try{
             }:null
           }));
       }
-      if(proposalView.reviewPanelCount!==1||proposalView.contextVisible!==true||
+      if(proposalView.chatComposer!==1||proposalView.composerCount!==1||proposalView.chatHasLog!==true||
+         proposalView.reviewOpen!==true||proposalView.reviewPanelCount!==1||proposalView.contextVisible!==false||
          JSON.stringify(proposalView.reviewTabs)!==JSON.stringify(["Plan","Flow Changes","YAML Diff","Validation"])||
          proposalView.flowGroups<1||proposalView.diffAddedRows<1||
          proposalView.diffRemovedRows<0||!proposalView.diffSummary.includes("新增")||
@@ -1926,7 +1933,7 @@ try{
       const firstHistory=await command("Runtime.evaluate",{
         contextId:aiContextId,returnByValue:true,
         expression:"(()=>({count:document.querySelectorAll('#revisionTimeline .revision-entry').length,"+
-          "refineEnabled:document.getElementById('refine')?.disabled===false}))()"
+          "refineEnabled:document.getElementById('continueOption')?.disabled===false}))()"
       });
       if(firstHistory.result?.value?.count!==1||
          firstHistory.result?.value?.refineEnabled!==true)
@@ -1934,8 +1941,8 @@ try{
           JSON.stringify(firstHistory.result?.value));
       const refineClicked=await command("Runtime.evaluate",{
         contextId:aiContextId,returnByValue:true,
-        expression:"(()=>{const task=document.getElementById('refineTask');"+
-          "const button=document.getElementById('refine');"+
+        expression:"(()=>{const task=document.getElementById('task');"+
+          "const button=document.getElementById('sendTask');"+
           "if(!task||!button||button.disabled)return false;"+
           "task.value='Keep the temporary Node but clarify the final outcome explanation.';"+
           "task.dispatchEvent(new Event('input',{bubbles:true}));"+
@@ -1952,7 +1959,7 @@ try{
         const result=await command("Runtime.evaluate",{
           contextId:aiContextId,returnByValue:true,
           expression:"(()=>({count:document.querySelectorAll('#revisionTimeline .revision-entry').length,"+
-            "refineEnabled:document.getElementById('refine')?.disabled===false,"+
+            "refineEnabled:document.getElementById('continueOption')?.disabled===false,"+
             "candidate:document.getElementById('candidateSource')?.textContent.includes('ai-authoring-smoke-node')}))()"
         });
         const value=result.result?.value;
@@ -1966,7 +1973,7 @@ try{
           gatewayRequests.length);
       await command("Runtime.evaluate",{
         contextId:aiContextId,returnByValue:true,
-        expression:"document.getElementById('refineTask').value='unsent refine draft'"
+        expression:"document.getElementById('task').value='unsent refine draft'"
       });
       await switchWorkspaceMode('Console');
       await switchWorkspaceMode('AI Workbench');
@@ -1975,7 +1982,7 @@ try{
         contextId:aiContextId,returnByValue:true,
         expression:"(()=>({history:document.querySelectorAll('#revisionTimeline .revision-entry').length,"+
           "groups:document.querySelectorAll('#groups input:checked').length,"+
-          "refine:document.getElementById('refineTask')?.value}))()"
+          "refine:document.getElementById('task')?.value}))()"
       });
       if(!resumed?.proposalSummary || !resumed.candidateSource ||
           retained.result?.value?.history!==2 || retained.result.value.groups<1 ||
@@ -1995,7 +2002,7 @@ try{
           contextId:aiContextId,returnByValue:true,
           expression:"(()=>({patch:document.getElementById('patchState')?.textContent||''," +
             "applyDisabled:document.getElementById('apply')?.disabled===true,"+
-            "refineDisabled:document.getElementById('refine')?.disabled===true,"+
+            "refineDisabled:document.getElementById('continueOption')?.disabled===true,"+
             "groupsDisabled:[...document.querySelectorAll('#groups input')].every(x=>x.disabled)}))()"
         });
         const value=result.result?.value;
@@ -2008,8 +2015,9 @@ try{
       const agentStart=await command("Runtime.evaluate",{
         contextId:aiContextId,returnByValue:true,
         expression:`(()=>{
-          const button=document.getElementById('runAgent');
+          const button=document.getElementById('sendTask');
           if(!button || button.disabled)return false;
+          document.getElementById('sendMode').value='runAgent';
           document.getElementById('task').value='Find the relevant Package contract and prepare a candidate';
           button.click();
           return true;
@@ -2028,13 +2036,19 @@ try{
           expression:`({
             status:document.getElementById('status').textContent,
             log:document.getElementById('agentActivity').textContent,
+            user:document.querySelector('#agentActivity [data-role=user]:last-of-type')?.textContent||
+              [...document.querySelectorAll('#agentActivity [data-role=user]')].at(-1)?.textContent,
+            reply:[...document.querySelectorAll('#agentActivity [data-role=agent]')].at(-1)?.textContent,
             candidate:document.getElementById('candidateSource').textContent,
             busy:!document.getElementById('cancel').disabled
           })`
         });
         const value=activity.result?.value;
         lastAgentActivity=value;
-        agentReady=value?.log.includes("读取本轮资料")&&value.candidate.includes("ai-authoring-smoke-node")&&!value.busy;
+        agentReady=value?.log.includes("读取本轮资料")&&
+          value.user?.includes("Find the relevant Package contract")&&
+          value.reply?.includes("AI Authoring mock proposal")&&
+          value.candidate.includes("ai-authoring-smoke-node")&&!value.busy;
         if(!agentReady)await sleep(100);
       }
       const catalogMessage=gatewayRequests[2]?.body.messages[1].content;
@@ -2252,7 +2266,7 @@ try{
       for(let attempt=0;attempt<100;attempt++){
         const view=await readAiView();
         if(view?.gatewayConfigured&&view.bodyText.includes("example")&&
-           view.bodyText.includes("上下文来源")){
+           view.contextText.includes("上下文来源")){
           positiveReady=true;break;
         }
         await sleep(100);
@@ -2264,7 +2278,8 @@ try{
         contextId:aiContextId,
         returnByValue:true,
         expression:"(()=>{const task=document.getElementById('task');"+
-          "const button=document.getElementById('generate');"+
+          "const button=document.getElementById('sendTask');"+
+          "document.getElementById('sendMode').value='generate';"+
           "if(!task||!button||button.disabled)return false;"+
           "task.value="+JSON.stringify(task)+";"+
           "task.dispatchEvent(new Event('input',{bubbles:true}));"+
