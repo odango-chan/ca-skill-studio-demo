@@ -78,7 +78,7 @@ function setupWelcome(language="en",workspaceFolders=[],invokeWelcome=false){
     })
   });
   return {handle,webview,messages,sent,elements,status,listeners,
-    browserListeners,clientMessages,receiveMessage,commands,
+    browserListeners,clientMessages,receiveMessage,commands,closePanel:()=>panel.dispose(),
     panelCreatedOnActivation,panelCreated:()=>panelCreated};
 }
 
@@ -138,7 +138,7 @@ test("Welcome can be explicitly reopened while an existing project workspace is 
 
 test("Welcome diagnostics retain the last Example import failure when the panel is hidden",()=>{
   const h=setupWelcome("en");
-  h.handle.dispose();
+  h.closePanel();
   h.handle.setImportStatus({state:"error",
     message:"persist-example-interface-lock: Pinned dependency manifest unreadable: missing"});
   assert.deepEqual(h.handle.getDiagnostics().lastImportStatus,{
