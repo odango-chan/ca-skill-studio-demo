@@ -32,6 +32,9 @@ const contextRead=hints.find(item=>item.argumentProperties.some(p=>
   p.name==='supi')&&item.argumentProperties.some(p=>p.name==='pduSessionId'));
 assert.ok(contextRead,'released context query Schema should declare SUPI/PSI keys');
 assert.ok(contextRead.argumentProperties.some(p=>p.name==='supi'&&p.required));
+assert.ok(Array.isArray(contextRead.outputProperties)&&
+  contextRead.outputProperties.some(p=>p.name==='status'),
+  'released output Schema must provide the read-result status path');
 console.log('PUBLISHED_INTERFACE_ZIP_PASS',JSON.stringify({
   sha256:expected,packageId:packageData.manifest.packageId,
   version:packageData.manifest.version,files:packageData.files.length,
