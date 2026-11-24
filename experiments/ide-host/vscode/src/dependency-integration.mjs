@@ -155,8 +155,11 @@ export function registerDependencyIntegration(vscode,context,{onLockChanged=()=>
         return item;
       }
       const item=new vscode.TreeItem(node.dependency.id,state.Collapsed);
-      item.description=node.state+
-        " · Owner "+node.ownerState+" · "+node.dependency.source.type;
+      item.description=node.dependency.kind==="interface-package"
+        ?(node.dependency.source.packageId??"unknown-package")+"@"+
+          (node.dependency.source.version??"unknown-version")+" · "+node.state+
+          " · Compiler NOT_LINKED"
+        :node.state+" · Owner "+node.ownerState+" · "+node.dependency.source.type;
       item.id="dependency:"+node.dependency.id;
       item.contextValue="skillStudio.dependency";
       item.iconPath=new vscode.ThemeIcon(
