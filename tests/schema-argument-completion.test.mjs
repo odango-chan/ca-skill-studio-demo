@@ -233,3 +233,21 @@ test('an unverified or absent Schema never guesses context/output fields',()=>{
   value.lastIndexOf('\n',value.indexOf('        supi: context.request.sNssai.'))+1,
   6),[]);
 });
+
+
+test('an earlier-stage route bypass cannot authorize producer output suggestions',async()=>{
+  const hints=projectLockedInterfaceCompletionHints(await locked());
+  const enriched=hints.map(h=>({...h,outputProperties:[
+    {name:'status',type:'string',description:'',children:null}
+  ]}));
+  const bypassStage=pathProcedure.replace(
+    '  read:\n    observation:',
+    '  read:\n    precondition:\n      routes:\n        PASS: update\n    observation:'
+  );
+  assert.deepEqual(pathCompletion(bypassStage,enriched,
+    '        payload: read.observation.output.'),[]);
+  const cyclic=pathProcedure.replace('        FAILED: FAILED',
+    '        FAILED: read');
+  assert.deepEqual(pathCompletion(cyclic,enriched,
+    '        payload: read.observation.output.'),[]);
+});
