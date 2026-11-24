@@ -80,7 +80,7 @@ export function schemaArgumentCompletions(snapshot,document,prefix,offset,lineSt
       Number(Boolean(b.required))-Number(Boolean(a.required))||
       a.name.localeCompare(b.name)).map(p=>{
       const detail=(p.required?'required · ':'optional · ')+p.type+
-        ' · published Schema '+hint.inputSchemaId+' · NOT_AUTHORIZED';
+        ' · published Schema '+hint.inputSchemaId+' · AUTH_NOT_CHECKED';
       const item=edit(start,offset,lineStart,p.name+': ',COMPLETION_PROPERTY,
         p.name,detail,p.description||p.title||'',p.required?'0'+p.name:'1'+p.name);
       item.textEdit.range.start.line=lineNumber;
@@ -98,7 +98,7 @@ export function schemaArgumentCompletions(snapshot,document,prefix,offset,lineSt
       String(choice).startsWith(typed)).map(choice=>{
       const yaml=typeof choice==='string'?JSON.stringify(choice):String(choice);
       const item=edit(start,offset,lineStart,yaml,COMPLETION_ENUM,String(choice),
-        'enum · '+hint.inputSchemaId+' · NOT_AUTHORIZED',
+        'enum · '+hint.inputSchemaId+' · AUTH_NOT_CHECKED',
         property.description||'',null);
       item.textEdit.range.start.line=lineNumber;
       item.textEdit.range.end.line=lineNumber;
