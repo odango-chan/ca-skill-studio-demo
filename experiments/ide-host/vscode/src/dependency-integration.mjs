@@ -8,10 +8,20 @@ import {applyDependency,removeDependency,refreshDependency,
 import {acquireUpload,acquireMcp,acquireGit,acquireBuiltin}
   from "./contract-acquisition.mjs";
 import {readGitHubPinnedFile} from "./acquisition-transports.mjs";
-import {decodeBase64} from "./dependency-snapshot.mjs";
+import {decodeBase64,sha256} from "./dependency-snapshot.mjs";
+import {decodeInterfacePackageZip} from "./interface-package-zip.mjs";
 import {projectDependencyReadiness,projectLockedToolCatalog}
   from "./dependency-catalog-projection.mjs";
 const aliasPattern=/^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/;
+function readInterfaceManifest(snapshot){
+  const file=snapshot.files.find(f=>f.path==="package.json");
+  if(!file)throw Error("Verified Interface Package has no package.json");
+  const text=new TextDecoder("utf-8",{fatal:true}).decode(decodeBase64(file.bytes));
+  const manifest=JSON.parse(text);
+  if(manifest.apiVersion!=="connectionagent.io/interface-package/v1alpha1"||
+     !Array.isArray(manifest.exports))throw Error("Invalid locked Interface Package manifest");
+  return manifest;
+}
 export function registerDependencyIntegration(vscode,context,{onLockChanged=()=>{},
   onProjectRootChanged=()=>{}}={}){
   const emitter=new vscode.EventEmitter();
@@ -38,6 +48,14 @@ export function registerDependencyIntegration(vscode,context,{onLockChanged=()=>
   const provider={
     onDidChangeTreeData:emitter.event,
     async getChildren(node){
+      if(node?.kind==="interface-group"){
+        const manifest=readInterfaceManifest(node.snapshot);
+        return manifest.exports.filter(item=>item.kind===node.exportKind)
+          .sort((a,b)=>a.id.localeCompare(b.id)).map(item=>({
+            kind:"interface-export",dependency:node.dependency,
+            id:item.id,exportKind:item.kind,path:item.path
+          }));
+      }
       if(node?.kind==="dependency"){
         const resolved=latest??await resolveLockedDependencies(vscode,selectedRoot);
         if(node.state!=="SNAPSHOT_VERIFIED")
@@ -47,6 +65,20 @@ export function registerDependencyIntegration(vscode,context,{onLockChanged=()=>
           s.snapshotDigest===node.entry?.snapshotDigest);
         if(!snapshot)return [{kind:"message",text:
           "BLOCKED · verified locked snapshot unavailable"}];
+        if(node.dependency.kind==="interface-package"){
+          try{
+            const manifest=readInterfaceManifest(snapshot);
+            const groups=["Schema","CallableCatalog","CapabilityCatalog",
+              "EvidenceDescriptor","IngressCatalog"];
+            return [{
+              kind:"interface-export",dependency:node.dependency,
+              id:"package.json",exportKind:"Manifest",path:"package.json"
+            },...groups.filter(kind=>manifest.exports.some(item=>item.kind===kind))
+              .map(kind=>({kind:"interface-group",dependency:node.dependency,
+                snapshot,exportKind:kind}))];
+          }catch(error){return [{kind:"message",text:
+            "BLOCKED · invalid locked Interface Package: "+String(error.message)}];}
+        }
         if(node.dependency.kind!=="tool-catalog")
           return [{kind:"message",text:
             "Schema Bundle snapshot verified · Owner/Schema export authorization NOT_CHECKED"}];
@@ -82,6 +114,28 @@ export function registerDependencyIntegration(vscode,context,{onLockChanged=()=>
         item.iconPath=new vscode.ThemeIcon("info");
         return item;
       }
+      if(node.kind==="interface-group"){
+        const labels={Schema:"Schemas",CallableCatalog:"Tools",
+          CapabilityCatalog:"Capabilities",EvidenceDescriptor:"Evidence",
+          IngressCatalog:"Ingress"};
+        const item=new vscode.TreeItem(labels[node.exportKind]??node.exportKind,state.Collapsed);
+        item.iconPath=new vscode.ThemeIcon("folder-library");
+        return item;
+      }
+      if(node.kind==="interface-export"){
+        const item=new vscode.TreeItem(node.id,state.None);
+        item.id="interface:"+node.dependency.id+":"+node.exportKind+":"+node.id;
+        item.description=node.path;
+        item.tooltip="Immutable locked Interface Package · "+node.exportKind+
+          "\n"+node.path+"\nRead-only source. Compiler/Owner/Runtime authorization NOT_CHECKED.";
+        item.iconPath=new vscode.ThemeIcon(node.exportKind==="Schema"?"symbol-struct":
+          node.exportKind==="CallableCatalog"?"symbol-method":
+          node.exportKind==="CapabilityCatalog"?"symbol-interface":"file-code");
+        item.command={command:"skillStudio.openInterfaceExport",
+          title:"Open immutable Interface Package source",
+          arguments:[node.dependency.id,node.path]};
+        return item;
+      }
       if(node.kind==="operation"){
         const item=new vscode.TreeItem(node.operation.id,state.None);
         item.id="operation:"+node.dependency.id+":"+node.operation.id;
@@ -105,6 +159,8 @@ export function registerDependencyIntegration(vscode,context,{onLockChanged=()=>
       item.iconPath=new vscode.ThemeIcon(
         node.state==="SNAPSHOT_VERIFIED"?"package":"warning");
       item.tooltip=[node.dependency.kind,node.entry?.snapshotDigest??"UNLOCKED",
+        node.dependency.kind==="interface-package"?
+          "Interface Package is import-verified; Compiler v2.1 binding NOT CONNECTED":"",
         JSON.stringify(node.dependency.source),node.blocked?.message??"",
         "Snapshot status: "+node.state,
         "Owner/Capability/Evidence publication: NOT_CHECKED",
@@ -161,6 +217,39 @@ export function registerDependencyIntegration(vscode,context,{onLockChanged=()=>
         vscode.TextEditorRevealType?.InCenter);
     }
   }
+  async function openInterfaceFile(id,path){
+    const root=await ensureRoot();
+    const resolved=await resolveLockedDependencies(vscode,root);
+    const snapshot=resolved.snapshots.find(item=>item.id===id&&
+      item.kind==="interface-package");
+    if(!snapshot)throw Error("Interface Package lock is missing or invalid");
+    const manifest=readInterfaceManifest(snapshot);
+    if(path!=="package.json"&&!manifest.exports.some(item=>item.path===path))
+      throw Error("Requested source is not an exported Interface Package file");
+    // Hydrate only verified source bytes. Sibling $ref pointers can then be
+    // opened without requesting mutable files over the network.
+    for(const file of snapshot.files){
+      if(!/\.(?:json|ya?ml)$/i.test(file.path))continue;
+      const text=new TextDecoder("utf-8",{fatal:true}).decode(decodeBase64(file.bytes));
+      prepareToolCatalog(snapshot,file.path,text);
+    }
+    const target=snapshot.files.find(item=>item.path===path);
+    if(!target)throw Error("Exported source is absent from immutable lock");
+    const uri=prepareToolCatalog(snapshot,path,
+      new TextDecoder("utf-8",{fatal:true}).decode(decodeBase64(target.bytes)));
+    let document=await vscode.workspace.openTextDocument(uri);
+    const language=/\.ya?ml$/i.test(path)?"yaml":/\.json$/i.test(path)?"json":null;
+    if(language&&document.languageId!==language){
+      if(typeof vscode.languages?.setTextDocumentLanguage!=="function")
+        throw Error("Host cannot assign native source language to read-only dependency");
+      document=await vscode.languages.setTextDocumentLanguage(document,language);
+    }
+    await vscode.window.showTextDocument(document,{
+      viewColumn:vscode.ViewColumn.One,preview:true,preserveFocus:false
+    });
+    if(/\.schema\.(?:json|ya?ml)$/i.test(path))
+      await vscode.commands.executeCommand("skillStudio.showPreview",uri);
+  }
   async function askAlias(){
     return vscode.window.showInputBox({
       prompt:"Dependency ID (project-local, e.g. network-tools)",
@@ -175,9 +264,26 @@ export function registerDependencyIntegration(vscode,context,{onLockChanged=()=>
     if(token)await context.secrets?.store?.(key,token);
     return token??undefined;
   }
+  async function acquireInterfaceZip(uploadName){
+    const picked=await vscode.window.showOpenDialog({canSelectMany:false,
+      canSelectFiles:true,canSelectFolders:false,
+      filters:{"CA-SL Interface Package ZIP":["zip"]}});
+    if(!picked?.length)return null;
+    const raw=await vscode.workspace.fs.readFile(picked[0]);
+    const imported=await decodeInterfacePackageZip(raw);
+    return {kind:"interface-package",
+      source:{type:"interface-zip",
+        upload:uploadName??picked[0].path.split("/").at(-1),
+        contentDigest:await sha256(raw),
+        packageId:imported.manifest.packageId,
+        version:imported.manifest.version,
+        publisher:imported.manifest.publisher},
+      files:imported.files};
+  }
   async function acquireSource(source){
     switch(source.type){
       case "builtin":return acquireBuiltin(source);
+      case "interface-zip":return acquireInterfaceZip(source.upload);
       case "git":{
         const token=await askSecret("skillStudio.git.github");
         return acquireGit({...source,
@@ -197,6 +303,7 @@ export function registerDependencyIntegration(vscode,context,{onLockChanged=()=>
     }
   }
   async function acquireNew(type){
+    if(type==="interface-zip")return acquireInterfaceZip();
     if(type==="builtin")return acquireBuiltin({
       bundleId:"studio-example-toolcatalog",version:"1.0.0"});
     if(type==="upload"){
@@ -239,19 +346,21 @@ export function registerDependencyIntegration(vscode,context,{onLockChanged=()=>
   });
   command("skillStudio.refreshDependencies",async()=>{await ensureRoot();refresh();});
   command("skillStudio.inspectDependencyContract",inspect);
+  command("skillStudio.openInterfaceExport",openInterfaceFile);
   command("skillStudio.addDependency",async()=>{
     const root=await ensureRoot();
     const type=await vscode.window.showQuickPick([
+      {label:"Import Interface Package ZIP (read-only Schemas / Tools)",value:"interface-zip"},
       {label:"Upload current ToolCatalog YAML / JSON",value:"upload"},
       {label:"Git pinned Owner ToolCatalog",value:"git"},
       {label:"Built-in unqualified ToolCatalog example",value:"builtin"}
     ],{placeHolder:"Choose Dependency Contract source"});
     if(!type)return;
-    const alias=await askAlias();if(!alias)return;
     const acquired=await acquireNew(type.value);if(!acquired)return;
+    const alias=await askAlias();if(!alias)return;
     const result=await applyDependency(vscode,root,alias,acquired,{
       confirm:()=>confirm("Pin "+alias+" from "+acquired.source.type+
-        "? Declaration effects come from source; Owner and Capability authorization remain NOT_CHECKED.","Add Dependency")});
+        "? Immutable bytes will be stored. Compiler interface-package binding and Owner/Runtime authorization remain NOT_CHECKED.","Add Dependency")});
     refresh();onLockChanged();return result;
   });
   const aliasOf=node=>typeof node==="string"?node:node?.dependency?.id;
