@@ -5,6 +5,9 @@ import {readFileSync} from 'node:fs';
 import {sha256} from '../experiments/ide-host/vscode/src/dependency-snapshot.mjs';
 import {decodeInterfacePackageZip}
   from '../experiments/ide-host/vscode/src/interface-package-zip.mjs';
+import {base64Bytes} from '../experiments/ide-host/vscode/src/dependency-snapshot.mjs';
+import {projectLockedInterfaceCompletionHints}
+  from '../experiments/ide-host/vscode/src/interface-schema-completion.mjs';
 
 const name=process.argv[2];
 if(!name)throw Error('Usage: node scripts/verify-published-interface-zip.mjs <exact published zip>');
@@ -18,8 +21,20 @@ assert.equal(packageData.manifest.version,'1.1.0');
 assert.equal(packageData.manifest.exports.filter(x=>x.kind==='CallableCatalog').length,11);
 assert.equal(packageData.manifest.exports.filter(x=>x.kind==='CapabilityCatalog').length,2);
 assert.equal(packageData.manifest.exports.filter(x=>x.kind==='Schema').length,4);
+const hints=projectLockedInterfaceCompletionHints({
+  id:'ca-client',kind:'interface-package',
+  files:packageData.files.map(file=>({
+    path:file.path,bytes:base64Bytes(file.bytes)
+  }))
+});
+assert.ok(hints.length>0,'released public ToolCatalog/Schema must yield input hints');
+const contextRead=hints.find(item=>item.argumentProperties.some(p=>
+  p.name==='supi')&&item.argumentProperties.some(p=>p.name==='pduSessionId'));
+assert.ok(contextRead,'released context query Schema should declare SUPI/PSI keys');
+assert.ok(contextRead.argumentProperties.some(p=>p.name==='supi'&&p.required));
 console.log('PUBLISHED_INTERFACE_ZIP_PASS',JSON.stringify({
   sha256:expected,packageId:packageData.manifest.packageId,
   version:packageData.manifest.version,files:packageData.files.length,
-  exports:packageData.manifest.exports.length
+  exports:packageData.manifest.exports.length,
+  completionCallables:hints.length,contextReadId:contextRead.id
 }));
