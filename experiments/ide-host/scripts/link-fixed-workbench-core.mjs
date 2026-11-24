@@ -4,7 +4,7 @@ import {dirname,resolve} from "node:path";
 const appArgument=process.argv[2];
 if(!appArgument)throw Error("Usage: node link-fixed-workbench-core.mjs <theia-app-directory>");
 const app=resolve(appArgument);
-for(const name of ["core","editor","ai-core","ai-chat"]){
+for(const name of ["core","editor","editor-preview","ai-core","ai-chat"]){
   const dependency=resolve(app,"node_modules/@theia",name);
   const target=resolve("experiments/ide-host/theia-fixed-workbench/node_modules/@theia",name);
   await mkdir(dirname(target),{recursive:true});

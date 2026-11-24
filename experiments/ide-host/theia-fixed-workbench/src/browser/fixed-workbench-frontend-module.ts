@@ -10,7 +10,7 @@ import { MAIN_AREA_CLASS } from '@theia/core/lib/browser/shell/application-shell
 import { TheiaDockPanel } from '@theia/core/lib/browser/shell/theia-dock-panel';
 import { Widget, type DockPanel } from '@theia/core/lib/browser/widgets/widget';
 import { CommandRegistry } from '@theia/core/lib/common/command';
-import { EditorManager } from '@theia/editor/lib/browser/editor-manager';
+import { EditorPreviewManager } from '@theia/editor-preview/lib/browser/editor-preview-manager';
 import { constrainMainEditorPanelOptions, isMainEditorPanelOptions, createPreviewAutoRevealPreference, hasVisualizableSourceEditor } from './fixed-editor-panel-policy.mjs';
 
 // Dedicated Preview container: never nest the visualization beneath Inspector.
@@ -24,7 +24,7 @@ function isAiWorkbench(widget: Widget | undefined) {
     return (widget as (Widget & { viewType?: string }) | undefined)?.viewType === AI_WORKBENCH_VIEW;
 }
 
-class StudioEditorManager extends EditorManager {
+class StudioEditorManager extends EditorPreviewManager {
     protected override updateCurrentEditor(): void {
         if (isAiWorkbench(this.shell.getCurrentWidget('main'))) {
             // Theia normally keeps the last native editor as current. Keeping
@@ -141,7 +141,7 @@ function addWorkspaceModeControl(app: FrontendApplication, commands: CommandRegi
 }
 
 export default new ContainerModule((bind, unbind, isBound, rebind) => {
-    rebind(EditorManager).to(StudioEditorManager).inSingletonScope();
+    rebind(EditorPreviewManager).to(StudioEditorManager).inSingletonScope();
     bind(Agent).toDynamicValue(({ container }) =>
         createStudioChatAgent(container.get(CommandRegistry))).inSingletonScope();
 

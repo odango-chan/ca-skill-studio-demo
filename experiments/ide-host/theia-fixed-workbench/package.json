@@ -12,6 +12,7 @@
     "@theia/ai-chat": "1.76.0",
     "@theia/ai-core": "1.76.0",
     "@theia/core": "1.76.0",
-    "@theia/editor": "1.76.0"
+    "@theia/editor": "1.76.0",
+    "@theia/editor-preview": "1.76.0"
   }
 }
