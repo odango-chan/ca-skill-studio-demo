@@ -1657,7 +1657,10 @@ try{
         throw Error("AI Gateway request did not match the expected OpenAI-compatible v1 Chat Completions contract");
 
       let proposalView=null;
-      for(let attempt=0;attempt<120&&!proposalView;attempt++){
+      // Allow the Host's 60-second Compiler Worker timeout to settle and
+      // report a real terminal result before asserting the Patch preview.
+      const proposalDeadline=Date.now()+70000;
+      while(Date.now()<proposalDeadline&&!proposalView){
         const view=await readAiView();
         if(view?.proposalSummary.includes("AI Authoring mock proposal")&&
            view.candidateSource.includes("ai-authoring-smoke-node"))proposalView=view;
@@ -2139,7 +2142,8 @@ try{
       await command("Input.dispatchMouseEvent",{type:"mousePressed",x:approval.x,y:approval.y,button:"left",clickCount:1});
       await command("Input.dispatchMouseEvent",{type:"mouseReleased",x:approval.x,y:approval.y,button:"left",clickCount:1});
       let readyView=null;
-      for(let attempt=0;attempt<200&&!readyView;attempt++){
+      const qualifiedDeadline=Date.now()+70000;
+      while(Date.now()<qualifiedDeadline&&!readyView){
         const view=await readAiView();
         if(view?.candidateSource.includes("FAIL: FAILED")&&
            view.compilerStatus.includes("Compiler v2.0.2 Check: PASS")&&

@@ -1068,6 +1068,7 @@ function createAuthoringView(vscode, context, {
         maxTokens: 2048,
       });
       if (!isCurrent()) return;
+      post({ type: "status", message: "已收到模型响应，正在生成 Source Patch 候选…", busy: true });
       const current = await collectAuthoringState(document);
       if (!isCurrent()) return;
       if (document.version !== initial.procedure.version ||
@@ -1126,6 +1127,7 @@ function createAuthoringView(vscode, context, {
       let compilerCheck = null;
       let compilerCheckError = null;
       if (patchPlan && candidateSource !== null && candidateDigest) {
+        post({ type: "status", message: "正在校验精确候选的 Compiler Check…", busy: true });
         try {
           compilerCheck = await createAuthoringCompilerCheck({
             compilerIntegration,
