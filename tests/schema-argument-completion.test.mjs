@@ -104,7 +104,7 @@ test('Schema imports reach current CA-SL argument completion (required first)',a
   assert.equal(suggestions[0].kind,10);
   assert.match(suggestions[0].detail,/required .*integer/);
   assert.match(suggestions[1].documentation,/3GPP SUPI/);
-  assert.match(suggestions[0].detail,/NOT_AUTHORIZED/);
+  assert.match(suggestions[0].detail,/AUTH_NOT_CHECKED/);
   assert.equal(suggestions[0].textEdit.newText,'pduSessionId: ');
   assert.deepEqual(suggestions[0].textEdit.range.start,{line:6,character:8});
 });
