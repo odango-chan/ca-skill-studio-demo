@@ -1217,6 +1217,8 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
           "      arguments:",
           "        ueRef: context.ueRef",
           "        schemaProbe: context.request.sNssai.",
+          "        schemaRootProbe: context.",
+          "        schemaStartProbe: context",
           "      routes:",
           "        SUCCEEDED: mutate",
           "        FAILED: SAFE_STOPPED",
@@ -1367,6 +1369,10 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
             "        request: await-event.wait.output");
           const contextRequestFields=await complete(procedureDocument,
             "        schemaProbe: context.request.sNssai.");
+          const contextRoot=await complete(procedureDocument,
+            "        schemaRootProbe: context.");
+          const contextStart=await complete(procedureDocument,
+            "        schemaStartProbe: context");
           const unknownTarget=await complete(procedureDocument,
             "OUTCOME_UNKNOWN: ");
           const require=(items,label,description)=>{
@@ -1410,6 +1416,8 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
           require(waitOutput,"await-event.wait.output","typed Wait output binding");
           require(contextRequestFields,"sst","Schema-driven context.request nested field");
           require(contextRequestFields,"sd","Schema-driven context.request nested field");
+          require(contextRoot,"request","Schema-driven context root");
+          require(contextStart,"context.request","Schema-driven request path stem");
           require(unknownTarget,"SAFE_STOPPED","OUTCOME_UNKNOWN terminal");
           if(unknownTarget.some(item=>["check","read","mutate","await-event","timeout-handler","run-script","final"].includes(item)))
             throw Error("OUTCOME_UNKNOWN offered a business Node target: "+
@@ -1474,7 +1482,8 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
             operationRouteKeys:routeKeys,mutationRouteKeys,scriptPathCompletion:scriptPath,
             waitNodeFields,waitFields,waitEventFields,waitResponseFields,
             waitRouteKeys,waitResponseAfter,waitTimeoutTarget,waitOutput,
-            contextRequestFields,outcomeUnknownTargets:unknownTarget,
+            contextRequestFields,contextRoot,contextStart,
+            outcomeUnknownTargets:unknownTarget,
             contractDefinition:gateDefinition.length,
             predicateDefinition:predicateDefinition.length,
             predicateHoverSignature:predicateHover.includes("demo.ready(ue: string)"),
