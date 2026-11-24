@@ -11,6 +11,7 @@ import {readGitHubPinnedFile} from "./acquisition-transports.mjs";
 import {decodeBase64,sha256} from "./dependency-snapshot.mjs";
 import {decodeInterfacePackageZip} from "./interface-package-zip.mjs";
 import {readPinnedInterfaceRelease} from "./interface-release-acquisition.mjs";
+import {pickBrowserInterfaceZip} from "./interface-upload-webview.mjs";
 import {localSchemaReference,isSkillSchema} from "./schema-editor.mjs";
 import {projectJsonSchema,resolveSchemaPointer} from "../../../../site/schema-projection.mjs";
 import {projectDependencyReadiness,projectLockedToolCatalog}
@@ -304,15 +305,25 @@ export function registerDependencyIntegration(vscode,context,{onLockChanged=()=>
     return token??undefined;
   }
   async function acquireInterfaceZip(uploadName){
-    const picked=await vscode.window.showOpenDialog({canSelectMany:false,
-      canSelectFiles:true,canSelectFolders:false,
-      filters:{"CA-SL Interface Package ZIP":["zip"]}});
-    if(!picked?.length)return null;
-    const raw=await vscode.workspace.fs.readFile(picked[0]);
+    // Web workbenches need the device File API; native showOpenDialog chooses
+    // a workspace file, which is not equivalent to a user's local ZIP.
+    const selected=await pickBrowserInterfaceZip(vscode);
+    if(selected===null)return null;
+    let raw,filename;
+    if(selected===undefined){
+      const picked=await vscode.window.showOpenDialog({canSelectMany:false,
+        canSelectFiles:true,canSelectFolders:false,
+        filters:{"CA-SL Interface Package ZIP":["zip"]}});
+      if(!picked?.length)return null;
+      raw=await vscode.workspace.fs.readFile(picked[0]);
+      filename=picked[0].path.split("/").at(-1);
+    }else{
+      raw=selected.bytes;filename=selected.name;
+    }
     const imported=await decodeInterfacePackageZip(raw);
     return {kind:"interface-package",
       source:{type:"interface-zip",
-        upload:uploadName??picked[0].path.split("/").at(-1),
+        upload:uploadName??filename,
         contentDigest:await sha256(raw),
         packageId:imported.manifest.packageId,
         version:imported.manifest.version,
