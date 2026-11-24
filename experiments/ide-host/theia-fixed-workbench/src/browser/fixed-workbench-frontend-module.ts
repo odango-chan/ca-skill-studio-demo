@@ -90,7 +90,7 @@ function addWorkspaceModeControl(app: FrontendApplication, commands: CommandRegi
     control.id = 'skill-studio-workspace-mode';
     control.node.setAttribute('aria-label', 'Skill Studio mode');
     Object.assign(control.node.style, {
-        display: 'flex', gap: '4px', alignItems: 'center', padding: '3px 8px',
+        display: 'flex', flexWrap: 'wrap', gap: '4px', alignItems: 'center', padding: '3px 8px',
         background: 'var(--theia-titleBar-activeBackground)'
     });
     const modes = [
@@ -125,6 +125,10 @@ function addWorkspaceModeControl(app: FrontendApplication, commands: CommandRegi
     chat.textContent = 'AI Chat';
     chat.onclick = () => { void commands.executeCommand('aiChat:toggle'); };
     control.node.appendChild(chat);
+    // The static preview places this notice in the document before startup.
+    // Give it space in the toolbar so it never overlaps the Chat composer.
+    const previewNotice = document.getElementById('skill-studio-preview-warning');
+    if (previewNotice) control.node.appendChild(previewNotice);
     const update = () => {
         const current = shell.getCurrentWidget('main');
         const active = isAiWorkbench(current) ? 0 :

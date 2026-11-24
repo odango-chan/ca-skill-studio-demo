@@ -2326,6 +2326,28 @@ try{
     if(nativeSidebar?.visible!==true||nativeSidebar.groups!==1)
       throw Error("Theia native AI Chat did not open in the existing right sidebar: "+JSON.stringify(nativeSidebar));
     console.log("STUDIO_NATIVE_SKILL_CHAT_SIDEBAR_CHROMIUM_PASS");
+    if(!externalUrl){
+      // In the static build, the safety notice must remain visible at both
+      // widths without covering any part of the real native Chat sidebar.
+      for(const width of [1440, 960]){
+        await command("Emulation.setDeviceMetricsOverride",{width,height:900,deviceScaleFactor:1,mobile:false});
+        const noteLayout=await evalJS(`new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(()=>{
+          const note=document.getElementById('skill-studio-preview-warning');
+          const chat=document.getElementById('chat-view-widget');
+          const warning=note?.getBoundingClientRect(),sidebar=chat?.getBoundingClientRect();
+          if(!warning||!sidebar){resolve(null);return;}
+          const overlaps=warning.left<sidebar.right&&warning.right>sidebar.left&&
+            warning.top<sidebar.bottom&&warning.bottom>sidebar.top;
+          resolve({visible:warning.width>0&&warning.height>0&&getComputedStyle(note).visibility==='visible',
+            docked:note.closest('#skill-studio-workspace-mode')!==null,overlaps,
+            sidebarVisible:sidebar.width>0&&sidebar.height>0});
+        })))`);
+        if(!noteLayout?.visible||!noteLayout.docked||noteLayout.overlaps||!noteLayout.sidebarVisible)
+          throw Error("Static safety notice overlapped or disappeared next to native AI Chat at "+width+"px: "+
+            JSON.stringify(noteLayout));
+      }
+      console.log("STUDIO_NATIVE_CHAT_WARNING_NO_OVERLAP_CHROMIUM_PASS");
+    }
   }
   if(requireEditor)
     console.log("THEIA_BROWSER_HOST_V1ALPHA5_ACCEPTANCE_PASS");
