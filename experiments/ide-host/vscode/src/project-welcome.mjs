@@ -16,7 +16,7 @@ function nonce(){
 }
 
 export function registerProjectWelcome(vscode,context){
-  let panel=null,lastError=null,lastOpenedAt=null;
+  let panel=null,lastError=null,lastOpenedAt=null,lastImportStatus=null;
   const language=String(vscode.env?.language??"en").toLowerCase();
   const zh=language.startsWith("zh");
   const labels=zh?{
@@ -180,7 +180,7 @@ window.addEventListener("message",event=>{
       panelOpen:Boolean(panel),
       createWebviewPanelAvailable:typeof vscode.window.createWebviewPanel==="function",
       workspaceFolderCount:(vscode.workspace.workspaceFolders??[]).length,
-      lastError,lastOpenedAt
+      lastError,lastOpenedAt,lastImportStatus
     })
   };
 }
