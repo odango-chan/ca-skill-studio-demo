@@ -145,7 +145,7 @@ async function persistExampleInterfaceIfAbsent(vscode,root,prepared,
     for(const [name] of await fs.readDirectory(settingsFolder)){
       if(name==="settings.json")continue;
       if(typeof name!=="string"||!name||name==="."||name===".."||
-         name.includes("/")||name.includes("\"))
+         name.includes("/")||name.includes("\\"))
         fail("Unsafe Example workspace settings child");
       await fs.delete(vscode.Uri.joinPath(settingsFolder,name),
         {recursive:true,useTrash:false});
