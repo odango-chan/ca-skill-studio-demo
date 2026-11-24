@@ -1077,6 +1077,8 @@ export async function runWorkbenchAcceptance({
        !currentLanguageFeatures.procedureOutline?.includes("timeout-handler")||
        !currentLanguageFeatures.interfaceToolCompletion?.includes(
          "ca-client::openamsm.smf.mas.sc.query")||
+       !currentLanguageFeatures.interfaceNativeToolCompletion?.includes(
+         "ca-client::openamsm.smf.mas.sc.query")||
        !currentLanguageFeatures.interfaceArgumentCompletion?.includes("supi")||
        !currentLanguageFeatures.interfaceArgumentCompletion?.includes("pduSessionId")||
        !currentLanguageFeatures.interfaceNativeArgumentCompletion?.includes("supi")||
@@ -1091,6 +1093,7 @@ export async function runWorkbenchAcceptance({
         JSON.stringify(currentLanguageFeatures));
     console.log("STUDIO_EXAMPLE_INTERFACE_SCHEMA_COMPLETION_CHROMIUM",JSON.stringify({
       tool:currentLanguageFeatures.interfaceToolCompletion,
+      nativeTool:currentLanguageFeatures.interfaceNativeToolCompletion,
       arguments:currentLanguageFeatures.interfaceArgumentCompletion,
       nativeArguments:currentLanguageFeatures.interfaceNativeArgumentCompletion,
       details:currentLanguageFeatures.interfaceArgumentCompletionDetails,
