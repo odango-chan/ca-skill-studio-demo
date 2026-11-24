@@ -2310,6 +2310,59 @@ try{
     console.log("STUDIO_INTERFACE_SCHEMA_NATIVE_READONLY_CHROMIUM_PASS",
       JSON.stringify(readonly));
   }
+  if(requireEditor&&requireBrowserLsp){
+    const started=await evalJS("(()=>{"+
+      "const c=window.theia.container;"+
+      "const k=[...c._bindingDictionary._map.keys()].find(k=>"+
+      "typeof k==='function'&&k.prototype?.executeCommand&&"+
+      "k.prototype?.registerCommand&&k.prototype?.getCommand);"+
+      "if(!k)throw Error('Theia command service unavailable');"+
+      "window.__studioZipPickerAcceptance=c.get(k).executeCommand("+
+      "'skillStudio.internal.browserZipPickerAcceptance');"+
+      "return true;})()");
+    if(started!==true)throw Error("Cannot open browser-local ZIP picker");
+    let fileInput=null;
+    for(let attempt=0;attempt<60&&!fileInput;attempt++){
+      const tree=await command("Page.getFrameTree");
+      const frames=[],collect=node=>{
+        if(!node)return;frames.push(node.frame);
+        for(const child of node.childFrames??[])collect(child);
+      };
+      collect(tree.frameTree);
+      for(const frame of frames.filter(f=>/webview/i.test(f.url??""))){
+        try{
+          const world=await command("Page.createIsolatedWorld",{
+            frameId:frame.id,worldName:"studio-browser-zip-file-input",
+            grantUniveralAccess:true
+          });
+          const result=await command("Runtime.evaluate",{
+            contextId:world.executionContextId,
+            returnByValue:true,awaitPromise:true,
+            expression:"(()=>({input:!!document.querySelector('input[type=file]'),"+
+              "csp:document.querySelector('meta[http-equiv=Content-Security-Policy]')?.content??''}))()"
+          });
+          if(result.result?.value?.input){
+            fileInput={contextId:world.executionContextId,...result.result.value};
+            break;
+          }
+        }catch{}
+      }
+      if(!fileInput)await sleep(150);
+    }
+    if(!fileInput||!fileInput.csp.includes("script-src 'nonce-"))
+      throw Error("Browser ZIP device file input/CSP was not rendered: "+
+        JSON.stringify(fileInput));
+    await command("Runtime.evaluate",{
+      contextId:fileInput.contextId,returnByValue:true,
+      expression:"document.getElementById('cancel').click();true"
+    });
+    const cancelled=await evalJS("window.__studioZipPickerAcceptance");
+    if(cancelled?.status!=="CANCELLED")
+      throw Error("Browser ZIP picker did not cancel cleanly: "+JSON.stringify(cancelled));
+    console.log("STUDIO_BROWSER_LOCAL_INTERFACE_ZIP_PICKER_CHROMIUM_PASS",JSON.stringify({
+      input:true,nonceCsp:true,cancellation:"PASS",projectFilesUnchanged:true
+    }));
+  }
   if(requireEditor)
     console.log("THEIA_BROWSER_HOST_V1ALPHA5_ACCEPTANCE_PASS");
   else
