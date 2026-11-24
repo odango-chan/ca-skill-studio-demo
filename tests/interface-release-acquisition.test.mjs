@@ -50,7 +50,7 @@ test('reject latest, ambiguous published assets and oversized release claims',as
   const unsafe={...(await options(mock())),tag:'../latest'};
   await assert.rejects(()=>readPinnedInterfaceRelease(unsafe),/exact owner/);
   const oversized=await options(mock({release:{...metadata,
-    assets:[{...metadata.assets[0],size:25000000}]}}));
+    assets:[{...metadata.assets[0],size:30000000}]}}));
   await assert.rejects(()=>readPinnedInterfaceRelease(oversized),
     /size or identity invalid/);
 });
