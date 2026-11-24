@@ -126,6 +126,22 @@ test('composed input Schemas do not produce misleading partial parameter suggest
     await locked({allOf:[{properties:{supi:{type:'integer'}}}]}));
   assert.equal(hints.length,0);
 });
+test('Schema key completion suppresses already declared keys after the cursor',async()=>{
+  const hints=projectLockedInterfaceCompletionHints(await locked());
+  const source=document.replace('      arguments:\n        \n',
+    '      arguments:\n        \n        supi: context.supi\n');
+  const needle='      arguments:\n        \n';
+  const start=source.indexOf(needle);
+  assert.ok(start>=0);
+  const offset=start+needle.length-1;
+  const lineStart=source.lastIndexOf('\n',offset-1)+1;
+  const suggestions=schemaArgumentCompletions({
+    completeness:'complete',schemaCompletionHints:hints
+  },{relativePath:'assurance/procedure.yaml',text:source},
+  '        ',offset,lineStart,6);
+  assert.ok(suggestions.some(x=>x.label==='pduSessionId'));
+  assert.ok(!suggestions.some(x=>x.label==='supi'));
+});
 test('wrong dialect or absent Tool does not invent input fields',async()=>{
   await assert.rejects(
     ()=>locked({$schema:'https://json-schema.org/draft/2019-09/schema'}),
