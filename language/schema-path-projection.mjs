@@ -4,7 +4,7 @@
 import {parseDocument,isMap,isSeq,isScalar} from "yaml";
 const DIALECT="https://json-schema.org/draft/2020-12/schema";
 const NAME=/^[A-Za-z_][A-Za-z0-9_-]*$/;
-function field(m,key){return isMap(m)?m.get(key,true):null;}
+function field(m,key){return isMap(m)?(m.get(key,true)??null):null;}
 function scalar(n){return isScalar(n)?n.value:null;}
 export function projectSchemaPropertyTree(source,{expectedId}={}){
   if(typeof source!=="string"||source.length>2*1024*1024)return null;
