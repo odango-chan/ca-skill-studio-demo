@@ -1259,6 +1259,16 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
           "        SUCCEEDED: SAFE_STOPPED",
           "        FAILED: SAFE_STOPPED",
           "        UNKNOWN: SAFE_STOPPED",
+          // This disconnected, read-only probe exercises the actual pinned
+          // Interface Package dependency loaded from the Example workspace.
+          "  client-query:",
+          "    observation:",
+          "      tool: ca-client::openamsm.smf.mas.sc.query",
+          "      arguments:",
+          "        ",
+          "      routes:",
+          "        SUCCEEDED: final",
+          "        FAILED: SAFE_STOPPED",
           "  run-script:",
           "    operation:",
           "      ",
@@ -1375,6 +1385,70 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
             "        schemaStartProbe: context");
           const unknownTarget=await complete(procedureDocument,
             "OUTCOME_UNKNOWN: ");
+
+          // The temporary Package inherits the Example's exact .vscode lock.
+          // Assert the immutable Schema hint reached this Package generation,
+          // then query the real browser Worker and native Theia Completion API.
+          const queryToolId="ca-client::openamsm.smf.mas.sc.query";
+          const dependencyHints=state.lastSentSnapshot?.schemaCompletionHints??[];
+          const queryHint=dependencyHints.filter(item=>
+            item.id===queryToolId&&item.kind==="observation"&&
+            item.trust==="DECLARATION_ONLY");
+          if(queryHint.length!==1)
+            throw Error("Pinned ca-client Schema hint did not reach the accepted LSP Package snapshot: "+
+              JSON.stringify({queryHint,dependencyHints:dependencyHints.map(item=>item.id)}));
+          const queryToolCompletion=await complete(procedureDocument,
+            "tool: ca-client::openamsm.smf.mas.sc.q");
+          const querySource=procedureDocument.getText();
+          const queryArgumentsAnchor="      arguments:\\n        ";
+          const queryArgumentsStart=querySource.lastIndexOf(queryArgumentsAnchor);
+          if(queryArgumentsStart<0)
+            throw Error("Pinned ca-client query arguments probe anchor is missing");
+          const queryArgumentsPosition=procedureDocument.positionAt(
+            queryArgumentsStart+queryArgumentsAnchor.length);
+          const queryArgumentsResult=await languageClient.provideCompletion(
+            procedureDocument.uri.toString(),queryArgumentsPosition);
+          const queryArgumentItems=Array.isArray(queryArgumentsResult)
+            ?queryArgumentsResult:queryArgumentsResult?.items??[];
+          const nativeQueryArgumentsResult=await vscode.commands.executeCommand(
+            "vscode.executeCompletionItemProvider",procedureDocument.uri,
+            queryArgumentsPosition);
+          const nativeQueryArgumentItems=Array.isArray(nativeQueryArgumentsResult)
+            ?nativeQueryArgumentsResult
+            :nativeQueryArgumentsResult?.items??nativeQueryArgumentsResult?.suggestions??[];
+          const queryArgumentLabels=queryArgumentItems.map(item=>
+            typeof item.label==="string"?item.label:item.label?.label??"");
+          const nativeQueryArgumentLabels=nativeQueryArgumentItems.map(item=>
+            typeof item.label==="string"?item.label:item.label?.label??"");
+          const requiredQueryArguments=queryArgumentItems.filter(item=>
+            ["supi","pduSessionId"].includes(
+              typeof item.label==="string"?item.label:item.label?.label));
+          const nativeRequiredQueryArguments=nativeQueryArgumentItems.filter(item=>
+            ["supi","pduSessionId"].includes(
+              typeof item.label==="string"?item.label:item.label?.label));
+          if(queryArgumentLabels.length!==2||
+             !queryArgumentLabels.includes("supi")||
+             !queryArgumentLabels.includes("pduSessionId")||
+             !nativeQueryArgumentLabels.includes("supi")||
+             !nativeQueryArgumentLabels.includes("pduSessionId")||
+             requiredQueryArguments.length!==2||
+             requiredQueryArguments.some(item=>
+               !String(item.detail??"").includes("required")||
+               !String(item.detail??"").includes("AUTH_NOT_CHECKED"))||
+             nativeRequiredQueryArguments.length!==2||
+             nativeRequiredQueryArguments.some(item=>
+               !String(item.detail??"").includes("required")||
+               !String(item.detail??"").includes("AUTH_NOT_CHECKED")))
+            throw Error("Pinned Interface Schema completion did not reach the actual Theia editor: "+
+              JSON.stringify({queryToolCompletion,queryArgumentLabels,
+                nativeQueryArgumentLabels,requiredQueryArguments,
+                nativeRequiredQueryArguments}));
+          if(!queryToolCompletion.includes(queryToolId))
+            throw Error("Pinned Interface Tool completion omitted its exact exported callable: "+
+              JSON.stringify(queryToolCompletion));
+          if(procedureDocument.getText()!==querySource)
+            throw Error("Read-only Schema completion mutated Procedure Source");
+
           const require=(items,label,description)=>{
             if(!items.includes(label))
               throw Error("Native Theia "+description+" completion omitted "+
@@ -1483,6 +1557,19 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
             waitNodeFields,waitFields,waitEventFields,waitResponseFields,
             waitRouteKeys,waitResponseAfter,waitTimeoutTarget,waitOutput,
             contextRequestFields,contextRoot,contextStart,
+            interfaceToolCompletion:queryToolCompletion,
+            interfaceArgumentCompletion:queryArgumentLabels,
+            interfaceNativeArgumentCompletion:nativeQueryArgumentLabels,
+            interfaceArgumentCompletionDetails:requiredQueryArguments.map(item=>({
+              label:typeof item.label==="string"?item.label:item.label?.label,
+              detail:item.detail,
+              insertText:item.textEdit?.newText??null
+            })),
+            interfaceNativeArgumentCompletionDetails:nativeRequiredQueryArguments.map(item=>({
+              label:typeof item.label==="string"?item.label:item.label?.label,
+              detail:item.detail,
+              insertText:item.textEdit?.newText??null
+            })),
             outcomeUnknownTargets:unknownTarget,
             contractDefinition:gateDefinition.length,
             predicateDefinition:predicateDefinition.length,
