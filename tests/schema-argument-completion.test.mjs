@@ -265,3 +265,28 @@ test('Wait TIMEOUT path bypassing producer stage suppresses output suggestions',
   assert.deepEqual(pathCompletion(waitBypass,enriched,
     '        payload: read.observation.output.'),[]);
 });
+
+
+test('Schema-backed value stems guide typing from Context and producer Node',async()=>{
+  const hints=projectLockedInterfaceCompletionHints(await locked());
+  const enriched=hints.map(h=>({...h,outputProperties:[
+    {name:'status',type:'string',description:'Result status',children:null}
+  ]}));
+  const context=pathProcedure.replace('context.request.sNssai.','context');
+  assert.deepEqual(pathCompletion(context,enriched,'        supi: context')
+    .map(x=>x.label),['context.request']);
+  const ctxDot=pathProcedure.replace('context.request.sNssai.','context.');
+  assert.deepEqual(pathCompletion(ctxDot,enriched,'        supi: context.')
+    .map(x=>x.label),['request']);
+  const producer=pathProcedure.replace('read.observation.output.','re');
+  assert.deepEqual(pathCompletion(producer,enriched,'        payload: re')
+    .map(x=>x.label),['read.observation.output']);
+  const stage=pathProcedure.replace('read.observation.output.','read.');
+  assert.deepEqual(pathCompletion(stage,enriched,'        payload: read.')
+    .map(x=>x.label),['observation']);
+  const output=pathProcedure.replace('read.observation.output.','read.observation.');
+  assert.deepEqual(pathCompletion(output,enriched,
+    '        payload: read.observation.').map(x=>x.label),['output']);
+  assert.equal(pathCompletion(stage,hints,'        payload: read.'),null,
+    'Do not suggest producer output without an exported output Schema');
+});
