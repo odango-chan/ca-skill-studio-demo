@@ -1216,6 +1216,7 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
           "      tool: ca::session.read",
           "      arguments:",
           "        ueRef: context.ueRef",
+          "        schemaProbe: context.request.sNssai.",
           "      routes:",
           "        SUCCEEDED: mutate",
           "        FAILED: SAFE_STOPPED",
@@ -1295,7 +1296,7 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
           "assurance/procedure.yaml":procedure,
           "assurance/predicates.yaml":predicates,
           "schemas/request.schema.yaml":
-            "$schema: https://json-schema.org/draft/2020-12/schema\ntype: object\n",
+            "$schema: https://json-schema.org/draft/2020-12/schema\ntype: object\nproperties:\n  sNssai:\n    type: object\n    properties:\n      sst: {type: integer, description: Slice/Service Type}\n      sd: {type: string}\n",
           "scripts/runner.py":"def main():\n    return {}\n"
         };
         let release=null;
@@ -1364,6 +1365,8 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
           const waitTimeoutTarget=await complete(procedureDocument,"        TIMEOUT: ");
           const waitOutput=await complete(procedureDocument,
             "        request: await-event.wait.output");
+          const contextRequestFields=await complete(procedureDocument,
+            "        schemaProbe: context.request.sNssai.");
           const unknownTarget=await complete(procedureDocument,
             "OUTCOME_UNKNOWN: ");
           const require=(items,label,description)=>{
@@ -1405,6 +1408,8 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
           require(waitResponseAfter,"final","Wait response boundary Node");
           require(waitTimeoutTarget,"timeout-handler","Wait timeout target Node");
           require(waitOutput,"await-event.wait.output","typed Wait output binding");
+          require(contextRequestFields,"sst","Schema-driven context.request nested field");
+          require(contextRequestFields,"sd","Schema-driven context.request nested field");
           require(unknownTarget,"SAFE_STOPPED","OUTCOME_UNKNOWN terminal");
           if(unknownTarget.some(item=>["check","read","mutate","await-event","timeout-handler","run-script","final"].includes(item)))
             throw Error("OUTCOME_UNKNOWN offered a business Node target: "+
@@ -1469,7 +1474,7 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
             operationRouteKeys:routeKeys,mutationRouteKeys,scriptPathCompletion:scriptPath,
             waitNodeFields,waitFields,waitEventFields,waitResponseFields,
             waitRouteKeys,waitResponseAfter,waitTimeoutTarget,waitOutput,
-            outcomeUnknownTargets:unknownTarget,
+            contextRequestFields,outcomeUnknownTargets:unknownTarget,
             contractDefinition:gateDefinition.length,
             predicateDefinition:predicateDefinition.length,
             predicateHoverSignature:predicateHover.includes("demo.ready(ue: string)"),
