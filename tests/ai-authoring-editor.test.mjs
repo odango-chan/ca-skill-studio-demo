@@ -553,7 +553,7 @@ test("AI Workbench renders Context / Plan / Flow / Diff / Validation / Change Se
   const html=renderAiAuthoringHtml("c".repeat(48));
   for(const id of ["contextPanel","contextMeta","sources","view-plan","view-flow","view-diff",
     "view-validation","flowChanges","diffRows","diffSummary","validationIdentity",
-    "diagnostics","groups","revisionInfo","task","generate","apply","discard"]) {
+    "diagnostics","groups","revisionInfo","task","sendTask","apply","discard"]) {
     assert.ok(html.includes('id="'+id+'"'),"missing Workbench section "+id);
   }
   assert.match(html,/role="tablist"/);
@@ -624,7 +624,7 @@ test("F3 Monaco YAML Diff is local, read-only and preserves line-diff fallback",
 
 test("F4 Workbench Refine + history is session-only, shows Context origin, and revokes old Apply",()=>{
   const html=renderAiAuthoringHtml("a".repeat(48));
-  for(const id of ["refineTask","refine","revisionTimeline","sources","contextMeta"]) {
+  for(const id of ["agentComposer","task","sendTask","continueOption","revisionTimeline","sources","contextMeta"]) {
     assert.ok(html.includes('id="'+id+'"'),"missing F4 element "+id);
   }
   assert.match(html,/function renderHistory/);
@@ -632,7 +632,7 @@ test("F4 Workbench Refine + history is session-only, shows Context origin, and r
   assert.match(html,/message.readonly===true/);
   assert.match(html,/input.disabled=historical/);
   assert.match(html,/message.type==='historyInspect'/);
-  assert.match(html,/type:'refine'/);
+  assert.match(html,/hasCurrentProposal\?'refine':'runAgent'/);
   assert.match(html,/writeOrigin/);
   assert.match(html,/item.digest/);
   const source=readFileSync(new URL("../experiments/ide-host/vscode/src/ai-authoring-editor.mjs",import.meta.url),"utf8");
@@ -683,4 +683,16 @@ test("F2 AI Host builds exact-source projections and does not weaken Compiler Ap
   assert.match(code,/compilerCheck\?\.state === "PASS"/);
   assert.match(build,/src\/ai-flow-compare\.tsx/);
   assert.match(build,/media\/ai-flow-compare\.js/);
+});
+
+
+test("AI Workbench offers a message transcript and a single task composer", () => {
+  const html = renderAiAuthoringHtml("a".repeat(48));
+  assert.match(html, /id="agentActivity"[^>]+role="log"/);
+  assert.equal([...html.matchAll(/<textarea\b/g)].length, 1);
+  assert.match(html, /<button id="sendTask" type="submit"/);
+  assert.match(html, /<aside id="agentReview"[^>]+hidden>/);
+  assert.match(html, /id="toggleReview"[^>]+aria-expanded="false"/);
+  assert.doesNotMatch(html, /id="(?:refineTask|runAgent|generate)"/);
+  assert.match(html, /hasCurrentProposal\?'refine':'runAgent'/);
 });
