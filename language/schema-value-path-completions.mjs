@@ -160,6 +160,65 @@ function descend(tree,segments){
   }
   return Array.isArray(level)?level:null;
 }
+// Build the first segments of a reference as the user types. Never offer
+// an unqualified Context field or a producer lacking a dominant output Schema.
+function schemaPathStemCompletions(snapshot,document,prefix,offset,lineStart,lineNumber,active){
+  const match=/^ {8}[A-Za-z_][A-Za-z0-9_-]*:[ \t]*([A-Za-z0-9_.-]*)$/.exec(prefix);
+  if(!match||!match[1])return null;
+  const expr=match[1];
+  const edit=(start,typed,newText,label,detail)=>({
+    label,kind:18,detail:detail+" · AUTH_NOT_CHECKED",
+    textEdit:{range:{
+      start:{line:lineNumber,character:start-lineStart},
+      end:{line:lineNumber,character:offset-lineStart}
+    },newText}
+  });
+  const request=requestTree(snapshot);
+  if(Array.isArray(request)){
+    if(expr==="context"){
+      return [edit(offset-expr.length,expr,"context.request",
+        "context.request","Declared Contract request Schema")];
+    }
+    const ref=/^context\.([A-Za-z0-9_-]*)$/.exec(expr);
+    if(ref&&"request".startsWith(ref[1]))
+      return [edit(offset-ref[1].length,ref[1],"request",
+        "request","Declared Contract request Schema")];
+  }
+  if(!/^[A-Za-z][A-Za-z0-9_.-]*$/.test(expr))return null;
+  const graph=graphInfo(document.text);
+  if(!graph)return null;
+  const choices=[];
+  for(const [id] of graph.items){
+    if(id===active.node)continue;
+    for(const stage of ["operation","observation"]){
+      if(!Array.isArray(producerTree(snapshot,graph,active.node,id,stage)))
+        continue;
+      const complete=id+"."+stage+".output";
+      const tokens=[id,stage,"output"];
+      // A typed reference may stop at the Node, stage, or output boundary.
+      // Replace the shortest unresolved segment, never the already typed part.
+      if(!expr.includes(".")&&id.startsWith(expr)){
+        choices.push(edit(offset-expr.length,expr,complete,complete,
+          "Declared prior Tool output Schema"));
+      }else if(expr.startsWith(id+".")){
+        const remaining=expr.slice(id.length+1);
+        if(!remaining.includes(".")&&stage.startsWith(remaining))
+          choices.push(edit(offset-remaining.length,remaining,stage,stage,
+            "Declared prior Tool stage"));
+        else if(remaining.startsWith(stage+".")&&
+          "output".startsWith(remaining.slice(stage.length+1))&&
+          !remaining.slice(stage.length+1).includes("."))
+          choices.push(edit(offset-(remaining.length-stage.length-1),
+            remaining.slice(stage.length+1),"output","output",
+            "Declared prior Tool output"));
+      }
+    }
+  }
+  if(!choices.length)return null;
+  const unique=new Map(choices.map(x=>[x.label,x]));
+  return [...unique.values()].sort((a,b)=>a.label.localeCompare(b.label));
+}
+
 export function schemaValuePathCompletions(snapshot,document,prefix,offset,lineStart,lineNumber){
   if(snapshot?.completeness!=="complete"||
      document?.relativePath!=="assurance/procedure.yaml"||
@@ -169,7 +228,9 @@ export function schemaValuePathCompletions(snapshot,document,prefix,offset,lineS
   const active=scope(document.text,lineStart);
   if(!active||!["operation","observation"].includes(active.stage))return null;
   const match=/^ {8}[A-Za-z_][A-Za-z0-9_-]*:\s*((?:context\.request|[A-Za-z][A-Za-z0-9_-]*\.(?:operation|observation)\.output)\.[A-Za-z0-9_.-]*)$/.exec(prefix);
-  if(!match)return null;
+  if(!match)return schemaPathStemCompletions(
+    snapshot,document,prefix,offset,lineStart,lineNumber,active
+  );
   const expr=match[1],end=expr.lastIndexOf("."),typed=expr.slice(end+1);
   if(typed&&!NAME.test(typed))return [];
   const base=expr.slice(0,end);
