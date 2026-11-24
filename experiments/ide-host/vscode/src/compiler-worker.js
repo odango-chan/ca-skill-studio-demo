@@ -1,4 +1,4 @@
-// Classic browser Worker adapter for the pinned Go/WASM Compiler v2.0.2.
+// Classic browser Worker adapter for the released Go/WASM Compiler v2.1.0.
 // The Worker has no workspace access, network resolver, credentials or Runtime.
 let boot = null;
 
@@ -17,10 +17,12 @@ async function ensureCompiler() {
         if (typeof self.skillcCheck === "function" &&
             typeof self.skillcBuild === "function" &&
             typeof self.skillcInspectDependencies === "function" &&
-            typeof self.skillcVerifyArtifact === "function") return;
+            typeof self.skillcVerifyArtifact === "function" &&
+            typeof self.skillcBuildDevelopment === "function" &&
+            typeof self.skillcVerifyDevelopment === "function") return;
         await new Promise(resolve => setTimeout(resolve, 10));
       }
-      throw new Error("Pinned Go/WASM Compiler did not expose its v1alpha5 callbacks");
+      throw new Error("Pinned Go/WASM Compiler v2.1.0 did not expose its frozen and Development callbacks");
     })();
   }
   return boot;
@@ -31,11 +33,24 @@ self.onmessage = async event => {
   try {
     if (!Number.isSafeInteger(id) || id < 1) throw new Error("Invalid Compiler Worker request ID");
     await ensureCompiler();
-    if (!["check", "build", "inspect", "verifyArtifact"].includes(command)) {
+    if (!["check", "build", "inspect", "verifyArtifact", "buildDevelopment", "verifyDevelopment"].includes(command)) {
       throw new Error("Unsupported Compiler Worker command");
     }
     if (command === "verifyArtifact") {
       const result = String(self.skillcVerifyArtifact(JSON.stringify(request)));
+      self.postMessage({ id, result });
+      return;
+    }
+    if (command === "verifyDevelopment") {
+      if (!request || typeof request !== "object" || !request.request || !request.result)
+        throw new Error("VerifyDevelopment requires the original request and its BuildDevelopment result");
+      const result = String(self.skillcVerifyDevelopment(
+        JSON.stringify(request.request),JSON.stringify(request.result)));
+      self.postMessage({ id, result });
+      return;
+    }
+    if (command === "buildDevelopment") {
+      const result = JSON.parse(self.skillcBuildDevelopment(JSON.stringify(request)));
       self.postMessage({ id, result });
       return;
     }
