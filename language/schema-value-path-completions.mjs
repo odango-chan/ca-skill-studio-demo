@@ -87,6 +87,19 @@ function graphInfo(source){
     }
     edges.set(id,[...out]);
   }
+  // Source Projection may be temporarily invalid while the user edits a DAG.
+  // Cyclic branches cannot supply a dominance proof.
+  const visited=new Set(),active=new Set();
+  function visit(node){
+    if(active.has(node))return false;
+    if(visited.has(node))return true;
+    active.add(node);
+    for(const target of edges.get(node)??[])if(!visit(target))return false;
+    active.delete(node);
+    visited.add(node);
+    return true;
+  }
+  for(const id of items.keys())if(!visit(id))return null;
   return {start,items,edges};
 }
 function reachable(graph,target,excluded=null){
@@ -102,12 +115,34 @@ function reachable(graph,target,excluded=null){
   }
   return false;
 }
+function canReachFrom(graph,origin,target){
+  const seen=new Set(),queue=[origin];
+  while(queue.length){
+    const item=queue.shift();
+    if(item===target)return true;
+    if(seen.has(item))continue;
+    seen.add(item);
+    for(const next of graph.edges.get(item)??[])if(!seen.has(next))queue.push(next);
+  }
+  return false;
+}
 function producerTree(snapshot,graph,current,producer,stage){
   if(producer===current||!graph.items.has(producer)||
      !reachable(graph,current)||!reachable(graph,producer)||
      reachable(graph,current,producer))return null;
   const node=graph.items.get(producer),segment=field(node,stage);
   if(!isMap(segment))return null;
+  // Node dominance is necessary, not sufficient. An earlier business stage
+  // might branch to the consumer before this output was produced.
+  for(const earlier of STAGES.slice(0,STAGES.indexOf(stage))){
+    const routes=field(field(node,earlier),"routes");
+    if(!isMap(routes))continue;
+    for(const item of routes.items){
+      const target=value(item.value);
+      if(graph.items.has(target)&&canReachFrom(graph,target,current))
+        return null;
+    }
+  }
   const tool=value(field(segment,"tool"));
   if(typeof tool!=="string")return null;
   const matches=(snapshot.schemaCompletionHints??[]).filter(h=>
