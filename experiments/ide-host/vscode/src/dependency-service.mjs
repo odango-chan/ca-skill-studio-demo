@@ -148,8 +148,8 @@ export async function refreshDependency(vscode,selectedRoot,id,acquire){
   if(typeof acquire!=="function")fail("BLOCKED","Source acquisition adapter unavailable");
   const candidate=await lockCandidate(vscode,selectedRoot,id,await acquire(old.source));
   const sameSource=metadataMatches(candidate.declaration.source,old.source);
-  const uploadReimport=old.source.type==="upload"&&
-    candidate.declaration.source.type==="upload"&&
+  const uploadReimport=["upload","interface-zip"].includes(old.source.type)&&
+    candidate.declaration.source.type===old.source.type&&
     candidate.declaration.source.upload===old.source.upload;
   if(!sameSource&&!uploadReimport)
     fail("ERROR","Refresh must preserve source identity (Upload may change content digest)");
