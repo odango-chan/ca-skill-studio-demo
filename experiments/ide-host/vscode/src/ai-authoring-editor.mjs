@@ -770,7 +770,8 @@ function createAuthoringView(vscode, context, {
   const revisionFor = createPackageRevisionTracker();
   let panel = null;
   let session = null;
-  let webviewReady = false;
+  let webviewReady = true;
+  let replayNativeCandidate = false;
   let nativeRun = null;
 
   const outbound = [];
@@ -1592,7 +1593,11 @@ function createAuthoringView(vscode, context, {
     const run = { result: null };
     nativeRun = run;
     try {
-      if (!panel) outbound.length = 0;
+      if (!panel) {
+        outbound.length = 0;
+        replayNativeCandidate = true;
+        webviewReady = false;
+      }
       await refreshContext();
       if (cancelled()) return { cancelled: true };
       if (run.result?.error) return run.result;
@@ -1638,8 +1643,10 @@ function createAuthoringView(vscode, context, {
       if (message.type === "console") await vscode.commands.executeCommand("skillStudio.openConsole");
       else if (message.type === "ready") {
         webviewReady = true;
-        if (session.contextRequestId === 0) await refreshContext();
-        else await flush();
+        if (replayNativeCandidate) {
+          replayNativeCandidate = false;
+          await flush();
+        } else await refreshContext();
       } else if (message.type === "refresh" && !nativeRun) await refreshContext();
       else if (!nativeRun && ["generate", "refine", "runAgent"].includes(message.type)) await handleGenerate(message);
       else if (message.type === "inspectHistory") await handleInspectHistory(message);
@@ -1663,7 +1670,8 @@ function createAuthoringView(vscode, context, {
       visibility.dispose();
       disposed.dispose();
       panel = null;
-      webviewReady = false;
+      webviewReady = true;
+      replayNativeCandidate = false;
       session = null;
       onDispose();
     });
