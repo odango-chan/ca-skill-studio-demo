@@ -1408,9 +1408,20 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
              dependencyHintIds.filter(id=>id===queryToolId).length!==1)
             throw Error("Pinned ca-client Schema hint was not projected into the accepted LSP Package snapshot: "+
               JSON.stringify(state.lastSentSnapshot));
-          const queryToolCompletion=await complete(procedureDocument,
-            "tool: ca-client::openamsm.smf.mas.sc.q");
+          const queryToolNeedle="tool: ca-client::openamsm.smf.mas.sc.q";
+          const queryToolCompletion=await complete(procedureDocument,queryToolNeedle);
           const querySource=procedureDocument.getText();
+          const queryToolStart=querySource.indexOf(queryToolNeedle);
+          if(queryToolStart<0)throw Error("Pinned ca-client Tool completion probe anchor is missing");
+          const queryToolPosition=procedureDocument.positionAt(
+            queryToolStart+queryToolNeedle.length);
+          const nativeQueryToolResult=await vscode.commands.executeCommand(
+            "vscode.executeCompletionItemProvider",procedureDocument.uri,queryToolPosition);
+          const nativeQueryToolItems=Array.isArray(nativeQueryToolResult)
+            ?nativeQueryToolResult
+            :nativeQueryToolResult?.items??nativeQueryToolResult?.suggestions??[];
+          const nativeQueryToolLabels=nativeQueryToolItems.map(item=>
+            typeof item.label==="string"?item.label:item.label?.label??"");
           const queryArgumentsAnchor="      arguments: {}\n        ";
           const queryArgumentsStart=querySource.lastIndexOf(queryArgumentsAnchor);
           if(queryArgumentsStart<0)
@@ -1437,7 +1448,8 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
           const nativeRequiredQueryArguments=nativeQueryArgumentItems.filter(item=>
             ["supi","pduSessionId"].includes(
               typeof item.label==="string"?item.label:item.label?.label));
-          if(queryArgumentLabels.length!==2||
+          if(!nativeQueryToolLabels.includes(queryToolId)||
+             queryArgumentLabels.length!==2||
              !queryArgumentLabels.includes("supi")||
              !queryArgumentLabels.includes("pduSessionId")||
              !nativeQueryArgumentLabels.includes("supi")||
@@ -1451,7 +1463,7 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
                !String(item.detail??"").includes("required")||
                !String(item.detail??"").includes("AUTH_NOT_CHECKED")))
             throw Error("Pinned Interface Schema completion did not reach the actual Theia editor: "+
-              JSON.stringify({queryToolCompletion,queryArgumentLabels,
+              JSON.stringify({queryToolCompletion,nativeQueryToolLabels,queryArgumentLabels,
                 nativeQueryArgumentLabels,requiredQueryArguments,
                 nativeRequiredQueryArguments}));
           if(!queryToolCompletion.includes(queryToolId))
@@ -1569,6 +1581,7 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
             waitRouteKeys,waitResponseAfter,waitTimeoutTarget,waitOutput,
             contextRequestFields,contextRoot,contextStart,
             interfaceToolCompletion:queryToolCompletion,
+            interfaceNativeToolCompletion:nativeQueryToolLabels,
             interfaceArgumentCompletion:queryArgumentLabels,
             interfaceNativeArgumentCompletion:nativeQueryArgumentLabels,
             interfaceArgumentCompletionDetails:requiredQueryArguments.map(item=>({
