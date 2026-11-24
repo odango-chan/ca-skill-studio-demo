@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {zipPackage} from '../site/zip.mjs';
+import {projectJsonSchema} from '../site/schema-projection.mjs';
 import {sha256} from '../experiments/ide-host/vscode/src/dependency-snapshot.mjs';
 import {
   decodeInterfacePackageZip,verifyInterfacePackageFiles
@@ -76,6 +77,12 @@ test('manifest closure blocks duplicate exports and unsafe paths',async()=>{
   const unsafe=all.map(f=>({path:f.path,bytes:enc.encode(f.text)}));
   unsafe[2].path='../catalog.yaml';
   await assert.rejects(()=>verifyInterfacePackageFiles(unsafe),/unsafe package file path/);
+});
+test('published JSON Schema feeds the same field-tree projection as YAML',()=>{
+  const projection=projectJsonSchema(schema);
+  assert.equal(projection.state,'READY');
+  assert.equal(projection.schemaId,SCHEMA_ID);
+  assert.ok(projection.tree.children.some(item=>item.name==='supi'));
 });
 test('YAML authoring and published JSON Schema share Preview but preserve suffixes',()=>{
   const yaml='/p/skills/a/schemas/request.schema.yaml';
