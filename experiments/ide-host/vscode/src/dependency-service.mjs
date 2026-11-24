@@ -133,7 +133,7 @@ export async function lockCandidate(vscode,selectedRoot,id,acquired){
   const project=readProjectConfiguration(vscode,selectedRoot);
   if(!/^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/.test(id??"")||id.length>80)
     fail("ERROR","Invalid dependency alias");
-  if(acquired.kind!=="tool-catalog"&&acquired.kind!=="schema-bundle")
+  if(!["tool-catalog","schema-bundle","interface-package"].includes(acquired.kind))
     fail("ERROR","Invalid Compiler dependency kind");
   const snapshot=await calculateSnapshot(acquired.files);
   const declaration={id,kind:acquired.kind,source:acquired.source};
