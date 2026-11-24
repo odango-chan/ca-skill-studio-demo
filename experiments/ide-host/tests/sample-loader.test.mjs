@@ -346,3 +346,21 @@ test("Example-only migration refuses unrelated workspaces, legacy sources and us
     uri("/extension"),uri("/global-storage"))).status,"PRESERVED");
   assert.equal(decode(h.files.get(root+"/.vscode/settings.json")),'{"editor.fontSize":18}');
 });
+
+test("Explicit replacement resets .vscode user settings only after rebuilding the Example",async()=>{
+  const h=host();
+  await seedExampleProject(h.vscode,uri("/extension"),uri("/global-storage"));
+  const settings=root+"/.vscode/settings.json";
+  h.files.set(settings,new TextEncoder().encode('{"editor.fontSize":33}'));
+  h.files.set(root+"/.vscode/obsolete.json",new TextEncoder().encode("retired"));
+  const r=await seedExampleProject(h.vscode,uri("/extension"),uri("/global-storage"),
+    {replaceExisting:true});
+  assert.equal(r.replacedExisting,true);
+  assert.equal(r.exampleDependencySeeded,true);
+  const values=JSON.parse(decode(h.files.get(settings)));
+  assert.equal(values["connectionAgent.skillStudio.dependencies"][0].id,"ca-client");
+  assert.equal(values["editor.fontSize"],undefined);
+  assert.equal(h.files.has(root+"/.vscode/obsolete.json"),false);
+  assert.deepEqual((await h.vscode.workspace.fs.readDirectory(uri(root)))
+    .map(([name])=>name).sort(),[".skill-studio",".vscode","README.md","skills"]);
+});
