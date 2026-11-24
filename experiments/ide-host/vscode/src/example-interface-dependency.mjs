@@ -32,7 +32,7 @@ export async function prepareExampleInterfaceDependency(encodedResource){
   if(m.apiVersion!=="connectionagent.io/interface-package/v1alpha1"||
      m.languageTarget!=="connectionagent.io/v1alpha5"||
      m.packageId!==EXAMPLE_INTERFACE_PACKAGE_ID||
-     m.version!=="1.1.0"||m.files.length!==7||m.exports.length!==17)
+     m.version!=="1.1.0"||decoded.files.length!==7||m.exports.length!==17)
     throw Error("Bundled Example Interface Package identity/exports differ from v1.1.0");
   const snap=await calculateSnapshot(decoded.files);
   const declaration={
