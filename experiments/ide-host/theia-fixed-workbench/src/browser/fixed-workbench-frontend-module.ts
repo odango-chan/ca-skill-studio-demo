@@ -1,4 +1,4 @@
-import { ContainerModule } from '@theia/core/shared/inversify';
+import { ContainerModule, decorate, injectable } from '@theia/core/shared/inversify';
 import { FrontendApplicationContribution } from '@theia/core/lib/browser/frontend-application-contribution';
 import type { FrontendApplication } from '@theia/core/lib/browser/frontend-application';
 import { FrontendApplicationStateService } from '@theia/core/lib/browser/frontend-application-state';
@@ -7,12 +7,33 @@ import { MAIN_AREA_CLASS } from '@theia/core/lib/browser/shell/application-shell
 import { TheiaDockPanel } from '@theia/core/lib/browser/shell/theia-dock-panel';
 import { Widget, type DockPanel } from '@theia/core/lib/browser/widgets/widget';
 import { CommandRegistry } from '@theia/core/lib/common/command';
+import { EditorManager } from '@theia/editor/lib/browser/editor-manager';
 import { constrainMainEditorPanelOptions, isMainEditorPanelOptions, createPreviewAutoRevealPreference, hasVisualizableSourceEditor } from './fixed-editor-panel-policy.mjs';
 
 // Dedicated Preview container: never nest the visualization beneath Inspector.
 const PREVIEW_CONTAINER_WIDGET_ID = 'plugin-view-container:workbench.view.extension.skillStudioPreview';
 const PREVIEW_VIEW_ID = 'skillStudio.preview';
 const PREVIEW_WIDGET_ID = 'plugin-view:skillStudio.preview';
+
+const AI_WORKBENCH_VIEW = 'skillStudio.aiAuthoring';
+
+function isAiWorkbench(widget: Widget | undefined) {
+    return (widget as (Widget & { viewType?: string }) | undefined)?.viewType === AI_WORKBENCH_VIEW;
+}
+
+class StudioEditorManager extends EditorManager {
+    protected override updateCurrentEditor(): void {
+        if (isAiWorkbench(this.shell.getCurrentWidget('main'))) {
+            // Theia normally keeps the last native editor as current. Keeping
+            // it here suppresses the event when the same editor is revealed
+            // again, leaving the VS Code-compatible visible editors stale.
+            this.setCurrentEditor(undefined);
+            return;
+        }
+        super.updateCurrentEditor();
+    }
+}
+decorate(injectable(), StudioEditorManager);
 
 function addWorkspaceModeControl(app: FrontendApplication, commands: CommandRegistry) {
     const shell = app.shell;
@@ -52,7 +73,7 @@ function addWorkspaceModeControl(app: FrontendApplication, commands: CommandRegi
     });
     const update = () => {
         const current = shell.getCurrentWidget('main');
-        const active = current?.title.label === 'AI Procedure Authoring' ? 0 :
+        const active = isAiWorkbench(current) ? 0 :
             current && current.title.label !== 'SKILL Studio Welcome' ? 1 : -1;
         buttons.forEach((button, index) => {
             button.setAttribute('aria-pressed', String(index === active));
@@ -67,6 +88,8 @@ function addWorkspaceModeControl(app: FrontendApplication, commands: CommandRegi
 }
 
 export default new ContainerModule((bind, unbind, isBound, rebind) => {
+    rebind(EditorManager).to(StudioEditorManager).inSingletonScope();
+
     // Theia does not expose VS Code's generated workbench.view.extension.*
     // commands through its extension host. Reveal the contributed secondary
     // sidebar through ApplicationShell instead, so the Preview WebviewView

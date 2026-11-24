@@ -122,9 +122,8 @@ export function createSemanticTokenDecorationRenderer(vscode, tokenTypes, semant
     diagnostics.lastVersionMismatches=summary.versionMismatches;
   }
 
-  function applyVisible(uri, entry, activatedEditor) {
+  function applyVisible(uri, entry) {
     const {visible,candidates}=editorCandidates();
-    if(activatedEditor&&!candidates.includes(activatedEditor))candidates.push(activatedEditor);
     const summary={
       visibleEditorCount:visible.length,candidateEditorCount:candidates.length,
       matchingEditorCount:0,versionMatchedEditorCount:0,appliedEditorCount:0,
@@ -184,7 +183,7 @@ export function createSemanticTokenDecorationRenderer(vscode, tokenTypes, semant
     applyVisible(uri, null);
   }
 
-  function render(document, data, activatedEditor) {
+  function render(document, data) {
     if (disposed) return { tokenCount: 0, tokenTypeCount: 0 };
     const uri = uriKey(document?.uri);
     if (!uri || !Number.isSafeInteger(document.lineCount) ||
@@ -240,7 +239,7 @@ export function createSemanticTokenDecorationRenderer(vscode, tokenTypes, semant
     diagnostics.lastDocumentVersion=document.version;
     diagnostics.lastTokenCount=tokenCount;
     diagnostics.lastTokenTypeCount=ranges.size;
-    applyVisible(uri, entry, activatedEditor);
+    applyVisible(uri, entry);
     return { tokenCount, tokenTypeCount: ranges.size };
   }
 
@@ -281,9 +280,6 @@ export function createSemanticTokenDecorationRenderer(vscode, tokenTypes, semant
 
   return {
     render,
-    hasCurrentRanges(document) {
-      return documents.get(uriKey(document?.uri))?.version===document?.version;
-    },
     diagnostics() {
       return {
         ...diagnostics,

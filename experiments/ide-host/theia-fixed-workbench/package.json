@@ -9,6 +9,7 @@
     }
   ],
   "dependencies": {
-    "@theia/core": "1.76.0"
+    "@theia/core": "1.76.0",
+    "@theia/editor": "1.76.0"
   }
 }
