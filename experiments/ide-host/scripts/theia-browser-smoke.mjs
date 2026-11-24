@@ -3,6 +3,8 @@ import {runPackageOverviewAcceptance,runWorkbenchAcceptance,assertSourceVisualPa
 // normal backend-backed browser host. Static mode uses an explicitly isolated
 // same-origin demo-only webview adapter; backend mode uses Theia's normal host.
 import {createServer} from "node:http";
+import {createHash} from "node:crypto";
+import {zipPackage} from "../../../site/zip.mjs";
 import {createReadStream,existsSync} from "node:fs";
 import {mkdtemp,readFile,rm,writeFile} from "node:fs/promises";
 import {spawn} from "node:child_process";
@@ -2456,6 +2458,85 @@ try{
     console.log("STUDIO_BROWSER_LOCAL_INTERFACE_ZIP_PICKER_CHROMIUM_PASS",JSON.stringify({
       input:true,nonceCsp:true,cancellation:"PASS",projectFilesUnchanged:true
     }));
+    // Actual Chrome DOM.setFileInputFiles -> HTML File API -> chunked webview
+    // bridge -> extension host -> formal ZIP/manifest/hash decoder. Synthetic
+    // release-shaped bytes; no project lock or Owner trust is created.
+    const syntheticSchema=JSON.stringify({
+      $schema:'https://json-schema.org/draft/2020-12/schema',
+      $id:'urn:wtlab:browser-upload-probe:v1',
+      type:'object',properties:{supi:{type:'string'}}
+    });
+    const hash=source=>'sha256:'+createHash('sha256')
+      .update(new TextEncoder().encode(source)).digest('hex');
+    const syntheticManifest={
+      apiVersion:'connectionagent.io/interface-package/v1alpha1',
+      languageTarget:'connectionagent.io/v1alpha5',
+      packageId:'urn:wtlab:browser-upload-acceptance',
+      version:'1.0.0',publisher:'wtlab',
+      dependencies:[],
+      files:[{path:'schemas/input.schema.json',sha256:hash(syntheticSchema)}],
+      exports:[{kind:'Schema',id:'urn:wtlab:browser-upload-probe:v1',
+        path:'schemas/input.schema.json'}]
+    };
+    const syntheticZip=zipPackage([
+      {path:'package.json',text:JSON.stringify(syntheticManifest)},
+      {path:'schemas/input.schema.json',text:syntheticSchema}
+    ]);
+    const uploadPath=join(profile,'synthetic-interface-package.zip');
+    await writeFile(uploadPath,syntheticZip);
+    const accepted=await evalJS("(()=>{"+
+      "const c=window.theia.container;"+
+      "const k=[...c._bindingDictionary._map.keys()].find(k=>"+
+      "typeof k==='function'&&k.prototype?.executeCommand&&"+
+      "k.prototype?.registerCommand&&k.prototype?.getCommand);"+
+      "window.__studioZipPickerUploaded=c.get(k).executeCommand("+
+      "'skillStudio.internal.browserZipPickerAcceptance');"+
+      "return true;})()");
+    if(accepted!==true)throw Error('Browser ZIP upload command did not open');
+    let inputObjectId=null;
+    for(let attempt=0;attempt<80&&!inputObjectId;attempt++){
+      const tree=await command('Page.getFrameTree');
+      const frames=[],walk=node=>{
+        if(!node)return;frames.push(node.frame);
+        for(const child of node.childFrames??[])walk(child);
+      };
+      walk(tree.frameTree);
+      for(const frame of frames.filter(item=>/webview/i.test(item.url??''))){
+        try{
+          const world=await command('Page.createIsolatedWorld',{
+            frameId:frame.id,worldName:'studio-upload-file-selection',
+            grantUniveralAccess:true
+          });
+          const evaluated=await command('Runtime.evaluate',{
+            contextId:world.executionContextId,
+            expression:"document.querySelector('input[type=file]')",
+            returnByValue:false
+          });
+          inputObjectId=evaluated.result?.objectId??null;
+          if(inputObjectId)break;
+        }catch{}
+      }
+      if(!inputObjectId)await sleep(150);
+    }
+    if(!inputObjectId)
+      throw Error('Native browser File API input not found for ZIP upload');
+    await command('DOM.setFileInputFiles',{
+      files:[uploadPath],objectId:inputObjectId
+    });
+    const imported=await evalJS('window.__studioZipPickerUploaded');
+    const expectedDigest='sha256:'+createHash('sha256')
+      .update(syntheticZip).digest('hex');
+    if(imported?.status!=='VERIFIED'||imported.syntheticOnly!==true||
+       imported.packageId!==syntheticManifest.packageId||
+       imported.version!=='1.0.0'||imported.digest!==expectedDigest||
+       imported.bytes!==syntheticZip.length||imported.exportCount!==1)
+      throw Error('Browser File API ZIP upload or manifest verification failed: '+
+        JSON.stringify(imported));
+    console.log('STUDIO_BROWSER_DEVICE_INTERFACE_ZIP_UPLOAD_CHROMIUM_PASS',JSON.stringify({
+      qualification:'SYNTHETIC_ONLY',fileInput:true,chunkedWebviewTransfer:true,
+      sha256Verified:true,manifestVerified:true,workspaceLockUnchanged:true
+    }));
+
   }
   if(requireEditor)
     console.log("THEIA_BROWSER_HOST_V1ALPHA5_ACCEPTANCE_PASS");
