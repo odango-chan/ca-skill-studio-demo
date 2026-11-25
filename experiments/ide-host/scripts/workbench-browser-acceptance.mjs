@@ -1108,8 +1108,9 @@ export async function runWorkbenchAcceptance({
     // Provider fixture cleanup and Webview focus changes can update Theia's
     // visible editor list asynchronously. Focus the exact native Source
     // before checking its real editor decorations and rendered colors.
-    await nativeCommand(
+    const highlightSourceFocus=await nativeCommand(
       "skillStudio.internal.openProcedureSourceForHighlightDiagnostics",defaultProcedureUri);
+    console.log("STUDIO_HIGHLIGHT_SOURCE_FOCUS_CHROMIUM",JSON.stringify(highlightSourceFocus));
     for(let attempt=0;attempt<40;attempt++){
       semanticTokenEvidence=await nativeCommand("skillStudio.internal.semanticTokenDiagnostics");
       const renderer=semanticTokenEvidence?.rendererDiagnostics;
