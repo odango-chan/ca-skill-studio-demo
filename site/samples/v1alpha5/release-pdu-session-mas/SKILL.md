@@ -1,66 +1,85 @@
 ---
 name: release-pdu-session-mas
-description: Source-aligned CA-SL v1alpha5 Release Procedure for the OpenAMSM MAS pdu-rel-v4 profile.
+description: CA-SL v1alpha5 UE-requested Release Procedure for the merged OpenAMSM Scheme C Owner transaction.
 ---
 
-# Release PDU Session — OpenAMSM MAS profile
+# Release PDU Session - OpenAMSM Scheme C MAS profile
 
 **Source language:** CA-SL v1alpha5.
 
-**Adoption state: NOT_QUALIFIED / NOT_LINKABLE.** This package defines a source-aligned Procedure. The required MAS ToolCatalog exports, new v0.3.0 candidate Schemas, mutation receipts, Evidence Guarantees, Owner identity and deployment CapabilityContracts are not published. Compiler linking must fail closed.
+**Adoption state: OWNER_LINKED / DEVELOPMENT_STATIC_BUILD_PASS / PRODUCTION_NOT_QUALIFIED.** The `mas` dependency resolves to the published Owner package `urn:openamsm:mas:tool-contracts` v1alpha4. Its ToolCatalog, Scheme C callable input/output Schemas, mutation receipt and commit-proof Schemas, Evidence Guarantees, Owner identity and deployment CapabilityContracts are published. `ca-skills` PR #85 verified this Skill with released `skillc v2.0.2` in release mode against the Owner v1alpha4 publication, without a fixture Owner identity. This is static Compiler evidence only: it is not Production Admission, and the 2026-11-23 live Development E2E used the pre-PR #85 source revision. Re-run the live E2E against this exact Owner-linked revision before claiming current-source E2E.
 
 ## Scope
 
-This Skill models release of an existing PDU Session. It does not create a session and does not replace Establishment. The Host authenticates and classifies the ingress, binds the exact SUPI / PSI / current generation, and invokes this Procedure with a normalized request envelope.
+This Skill models a UE-requested release of an existing PDU Session. It does not
+create a session and does not cover AMF-initiated ReleaseSMContext or
+SMF/network-initiated release. The Host authenticates and classifies the ingress,
+retains the exact original 5GSM PDU Session Release Request (0xd1) in its private
+artifact binding, and binds the exact SUPI / PSI / current generation and a
+Host-private release transaction. Neither the raw N1 nor the transaction id is a
+Skill-authored request field; the typed Provider resolves them from that trusted
+private context at dispatch time.
 
-The Skill does not expose raw NAS / NGAP bytes, Host ResourceMap keys, Owner session references, invocation IDs, generation IDs or transport correlation handles.
+The Skill does not parse NAS, build NGAP, delete PFCP state itself, or expose
+Host ResourceMap keys, Owner session references, invocation IDs, generation IDs
+or transport correlation handles.
 
-## Entry variants and numeric trigger
+## Entry
 
-The Host, not the caller, derives request.entryKind and request.trigger from authenticated SBI ingress or a trusted internal Owner event:
+Only `entryKind = UE_INITIATED` and the OpenAMSM numeric trigger 2 map to this
+Procedure. AMF-initiated ReleaseSMContext and network-initiated release are
+out of scope for this version and must be reported as NOT_RUN / BLOCKED by the
+Host rather than coerced into this Skill.
 
-| Host entryKind | OpenAMSM trigger | Source meaning |
-| --- | ---: | --- |
-| UE_INITIATED | 2 | UE_REQUESTED |
-| AMF_INITIATED | 6 | AMF_RELEASE_SM_CONTEXT |
-| AMF_INITIATED | 7 | AMF_UPDATE_SM_CONTEXT |
-| NETWORK_TRIGGERED | 1 | LOCAL_INITIATED |
-| NETWORK_TRIGGERED | 3 | PCF_INITIATED |
-| NETWORK_TRIGGERED | 4 | RAN_INITIATED |
-| NETWORK_TRIGGERED | 5 | SMF_INITIATED |
+The release transaction identity is Host-private state for this Run. It is never
+taken from the AMF JSON body and never becomes a Procedure argument.
 
-The numeric values are the pinned OpenAMSM constants. In particular, RAN_INITIATED is classified as NETWORK_TRIGGERED while retaining trigger=4. The Procedure checks that entryKind and trigger agree. The Host must not accept these fields as caller-selected authorization claims.
+## Source progression (merged Owner)
 
-This classification is Host-owned, not new CA-SL syntax. The Procedure is not a public SBI endpoint and does not relax OpenAMSM's current agent_step admission behavior.
+1. `r-parse` - `SSM.PARSE_N1_RELEASE` with `parse_n1=1` and the exact retained
+   N1. Read-only: validates EPD / PSI / PTI / message type and returns `psi`,
+   `pti`, optional `cause` and `release_intent=ue_requested`. The parse is
+   strictly read-only: it must not bind the PTI to the session.
+2. `r-build` - `SSM.BUILD_RELEASE_COMMAND` with `release=1`, `mode=build`,
+   `trigger` and the parsed `pti`. Build is the transaction-controlled PTI
+   binding, and the typed Provider supplies the Host-private `release_txn`.
+   The Owner builds the N1 Release Command (0xd3)
+   and the N2 PDU Session Resource Release Command, records the release
+   generation and returns their exact bytes as hex. The Host sends them to the
+   AMF in the UpdateSMContext answer.
+3. `r-confirm-n1` - `SSM.RELEASE_CONFIRM_N1` bound to the build transaction and
+   generation. Only an exact N1 Release Complete (0xd4) is accepted; duplicates,
+   late answers and old generations are rejected by the Owner.
+4. `r-confirm-n2` - `SSM.RELEASE_CONFIRM_N2` bound to the same transaction and
+   generation. N1 and N2 confirmations are independent and order-free; the
+   Owner reports `release_ready=1` only after both were accepted.
+5. `r-pa` - `PA.DELETE_SM_POLICY` terminates the policy association.
+6. `r-upn` - `UPN.DELETE_UP_SESSION` performs the real PFCP Session Deletion
+   (54/55).
+7. `r6` - `SE.EMIT_EVENTS(ev=RELEASED)` writes the local release marker.
+8. `r-sc` - `SC.RELEASE_SM_CONTEXT` with `release=1` and `finalize=1` releases
+   the SM Context after the successful cleanup.
 
-## Source progression
+The older OES-shaped `r2`-`r6` sequence (UPN -> SSM -> PA -> SC -> SE) is not
+this Owner transaction and is not used by this version.
 
-The Procedure includes the mandatory OES steps r2 through r6:
+## Continuation boundary
 
-1. r2 — UPN.DELETE_UP_SESSION; deletes the UP session and completes only after the matching PFCP deletion result. The released=1 output is not emitted merely because a delete request was sent.
-2. r3 — SSM.SIGNAL_UE_AN with release=1 and the numeric trigger. For triggers 1, 6 and 7, the pinned source sends no N1/N2 release signal. For triggers 2, 3, 4 and 5, it sends the applicable N1/N2 release and remains pending until the matching AMF release confirmation.
-3. r4 — PA.DELETE_SM_POLICY; completes the PCF association deletion. Evidence must distinguish DELETED from a verified NOT_PRESENT association. The OES plan declares no public output.
-4. r5 — SC.RELEASE_SM_CONTEXT; performs the source's UDM unsubscribe / UECM deregistration / AMF acknowledgement phases. The plan exposes lifecycle=RELEASING, not RELEASED.
-5. r6 — SE.EMIT_EVENTS with ev=RELEASED; the source updates a local in-memory MAS marker. The plan declares no public output. This is not a durable event record or a 3GPP SM Context Status Notify.
-
-The source plan marks r1 CA.DELETE_CHARGING optional and supplies no applicability predicate. It is deliberately omitted; the Procedure does not call it unconditionally. The pinned CA adapter only clears a local marker and does not delete a CHF charging resource.
-
-OES r7 COMPENSATE_RELEASE is explicitly execute: skip. It is not a Procedure Node. The OES compensate_then_replan_once policy is not imported. An unknown Mutation result must never trigger a blind retry or a new Release sequence.
-
-## Known source blocker
-
-The pinned Release plan declares start_inputs as an empty object but references from_start: trigger in both r2 and r3. This is a source-plan input declaration defect. The Owner must not invent a default or bypass the plan validation; the upstream plan must declare the typed trigger input before these two Operations can be linked and qualified.
-
-## Host / Owner boundary
-
-The current OpenAMSM agent_step admission path rejects the standard Nsmf business Release route. The missing Owner-private binding and publication are explicit blockers; this Skill does not relax the protocol admission gate or invent a public SBI route.
-
-The Owner must retain each pending occurrence and generation. Late callbacks may complete only the original r3 or r5 Owner operation; they must never resume a newer Run. The Host owns external URI ResourceMap tombstoning after the exact Release lifecycle has settled. That Host-owned action is outside this Procedure and is not inferred from lifecycle=RELEASING.
-
-See the [pinned operation mapping](references/openamsm-operation-mapping.md), the shared [source mapping](../../../docs/mas-lifecycle-source-mapping.md), the [Owner outcome contract](../../../docs/mas-lifecycle-owner-contract.md) and the [acceptance matrix](../../../docs/mas-lifecycle-acceptance-matrix.md).
+The two confirmations are separate SBI ingress events. The Host records each
+exact event for this Run and re-executes the same Run; the Runtime defers the
+confirmation occurrence until its event exists (INGRESS_WAIT), and replays the
+already settled parse/build. A confirmation must never be fabricated from a
+state string, and a duplicate or late answer must not dispatch the cleanup a
+second time.
 
 ## Goal boundary
 
-A successful Invocation proves that the mandatory source-declared Release Owner steps completed for the same SUPI / PSI / generation, including PFCP UP-session deletion, the exact SSM release disposition, PCF association disposition, SM Context release progression and the local in-memory release marker.
+A successful Invocation proves that the Owner built the release command for this
+Run's transaction, accepted both the N1 Release Complete and the N2 Release
+Response for the same generation, and completed the cleanup (policy termination,
+one PFCP Session Deletion, release event marker, SM Context finalize).
 
-It does not claim a real CHF deletion, a 3GPP Status Notify from r6, a Host ResourceMap tombstone, a final RELEASED lifecycle state, or product / live 5GC qualification.
+It does not prove that the AMF or UE observed the command, that PCF/UDM callbacks
+were delivered, or that the user plane carried traffic. A PFCP UNKNOWN deletion
+outcome, a failed finalize or a missing confirmation fails closed; the Skill
+never reports an unconfirmed release as SUCCEEDED.

@@ -1,5 +1,10 @@
-# CA-SL v1alpha5. Operation nodes map only to declared OES steps.
-# The mas dependency and all new Owner exports remain unpublished candidates.
+# CA-SL v1alpha5. Scheme C occurrences of the merged OpenAMSM Owner.
+#
+# UE-requested PDU Session Release. The Owner parses/builds/confirms the exact
+# N1/N2 exchange and then performs the release cleanup in the actual Scheme C
+# order (PA -> UPN -> SE -> SC). The Host retains the original N1, answers the
+# AMF with the Owner-built command and routes the N1 Release Complete and the
+# N2 Release Response back to this same Run.
 start: validate-release-request
 nodes:
   validate-release-request:
@@ -10,67 +15,124 @@ nodes:
             - context.supi
             - context.request.pduSessionId
             - context.request.entryKind
-            - context.request.trigger
       routes:
-        PASS: r2
+        PASS: parse-n1
         FAIL: FAILED
         UNKNOWN: UNRESOLVED
 
-  # OES r2: UPN.DELETE_UP_SESSION. The numeric trigger is Host-derived.
-  r2:
+  # Scheme C r-parse: read-only decode of the exact original N1 (0xd1).
+  parse-n1:
     operation:
-      tool: mas::UPN.DELETE_UP_SESSION
+      tool: mas::SSM.PARSE_N1_RELEASE
       arguments:
         ue_identity: context.supi
         psi: context.request.pduSessionId
-        trigger: context.request.trigger
+        parse_n1: "1"
       routes:
         FAILED: FAILED
         DENIED: FAILED
-        OUTCOME_UNKNOWN: SAFE_STOPPED
     postcondition:
       predicates:
-        - predicate: release.mas.up_session_deleted
+        - predicate: release.mas.release_parsed
           arguments:
-            - r2.operation.output
+            - parse-n1.operation.output
       routes:
-        PASS: r3
+        PASS: build-command
         FAIL: SAFE_STOPPED
         UNKNOWN: SAFE_STOPPED
 
-  # OES r3: SSM.SIGNAL_UE_AN release profile. Some triggers require no N1/N2;
-  # other triggers remain pending until the matching AMF release result arrives.
-  r3:
+  # Scheme C r-build: the Owner builds the N1 Release Command (0xd3) and the N2
+  # PDU Session Resource Release Command. The Host sends them to the AMF in the
+  # UpdateSMContext answer. The transaction id is fixed for this Run.
+  build-command:
     operation:
-      tool: mas::SSM.SIGNAL_UE_AN_RELEASE
+      tool: mas::SSM.BUILD_RELEASE_COMMAND
       arguments:
         ue_identity: context.supi
         psi: context.request.pduSessionId
         release: "1"
+        mode: "build"
         trigger: context.request.trigger
+        pti: parse-n1.operation.output.pti
       routes:
+        NOT_COMMITTED: SAFE_STOPPED
         FAILED: SAFE_STOPPED
         DENIED: SAFE_STOPPED
         OUTCOME_UNKNOWN: SAFE_STOPPED
     postcondition:
       predicates:
-        - predicate: release.mas.signal_settled
+        - predicate: release.mas.command_built
           arguments:
-            - r3.operation.output
+            - build-command.operation.output
       routes:
-        PASS: r4
+        PASS: confirm-n1
         FAIL: SAFE_STOPPED
         UNKNOWN: SAFE_STOPPED
 
-  # OES r4: PA.DELETE_SM_POLICY. The plan declares no public output.
-  r4:
+  # Scheme C r-confirm-n1: N1 Release Complete (0xd4). The runtime defers this
+  # occurrence until the Host has recorded that exact completion for this Run.
+  confirm-n1:
     operation:
-      tool: mas::PA.DELETE_SM_POLICY
+      tool: mas::SSM.RELEASE_CONFIRM_N1
+      arguments:
+        ue_identity: context.supi
+        psi: context.request.pduSessionId
+        release_confirm: "n1"
+        release_txn: build-command.operation.output.release_txn
+        release_generation: build-command.operation.output.release_generation
+      routes:
+        NOT_COMMITTED: SAFE_STOPPED
+        FAILED: SAFE_STOPPED
+        DENIED: SAFE_STOPPED
+        OUTCOME_UNKNOWN: SAFE_STOPPED
+    postcondition:
+      predicates:
+        - predicate: release.mas.n1_confirmed
+          arguments:
+            - confirm-n1.operation.output
+      routes:
+        PASS: confirm-n2
+        FAIL: SAFE_STOPPED
+        UNKNOWN: SAFE_STOPPED
+
+  # Scheme C r-confirm-n2: N2 PDU Session Resource Release Response. N1 and N2
+  # confirmations are independent and order-free; each is bound to the build
+  # generation and transaction.
+  confirm-n2:
+    operation:
+      tool: mas::SSM.RELEASE_CONFIRM_N2
+      arguments:
+        ue_identity: context.supi
+        psi: context.request.pduSessionId
+        release_confirm: "n2"
+        release_txn: build-command.operation.output.release_txn
+        release_generation: build-command.operation.output.release_generation
+      routes:
+        NOT_COMMITTED: SAFE_STOPPED
+        FAILED: SAFE_STOPPED
+        DENIED: SAFE_STOPPED
+        OUTCOME_UNKNOWN: SAFE_STOPPED
+    postcondition:
+      predicates:
+        - predicate: release.mas.release_ready
+          arguments:
+            - confirm-n2.operation.output
+      routes:
+        PASS: delete-policy
+        FAIL: SAFE_STOPPED
+        UNKNOWN: SAFE_STOPPED
+
+  # Authoritative cleanup, exactly once, in the merged Owner order.
+  delete-policy:
+    operation:
+      tool: mas::PA.DELETE_SM_POLICY_C
       arguments:
         ue_identity: context.supi
         psi: context.request.pduSessionId
         release: "1"
+        trigger: context.request.trigger
       routes:
+        NOT_COMMITTED: SAFE_STOPPED
         FAILED: SAFE_STOPPED
         DENIED: SAFE_STOPPED
         OUTCOME_UNKNOWN: SAFE_STOPPED
@@ -78,22 +140,67 @@ nodes:
       predicates:
         - predicate: release.mas.policy_association_released
           arguments:
-            - r4.operation.output
+            - delete-policy.operation.output
       routes:
-        PASS: r5
+        PASS: delete-user-plane
         FAIL: SAFE_STOPPED
         UNKNOWN: SAFE_STOPPED
 
-  # OES r5: SC.RELEASE_SM_CONTEXT. The declared lifecycle output is RELEASING,
-  # not a Host ResourceMap tombstone or a claim of RELEASED.
-  r5:
+  delete-user-plane:
     operation:
-      tool: mas::SC.RELEASE_SM_CONTEXT
+      tool: mas::UPN.DELETE_UP_SESSION
+      arguments:
+        ue_identity: context.supi
+        psi: context.request.pduSessionId
+        trigger: context.request.trigger
+      routes:
+        NOT_COMMITTED: SAFE_STOPPED
+        FAILED: SAFE_STOPPED
+        DENIED: SAFE_STOPPED
+        OUTCOME_UNKNOWN: SAFE_STOPPED
+    postcondition:
+      predicates:
+        - predicate: release.mas.up_session_deleted
+          arguments:
+            - delete-user-plane.operation.output
+      routes:
+        PASS: emit-release-event
+        FAIL: SAFE_STOPPED
+        UNKNOWN: SAFE_STOPPED
+
+  emit-release-event:
+    operation:
+      tool: mas::SE.EMIT_RELEASE_EVENT_C
+      arguments:
+        ue_identity: context.supi
+        psi: context.request.pduSessionId
+        ev: "RELEASED"
+      routes:
+        NOT_COMMITTED: SAFE_STOPPED
+        FAILED: SAFE_STOPPED
+        DENIED: SAFE_STOPPED
+        OUTCOME_UNKNOWN: SAFE_STOPPED
+    postcondition:
+      predicates:
+        - predicate: release.mas.release_event_recorded
+          arguments:
+            - emit-release-event.operation.output
+      routes:
+        PASS: release-sm-context
+        FAIL: SAFE_STOPPED
+        UNKNOWN: SAFE_STOPPED
+
+  release-sm-context:
+    operation:
+      tool: mas::SC.RELEASE_SM_CONTEXT_C
       arguments:
         ue_identity: context.supi
         psi: context.request.pduSessionId
         release: "1"
+        finalize: "1"
+        trigger: context.request.trigger
       routes:
+        NOT_COMMITTED: SAFE_STOPPED
         FAILED: SAFE_STOPPED
         DENIED: SAFE_STOPPED
         OUTCOME_UNKNOWN: SAFE_STOPPED
@@ -101,30 +208,7 @@ nodes:
       predicates:
         - predicate: release.mas.sm_context_release_progressed
           arguments:
-            - r5.operation.output
-      routes:
-        PASS: r6
-        FAIL: SAFE_STOPPED
-        UNKNOWN: SAFE_STOPPED
-
-  # OES r6: SE.EMIT_EVENTS(ev=RELEASED). The source writes only a local,
-  # in-memory MAS marker; it declares no public output.
-  r6:
-    operation:
-      tool: mas::SE.EMIT_RELEASE_EVENT
-      arguments:
-        ue_identity: context.supi
-        psi: context.request.pduSessionId
-        ev: "RELEASED"
-      routes:
-        FAILED: SAFE_STOPPED
-        DENIED: SAFE_STOPPED
-        OUTCOME_UNKNOWN: SAFE_STOPPED
-    postcondition:
-      predicates:
-        - predicate: release.mas.release_event_marker_written
-          arguments:
-            - r6.operation.output
+            - release-sm-context.operation.output
       routes:
         PASS: verify-release-completion
         FAIL: SAFE_STOPPED
@@ -133,21 +217,30 @@ nodes:
   verify-release-completion:
     postcondition:
       predicates:
-        - predicate: release.mas.up_session_deleted
+        - predicate: release.mas.release_parsed
           arguments:
-            - r2.operation.output
-        - predicate: release.mas.signal_settled
+            - parse-n1.operation.output
+        - predicate: release.mas.command_built
           arguments:
-            - r3.operation.output
+            - build-command.operation.output
+        - predicate: release.mas.n1_confirmed
+          arguments:
+            - confirm-n1.operation.output
+        - predicate: release.mas.release_ready
+          arguments:
+            - confirm-n2.operation.output
         - predicate: release.mas.policy_association_released
           arguments:
-            - r4.operation.output
+            - delete-policy.operation.output
+        - predicate: release.mas.up_session_deleted
+          arguments:
+            - delete-user-plane.operation.output
+        - predicate: release.mas.release_event_recorded
+          arguments:
+            - emit-release-event.operation.output
         - predicate: release.mas.sm_context_release_progressed
           arguments:
-            - r5.operation.output
-        - predicate: release.mas.release_event_marker_written
-          arguments:
-            - r6.operation.output
+            - release-sm-context.operation.output
       routes:
         PASS: SUCCEEDED
         FAIL: SAFE_STOPPED

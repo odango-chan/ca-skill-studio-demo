@@ -1,65 +1,115 @@
-# Release OES operation mapping
+# Release OpenAMSM Scheme C operation mapping
 
-**Status: SOURCE-ALIGNED DESIGN / NOT_QUALIFIED / NOT_LINKABLE.**
+**Status: SOURCE-ALIGNED DESIGN / NOT_QUALIFIED / NOT_LINKABLE.** This mapping
+describes the merged Owner Scheme C Release transaction. It is not a published
+Owner ToolCatalog, receipt or Runtime result.
 
 ## Pinned source
 
 - Repository: odango-chan/env-openamsm
 - Commit: 594dec78b95bff4fdc34deac8a3a9681fb41228f
-- Plan: upstream/openamsm/tools/nw-agent/plans/release/pdu-rel-v4.yaml
+- Historical plan: upstream/openamsm/tools/nw-agent/plans/release/pdu-rel-v4.yaml
 - Plan blob SHA: 849c3206569d452a663d1b8d42a63ffdc367be31
-- Implementation: src/smf/mas/upn/upnode.c, src/smf/mas/ssm/ssm_ue.c, src/smf/mas/pa/policy_adapter.c, src/smf/mas/sc/session_context.c, src/smf/mas/se/session_exposure.c, lib/pfcp/xact.h
+- Implementation: src/smf/mas/ssm/ssm_ue.c, src/smf/mas/upn/upnode.c,
+  src/smf/mas/pa/policy_adapter.c, src/smf/mas/sc/session_context.c,
+  src/smf/mas/se/session_exposure.c, lib/pfcp/xact.h
+
+The pinned OES plan is historical provenance only. Its declared
+`UPN.DELETE_UP_SESSION -> SSM.SIGNAL_UE_AN -> PA.DELETE_SM_POLICY ->
+SC.RELEASE_SM_CONTEXT -> SE.EMIT_EVENTS` sequence is superseded by the merged
+Owner transaction and is not the execution order this Skill implements.
 
 ## Procedure mapping
 
-| CA-SL Node | OES operation | Candidate callable | Effect | Input Schema | Output Schema | OES inputs / outputs |
-| --- | --- | --- | --- | --- | --- | --- |
-| r2 | UPN.DELETE_UP_SESSION | UPN.DELETE_UP_SESSION | MUTATION | wtlab:openamsm:mas:v0.3.0:upn-delete-up-session-input | wtlab:openamsm:mas:v0.3.0:upn-delete-up-session-result | trigger; released |
-| r3 | SSM.SIGNAL_UE_AN | SSM.SIGNAL_UE_AN_RELEASE | MUTATION | wtlab:openamsm:mas:v0.3.0:ssm-signal-ue-an-release-input | wtlab:openamsm:mas:v0.3.0:ssm-signal-ue-an-release-result | release='1', trigger; no output |
-| r4 | PA.DELETE_SM_POLICY | PA.DELETE_SM_POLICY | MUTATION | wtlab:openamsm:mas:v0.3.0:pa-delete-sm-policy-input | wtlab:openamsm:mas:v0.3.0:pa-delete-sm-policy-result | release='1'; no output |
-| r5 | SC.RELEASE_SM_CONTEXT | SC.RELEASE_SM_CONTEXT | MUTATION | wtlab:openamsm:mas:v0.3.0:sc-release-sm-context-input | wtlab:openamsm:mas:v0.3.0:sc-release-sm-context-result | release='1'; lifecycle |
-| r6 | SE.EMIT_EVENTS | SE.EMIT_RELEASE_EVENT | MUTATION | wtlab:openamsm:mas:v0.3.0:se-emit-release-event-input | wtlab:openamsm:mas:v0.3.0:se-emit-release-event-result | ev='RELEASED'; no output |
+| CA-SL node | Owner callable | Effect | Inputs | Declared Owner outputs |
+| --- | --- | --- | --- | --- |
+| `validate-release-request` | none (Predicate) | - | `supi`, `pduSessionId`, `entryKind` | - |
+| `parse-n1` | `SSM.PARSE_N1_RELEASE` | READ | `ue_identity`, `psi`, `parse_n1=1`; exact retained 0xd1 N1 | `release_intent`, `psi`, `pti`, optional `cause` |
+| `build-command` | `SSM.BUILD_RELEASE_COMMAND` | MUTATION | `ue_identity`, `psi`, `release=1`, `mode=build`, `trigger`, parsed `pti` | `release_phase`, `n1_sm_hex`, `n2_sm_hex`, `n2_sm_info_type`, `release_txn`, `release_generation` |
+| `confirm-n1` | `SSM.RELEASE_CONFIRM_N1` | MUTATION | `ue_identity`, `psi`, `release_confirm=n1`, `release_txn`, `release_generation` | `n1_released` |
+| `confirm-n2` | `SSM.RELEASE_CONFIRM_N2` | MUTATION | `ue_identity`, `psi`, `release_confirm=n2`, `release_txn`, `release_generation` | `n2_released`, `release_ready` |
+| `delete-policy` | `PA.DELETE_SM_POLICY_C` | MUTATION | `ue_identity`, `psi`, `release=1`, `trigger` | `terminated` |
+| `delete-user-plane` | `UPN.DELETE_UP_SESSION` | MUTATION | `ue_identity`, `psi`, `trigger` | `released` |
+| `emit-release-event` | `SE.EMIT_RELEASE_EVENT_C` | MUTATION | `ue_identity`, `psi`, `ev=RELEASED` | `last_event` |
+| `release-sm-context` | `SC.RELEASE_SM_CONTEXT_C` | MUTATION | `ue_identity`, `psi`, `release=1`, `finalize=1`, `trigger` | `lifecycle` |
+| `verify-release-completion` | none (Postcondition) | - | every preceding Owner output | - |
 
-All operation input objects are closed. ue_identity and psi are Owner Scope bindings; release / trigger / ev are the exact source inputs. The empty output Schemas for r3, r4 and r6 contain no business fields.
+## Public request boundary
+
+The Release Request Schema is closed and carries only `pduSessionId`,
+`entryKind` and `trigger`. `entryKind` is only `UE_INITIATED`; only
+`trigger=2` (`UE_REQUESTED`) is selected by this Skill's entry. Other trigger
+values belong to AMF-initiated or network-initiated variants that are out of
+scope for this version and must be reported NOT_RUN / BLOCKED rather than
+coerced.
+
+The raw N1 and the Host-private release transaction id are not Skill-authored
+request fields. The typed Provider resolves the retained N1 from trusted private
+context at dispatch time. `release_txn` and `release_generation` are created by
+the Build occurrence and passed only to the confirmations; they never appear in
+the request Schema.
+
+## Read-only parse and the single PTI binding
+
+The parse is read-only and must not mutate session state. It validates EPD / PSI
+/ PTI / message type and returns `release_intent=ue_requested`, `psi` and `pti`.
+It must not bind the PTI to the session and emits no mutation receipt.
+
+The Build occurrence is the only PTI binding. It is the transaction-controlled
+binding that builds the N1 Release Command (0xd3) and the N2 PDU Session Resource
+Release Command, records `release_txn` / `release_generation`, and lets the Host
+send the command to the AMF. `confirm-n1` and `confirm-n2` are independent and
+order-free but both are bound to that same Build transaction / generation. A
+confirmation must be bound to the original Run; a duplicate, late or
+old-generation answer must never dispatch the cleanup twice.
 
 ## Trigger classification
 
-The Host derives entryKind and numeric trigger from authenticated SBI ingress or a trusted internal Owner event. The caller cannot select either field.
+The Host derives `entryKind` and the numeric trigger from authenticated SBI
+ingress or a trusted internal event. The caller cannot select either field.
 
-| entryKind | trigger | Source constant |
-| --- | ---: | --- |
-| UE_INITIATED | 2 | UE_REQUESTED |
-| AMF_INITIATED | 6 | AMF_RELEASE_SM_CONTEXT |
-| AMF_INITIATED | 7 | AMF_UPDATE_SM_CONTEXT |
-| NETWORK_TRIGGERED | 1 | LOCAL_INITIATED |
-| NETWORK_TRIGGERED | 3 | PCF_INITIATED |
-| NETWORK_TRIGGERED | 4 | RAN_INITIATED |
-| NETWORK_TRIGGERED | 5 | SMF_INITIATED |
+| entryKind | trigger | Source constant | This Skill |
+| --- | ---: | --- | --- |
+| UE_INITIATED | 2 | UE_REQUESTED | selected |
+| AMF_INITIATED | 6 | AMF_RELEASE_SM_CONTEXT | out of scope |
+| AMF_INITIATED | 7 | AMF_UPDATE_SM_CONTEXT | out of scope |
+| NETWORK_TRIGGERED | 1 | LOCAL_INITIATED | out of scope |
+| NETWORK_TRIGGERED | 3 | PCF_INITIATED | out of scope |
+| NETWORK_TRIGGERED | 4 | RAN_INITIATED | out of scope |
+| NETWORK_TRIGGERED | 5 | SMF_INITIATED | out of scope |
 
-The SSM source skips N1/N2 for triggers 1, 6 and 7. For triggers 2, 3, 4 and 5 it sends the appropriate release signaling and parks the original Operation until the matching AMF release confirmation. The Host must not start a new Run for a late response.
+## Cleanup order and exclusions
 
-## Source blockers and exclusions
+Scheme C performs the cleanup exactly once after both confirmations, in the
+merged Owner order: policy association delete, user-plane session delete, local
+release event marker, then SM Context release/finalize. This order is not the
+historical OES plan order.
 
-1. pdu-rel-v4.yaml declares start_inputs: {} but r2 and r3 reference from_start: trigger. The upstream plan must declare the typed trigger input. The Owner must not invent a default or bypass validation.
-2. r1 CA.DELETE_CHARGING is optional and has no applicability predicate. It is omitted. Its pinned adapter only clears a local marker and records NOT_IMPL_skip; it does not delete a CHF resource.
-3. r7 COMPENSATE_RELEASE is execute: skip. It is not a Procedure Node. compensate_then_replan_once is not imported.
-4. r4's C implementation may set a private terminated marker, but the OES plan declares no output. The Skill exposes no terminated field.
-5. r6 updates an in-memory last_event marker. The OES plan declares no output; the Skill exposes no last_event field and does not claim persistence or 3GPP notification.
-6. r5 exposes lifecycle=RELEASING. The Host owns later ResourceMap tombstoning; the Skill does not claim RELEASED.
+1. Charging delete is optional and has no applicability predicate. It is omitted;
+   its adapter only clears a local marker and records `NOT_IMPL_skip`.
+2. Compensation is `execute: skip` and is not a Procedure node;
+   `compensate_then_replan_once` is not imported. No retry or replan is authored.
+3. `terminated` is a real `PA.DELETE_SM_POLICY_C` output and is compared with
+   `"1"`; it is not a synthetic field.
+4. `last_event` is a real local in-memory marker output and is compared with
+   `"1"`; no persistence, 3GPP Status Notify or external delivery is claimed.
+5. `lifecycle=RELEASING` is the only SC output. The Host owns any later ResourceMap
+   tombstone; the Skill does not claim RELEASED.
 
 ## Qualification scenario matrix
 
 | Scenario | Expected contract | Evidence status |
 | --- | --- | --- |
-| UE_INITIATED | Trigger 2, UE_REQUESTED | Source design only |
-| AMF_INITIATED | Trigger 6 or 7, AMF Release / Update | Source design only |
-| NETWORK_TRIGGERED | Trigger 1, 3, 4 or 5, trusted network event | Source design only |
-| PFCP deletion | r2 completes only after the exact PFCP delete response | Owner test NOT_RUN |
-| SSM signal skip | Trigger 1, 6 or 7 completes with source-derived no-signal evidence | Owner test NOT_RUN |
-| SSM signal required | Trigger 2, 3, 4 or 5 waits for matching AMF confirmation | Owner / Host test NOT_RUN |
-| PCF deletion | r4 evidence distinguishes DELETED from NOT_PRESENT | Owner test NOT_RUN |
-| Late callback | Resume only the original pending occurrence and generation | Host test NOT_RUN |
+| UE_INITIATED | Trigger 2, UE_REQUESTED, closed request Schema | Source design only |
+| Parse read-only | No session mutation and no PTI binding | Owner unit / source inspection only |
+| Build binding | Build is the only PTI binding and records the transaction / generation | Owner test NOT_RUN |
+| Confirmation binding | Both confirmations bound to the original Run's Build; duplicate/late/old generation rejected | Owner / Host test NOT_RUN |
+| PFCP deletion | `delete-user-plane` completes only after the exact PFCP delete response | Owner test NOT_RUN |
+| PCF deletion | `delete-policy` evidence distinguishes deleted from absent | Owner test NOT_RUN |
+| Release event | `last_event` is the local in-memory marker only | Source inspection only |
 | Unknown outcome | SAFE_STOPPED; no retry, compensation or replan | Route design only |
-| Release completion | r5 lifecycle remains RELEASING; Host tombstone is separate | Host test NOT_RUN |
+| Release completion | `lifecycle` remains RELEASING; Host tombstone is separate | Host test NOT_RUN |
+| AMF / network initiated | Out of scope; NOT_RUN / BLOCKED, never coerced into this Skill | Host test NOT_RUN |
 
-This matrix is not Runtime, live 5GC or product qualification evidence.
+This matrix is not Runtime, live 5GC or product qualification evidence. Owner
+publication is still absent.
