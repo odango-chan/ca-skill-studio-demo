@@ -20,6 +20,7 @@ function harness(saved) {
     Uri: { joinPath: (_, ...parts) => parts.join("/") },
     window: {
       activeTextEditor: editor,
+      visibleTextEditors: [editor],
       onDidChangeActiveTextEditor(listener) {
         onEditor = listener;
         return { dispose() { onEditor = undefined; } };
@@ -54,6 +55,7 @@ function harness(saved) {
   const mode = registerWorkspaceMode(vscode, context, { authoring, showWelcome: () => false });
   function activateEditor(editor) {
     vscode.window.activeTextEditor = editor;
+    vscode.window.visibleTextEditors = [editor];
     onEditor?.(editor);
   }
   return { commands, preferences, vscode, document, editor, opened, panels, mode, activateEditor };
@@ -133,6 +135,7 @@ test("reopening AI while Theia reports another native tab active preserves the s
     ViewColumn: { One: 1 },
     window: {
       activeTextEditor: procedureEditor,
+      visibleTextEditors: [procedureEditor],
       onDidChangeActiveTextEditor: () => ({ dispose() {} }),
       showWarningMessage: message => assert.fail(message),
       showTextDocument: async (...args) => opened.push(args),
@@ -292,6 +295,7 @@ test("Console navigation updates the saved return target before entering AI", as
     ViewColumn: { One: 1 },
     window: {
       activeTextEditor: procedureEditor,
+      visibleTextEditors: [contractEditor],
       onDidChangeActiveTextEditor(listener) {
         onEditor = listener;
         return { dispose() { onEditor = undefined; } };
