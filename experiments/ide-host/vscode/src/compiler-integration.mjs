@@ -2,7 +2,7 @@
 // The Compiler is the sole authority for Check, Build, linking and Artifact output.
 // This adapter owns workspace snapshots, diagnostics and read-only presentation.
 import {collectPackageSnapshot,packageRootForProcedure} from "./package-snapshot.mjs";
-import {createCompilerWorkerClient} from "./compiler-client.mjs";
+import {createCompilerWorkerClient,workerResourceUrl} from "./compiler-client.mjs";
 import {normalizeCompilerDiagnostics} from "./compiler-diagnostics.mjs";
 import {createCompilerResultGate} from "./compiler-result-gate.mjs";
 import {
@@ -646,8 +646,23 @@ export function registerCompilerIntegration(vscode,context,{
         }
         const developmentFixtureUri=vscode.Uri.joinPath(context.extensionUri,"dist",
           "authoring-development-build-request.json");
-        const developmentRequest=JSON.parse(utf8.decode(
-          await vscode.workspace.fs.readFile(developmentFixtureUri)));
+        // The browser-only Theia PluginWorker can execute extension commands but
+        // its workspace.fs provider may cancel reads against the hosted extension
+        // filesystem (Canceled FileSystemError). The asset is already served as
+        // part of the immutable extension package, so fetch that exact packaged
+        // URL in browser hosts. Keep workspace.fs for native Node extension hosts.
+        let developmentFixtureBytes;
+        if(localBrowserHost){
+          const fixtureUrl=workerResourceUrl(developmentFixtureUri);
+          const response=await fetch(fixtureUrl,{cache:"no-store"});
+          if(!response.ok)
+            throw new Error("Cannot load packaged Compiler Development fixture: HTTP "+
+              response.status+" "+fixtureUrl);
+          developmentFixtureBytes=new Uint8Array(await response.arrayBuffer());
+        }else{
+          developmentFixtureBytes=await vscode.workspace.fs.readFile(developmentFixtureUri);
+        }
+        const developmentRequest=JSON.parse(utf8.decode(developmentFixtureBytes));
         if(developmentRequest.apiVersion!==COMPILER_DEVELOPMENT_BUILD_REQUEST_API_VERSION)
           throw new Error("Staged Compiler v2.1.0 Development Build fixture has the wrong API version");
         const development=await client.request("buildDevelopment",developmentRequest);
