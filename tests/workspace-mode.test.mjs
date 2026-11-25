@@ -114,25 +114,25 @@ test("a fresh workspace opens AI when its first Procedure becomes available", as
 });
 
 
-test("Console restores the AI Procedure when Theia reports another native tab active", async () => {
+
+test("reopening AI while Theia reports another native tab active preserves the saved Console source", async () => {
   const commands = new Map();
   const preferences = new Map();
   const procedure = {
-    uri: {
-      path: "/skills/demo/assurance/procedure.yaml",
-      toString() { return this.path; },
-    },
+    uri: { path: "/skills/demo/assurance/procedure.yaml" },
     isClosed: false,
   };
   const contract = {
     uri: { path: "/skills/demo/assurance/contract.yaml" },
     isClosed: false,
   };
+  const procedureEditor = { document: procedure, selection: { anchor: 2 } };
+  const contractEditor = { document: contract, selection: { anchor: 8 } };
   const opened = [];
   const vscode = {
     ViewColumn: { One: 1 },
     window: {
-      activeTextEditor: { document: contract },
+      activeTextEditor: procedureEditor,
       showWarningMessage: message => assert.fail(message),
       showTextDocument: async (...args) => opened.push(args),
     },
@@ -151,19 +151,66 @@ test("Console restores the AI Procedure when Theia reports another native tab ac
     },
     subscriptions: [],
   };
-  const authoring = {
-    open: async () => true,
-    getDocument: () => procedure,
-  };
-  registerWorkspaceMode(vscode, context, {
-    authoring,
-    showWelcome: () => false,
+  const authoring = { open: async () => true, getDocument: () => procedure };
+  const mode = registerWorkspaceMode(vscode, context, {
+    authoring, showWelcome: () => false,
   });
 
+  assert.equal(await mode.restore(), true);
+  vscode.window.activeTextEditor = contractEditor;
   assert.equal(await commands.get("skillStudio.openAiAuthoring")(), true);
   assert.equal(await commands.get("skillStudio.openConsole")(), true);
-  assert.deepEqual(opened, [["vscode.openWith", procedure.uri, "default", {
-    viewColumn: 1, preview: false, preserveFocus: false,
-  }]]);
-  assert.equal(preferences.get("skillStudio.workspaceMode"), "console");
+  assert.equal(opened.at(-1)[1], procedure.uri);
+  assert.deepEqual(opened.at(-1)[3], {
+    viewColumn: 1, preview: false, preserveFocus: false, selection: procedureEditor.selection,
+  });
+});
+
+test("entering AI from Console preserves a selected non-Procedure source document", async () => {
+  const commands = new Map();
+  const preferences = new Map([["skillStudio.workspaceMode", "console"]]);
+  const procedure = {
+    uri: { path: "/skills/demo/assurance/procedure.yaml" },
+    isClosed: false,
+  };
+  const contract = {
+    uri: { path: "/skills/demo/assurance/contract.yaml" },
+    isClosed: false,
+  };
+  const contractEditor = { document: contract, selection: { anchor: 11 } };
+  const opened = [];
+  const vscode = {
+    ViewColumn: { One: 1 },
+    window: {
+      activeTextEditor: contractEditor,
+      showWarningMessage: message => assert.fail(message),
+      showTextDocument: async (...args) => opened.push(args),
+    },
+    commands: {
+      executeCommand: async (...args) => opened.push(args),
+      registerCommand(id, handler) {
+        commands.set(id, handler);
+        return { dispose() {} };
+      },
+    },
+  };
+  const context = {
+    globalState: {
+      get: key => preferences.get(key),
+      update: async (key, value) => preferences.set(key, value),
+    },
+    subscriptions: [],
+  };
+  const authoring = { open: async () => true, getDocument: () => procedure };
+  const mode = registerWorkspaceMode(vscode, context, {
+    authoring, showWelcome: () => false,
+  });
+
+  assert.equal(await mode.restore(), false);
+  assert.equal(await commands.get("skillStudio.openAiAuthoring")(), true);
+  assert.equal(await commands.get("skillStudio.openConsole")(), true);
+  assert.equal(opened.at(-1)[1], contract.uri);
+  assert.deepEqual(opened.at(-1)[3], {
+    viewColumn: 1, preview: false, preserveFocus: false, selection: contractEditor.selection,
+  });
 });
