@@ -263,7 +263,7 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
     "skillStudio.internal.semanticTokenDiagnostics",()=>({
       ...semanticTokenDiagnostics,
       rendererDiagnostics:semanticTokenDiagnostics.renderer==="theia-text-editor-decoration"
-        ?semanticTokenRenderer?.diagnostics?.()??null:null,
+        ?semanticTokenRenderer?.diagnostics?.(document?.uri?.toString?.())??null:null,
       activeDocumentUri:document?.uri?.toString?.()??null,
       activePackageRootUri:document
         ?packageRootForProcedure(vscode,document)?.uri?.toString?.()??null:null,
