@@ -230,10 +230,10 @@ export async function ensureOpenedExampleDependencies(vscode,extensionUri,storag
     try{return decoder.decode(await fs.readFile(uri));}
     catch(error){if(error?.code==="FileNotFound")return "";throw error;}
   }));
-  if(!/^\\s*start\\s*:/m.test(procedureText)||
-     !/^\\s*nodes\\s*:/m.test(procedureText)||
-     /^\\s*apiVersion\\s*:/m.test(procedureText)||
-     !/^\\s*requestSchema\\s*:/m.test(contractText))
+  if(!/^\s*start\s*:/m.test(procedureText)||
+     !/^\s*nodes\s*:/m.test(procedureText)||
+     /^\s*apiVersion\s*:/m.test(procedureText)||
+     !/^\s*requestSchema\s*:/m.test(contractText))
     return {status:"LEGACY_OR_UNKNOWN"};
   const manifestUri=vscode.Uri.joinPath(extensionUri,"samples","v1alpha5","files.json");
   const candidate=validate(JSON.parse(decoder.decode(

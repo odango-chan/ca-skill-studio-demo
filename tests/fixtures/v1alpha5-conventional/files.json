@@ -1,0 +1,32 @@
+{
+  "schemaVersion": 1,
+  "sourceRepo": "odango-chan/ca-skills",
+  "sourceRef": "refs/heads/main",
+  "sourceSha": "a1ed951b1e677f824c644541a26f08be4dc4847f",
+  "sourceStatus": "RELEASED_NOT_QUALIFIED",
+  "languageVersion": "connectionagent.io/v1alpha5",
+  "projectReadme": "README.md",
+  "skills": [
+    "establish-pdu-session"
+  ],
+  "files": [
+    "establish-pdu-session/SKILL.md",
+    "establish-pdu-session/assurance/contract.yaml",
+    "establish-pdu-session/assurance/predicates.yaml",
+    "establish-pdu-session/assurance/procedure.yaml",
+    "establish-pdu-session/schemas/establishment-request.schema.yaml",
+    "establish-pdu-session/scripts/validate-smf-session-context-entry.py",
+    "establish-pdu-session/scripts/validate-smf-session-context.py",
+    "establish-pdu-session/scripts/validate-subscription-request.py"
+  ],
+  "blobs": {
+    "establish-pdu-session/SKILL.md": "266191a8bc0ab0d1452621866fac27e8b19b06f8",
+    "establish-pdu-session/assurance/contract.yaml": "a624cec5caf462382e0e789d937ec83ef2ef93b8",
+    "establish-pdu-session/assurance/predicates.yaml": "afc96d1b3aca4da5e559e553b082b1c5b2ed22a3",
+    "establish-pdu-session/assurance/procedure.yaml": "8675e7d80e2be35ee654302fe767e9085e2f8bbb",
+    "establish-pdu-session/schemas/establishment-request.schema.yaml": "c30ebd0a95006e6be57a2ab51132e0a5c0ceb4d1",
+    "establish-pdu-session/scripts/validate-smf-session-context-entry.py": "c3b525f99f3106bfce571b514ddfadea5e3af8f2",
+    "establish-pdu-session/scripts/validate-smf-session-context.py": "03be904f2742c71eef18ca390db1a412e5a942ca",
+    "establish-pdu-session/scripts/validate-subscription-request.py": "806c9384e827a4a37f394194e9444dce7fc44c5a"
+  }
+}

@@ -6,7 +6,7 @@ import {routeTargetChoices,previewTargetPatch} from "../vscode/src/route-target.
 import {validateRouteProposal,isProcedurePath} from "../vscode/src/bridge.mjs";
 
 const source=readFileSync(
-  "site/samples/v1alpha5/establish-pdu-session/assurance/procedure.yaml","utf8");
+  "tests/fixtures/v1alpha5-conventional/establish-pdu-session/assurance/procedure.yaml","utf8");
 const model=projectWorkspace(source);
 
 test("Host identifies only the current assurance/procedure.yaml entry point",()=>{

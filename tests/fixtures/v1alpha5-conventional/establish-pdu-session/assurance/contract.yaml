@@ -1,0 +1,28 @@
+# CA-SL v1alpha5 author syntax. Capability IDs below are illustrative and NOT published.
+# Skill-visible context carries the 3GPP SUPI; invocation/lifecycle/correlation metadata stays private to Host.
+# ca-context, ca-session-context, SMF business Tools and the Integration IngressCatalog are placeholders, not trusted exports.
+goal: pdu_session.initial_request_fulfilled
+precondition: get-sm-subscription-data.precondition
+requestSchema: schemas/establishment-request.schema.yaml
+contextSchema: ca-context::urn:connectionagent:ca:context:subject:v1
+dependencies:
+  ca-context: urn:connectionagent:ca:host-context
+  ca-session-context: urn:connectionagent:ca:host:smf-session-context
+  ca: urn:example:connectionagent:5gc-tool-contracts
+  smf: urn:example:connectionagent:smf-tool-contracts
+  integration: urn:example:connectionagent:5gc-ingress-integration
+capabilities:
+  - urn:example:connectionagent:capability:3gpp:nudm-sdm-get:v1
+  - urn:example:connectionagent:capability:3gpp:nudm-sdm-subscribe:v1
+  - urn:example:connectionagent:capability:3gpp:npcf-sm-policy-control-create:v1
+  - urn:example:connectionagent:capability:3gpp:n4-session-establishment:v1
+  - urn:example:connectionagent:capability:3gpp:namf-communication-n1n2-transfer:v1
+  - urn:example:connectionagent:capability:3gpp:nsmf-pdu-session-update-sm-context:v1
+  - urn:example:connectionagent:capability:ca:smf-step17-response-observation:v1
+  # Generic read-only SMF session-context Observation; callable and Evidence contract NOT PUBLISHED.
+  - urn:example:connectionagent:capability:ca:smf-session-context-read:v1
+  - urn:example:connectionagent:capability:3gpp:n4-session-modification:v1
+  - urn:example:connectionagent:capability:3gpp:nudm-uecm-registration:v1
+
+limits:
+  maxActions: 32

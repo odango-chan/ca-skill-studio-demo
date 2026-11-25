@@ -8,7 +8,7 @@ import {DIAGNOSTIC_TEST_CASES}
 
 const expectedTestCount=DIAGNOSTIC_TEST_CASES.length;
 
-const root=new URL("../../../site/samples/v1alpha5/",import.meta.url);
+const root=new URL("../../../tests/fixtures/v1alpha5-conventional/",import.meta.url);
 const manifest=JSON.parse(readFileSync(new URL("files.json",root),"utf8"));
 const snapshot={
   completeness:"complete",

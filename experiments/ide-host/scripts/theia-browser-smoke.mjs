@@ -837,9 +837,9 @@ try{
      identity.workspaceFolders[0]!==identity.root||
      !identity.defaultProcedureExists||!identity.masProcedureExists||
      !String(identity.defaultProcedure??"").endsWith(
-       "/skills/establish-pdu-session/assurance/procedure.yaml")||
-     !String(identity.masProcedure??"").endsWith(
        "/skills/establish-pdu-session-mas/assurance/procedure.yaml")||
+     !String(identity.masProcedure??"").endsWith(
+       "/skills/modify-pdu-session-mas/assurance/procedure.yaml")||
      !afterImport.documentTitle.includes("skill-studio-demo")||
      afterImport.documentTitle.includes("Untitled"))
     throw Error("Example did not open as the named single-folder v1alpha5 workspace: "+
@@ -969,7 +969,7 @@ try{
       }catch(error){pythonOpenError=String(error?.message??error);}
       await sleep(250);
     }
-    if(!opened?.uri?.endsWith("/scripts/validate-subscription-request.py")||
+    if(!opened?.uri?.endsWith("/browser-acceptance/validate-subscription-request.py")||
        opened.languageId!=="python"||opened.viewColumn!==1)
       throw Error("Exact native Python Source did not open in the primary group after "+
         pythonOpenAttempts+" attempts: "+JSON.stringify({opened,pythonOpenError}));
@@ -1002,7 +1002,7 @@ try{
         JSON.stringify(pythonTextMate));
   }
   const packageOverviewEvidence=workbenchEvidence?.packageOverview
-    ?{required:true,fourSkills:true,evidence:workbenchEvidence.packageOverview}
+    ?{required:true,threeSkills:true,evidence:workbenchEvidence.packageOverview}
     :{required:false};
   const nativeMarkdownActivation=requireEditor
     ?await evalJS("(async()=>{const c=window.theia.container;"+

@@ -16,12 +16,10 @@ const sha=text=>{
 };
 
 test("only the current v1alpha5 Examples are selectable",()=>{
-  assert.deepEqual(Object.keys(SAMPLE_PACKAGES),["establish","mas"]);
-  assert.equal(SAMPLE_PACKAGES.establish.sourceDir,"v1alpha5");
+  assert.deepEqual(Object.keys(SAMPLE_PACKAGES),["mas","modify","release"]);
   assert.equal(SAMPLE_PACKAGES.mas.sourceDir,"v1alpha5");
-  assert.equal(SAMPLE_PACKAGES.establish.files.length,8);
   assert.equal(SAMPLE_PACKAGES.mas.files.length,6);
-  for(const key of ["establish","mas"]){
+  for(const key of Object.keys(SAMPLE_PACKAGES)){
     for(const item of packageFilesForSample(key)){
       assert.match(item.url,/^\.\/samples\/v1alpha5\//);
       assert.ok(readFileSync(new URL("../site/"+item.url.slice(2),import.meta.url),"utf8").trim().length>0);
@@ -29,12 +27,12 @@ test("only the current v1alpha5 Examples are selectable",()=>{
   }
 });
 
-test("built-in Example assets match the pinned ca-skills main blob manifest",()=>{
+test("built-in Example assets match the pinned ca-skills blob manifest",()=>{
   const manifest=JSON.parse(readFileSync(new URL("../site/samples/v1alpha5/files.json",import.meta.url),"utf8"));
   assert.equal(manifest.sourceRepo,"odango-chan/ca-skills");
-  assert.equal(manifest.sourceRef,"refs/heads/main");
-  assert.equal(manifest.sourceSha,"a1ed951b1e677f824c644541a26f08be4dc4847f");
-  assert.equal(manifest.sourceStatus,"RELEASED_NOT_QUALIFIED");
+  assert.equal(manifest.sourceRef,"refs/pull/86/head");
+  assert.equal(manifest.sourceSha,"83d9e0c7d523189a1ae03186f8913277f0829d72");
+  assert.equal(manifest.sourceStatus,"OWNER_LINKED_STATIC_BUILD_PASS_E2E_NOT_RERUN");
   for(const path of manifest.files){
     const content=readSample(path.split("/")[0],path.split("/").slice(1).join("/"));
     assert.equal(sha(content),manifest.blobs[path],path);
@@ -42,9 +40,9 @@ test("built-in Example assets match the pinned ca-skills main blob manifest",()=
 });
 
 test("real v1alpha5 Procedure files project to the current Root and Child graph",()=>{
-  const establish=projectWorkspace(readSample("establish-pdu-session","assurance/procedure.yaml"));
+  const establish=projectWorkspace(readSample("establish-pdu-session-mas","assurance/procedure.yaml"));
   assert.equal(establish.state,"READY");
-  assert.equal(establish.procedure.nodes.length,10);
+  assert.equal(establish.procedure.nodes.length,14);
   assert.equal(establish.procedures.size,1);
 });
 

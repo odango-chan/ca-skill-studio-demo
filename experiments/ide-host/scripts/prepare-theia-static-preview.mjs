@@ -65,7 +65,6 @@ for(const name of ["compiler-worker.js","skillc.wasm","wasm_exec.js"]){
 for(const required of [
   join(pluginTarget,"samples","v1alpha5","files.json"),
   join(pluginTarget,"samples","v1alpha5","README.md"),
-  join(pluginTarget,"samples","v1alpha5","establish-pdu-session","assurance","procedure.yaml"),
   join(pluginTarget,"samples","v1alpha5","establish-pdu-session-mas","assurance","procedure.yaml"),
   join(pluginTarget,"media","procedure.js"),
   join(pluginTarget,"media","procedure.css"),

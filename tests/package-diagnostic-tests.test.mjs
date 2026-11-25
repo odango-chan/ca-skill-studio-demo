@@ -8,12 +8,14 @@ import {
   runDiagnosticRegressionSuite
 } from "../site/package-diagnostic-tests.mjs";
 
-const root=new URL("../site/samples/v1alpha5/",import.meta.url);
+const exampleRoot=new URL("../site/samples/v1alpha5/",import.meta.url);
+const root=new URL("./fixtures/v1alpha5-conventional/",import.meta.url);
 const manifest=JSON.parse(readFileSync(new URL("files.json",root),"utf8"));
 function fixture(name="establish-pdu-session"){
-  return new Map(manifest.files.filter(path=>path.startsWith(name+"/"))
+  const sourceRoot=name==="establish-pdu-session"?root:exampleRoot;
+  return new Map(JSON.parse(readFileSync(new URL("files.json",sourceRoot),"utf8")).files.filter(path=>path.startsWith(name+"/"))
     .map(path=>[path.slice(name.length+1),{
-      text:readFileSync(new URL(path,root),"utf8")
+      text:readFileSync(new URL(path,sourceRoot),"utf8")
     }]));
 }
 

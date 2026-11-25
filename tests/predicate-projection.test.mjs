@@ -4,7 +4,7 @@ import {readFileSync} from 'node:fs';
 import {projectPredicateSet} from '../site/predicate-projection.mjs';
 
 const source = readFileSync(new URL(
-  '../site/samples/v1alpha5/establish-pdu-session/assurance/predicates.yaml',
+  './fixtures/v1alpha5-conventional/establish-pdu-session/assurance/predicates.yaml',
   import.meta.url), 'utf8');
 
 test('CA-SL v1alpha5 PredicateSet projects ordered parameter signatures and Evidence', () => {

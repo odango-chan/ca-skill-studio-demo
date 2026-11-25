@@ -495,6 +495,7 @@ export function activate(context){
           "assurance","contract.yaml");
         const procedure=vscode.Uri.joinPath(exampleRoot,"skills","establish-pdu-session",
           "assurance","procedure.yaml");
+        await vscode.workspace.fs.createDirectory(vscode.Uri.joinPath(exampleRoot,"skills","establish-pdu-session","assurance"));
         await vscode.workspace.fs.createDirectory(vscode.Uri.joinPath(exampleRoot,"lib"));
         await vscode.workspace.fs.createDirectory(vscode.Uri.joinPath(exampleRoot,"output"));
         await vscode.workspace.fs.writeFile(contract,new TextEncoder().encode(
@@ -835,8 +836,11 @@ export function activate(context){
     "skillStudio.internal.openPythonSyntaxAcceptance",async()=>{
       const folders=vscode.workspace.workspaceFolders??[];
       if(folders.length!==1)throw Error("Python syntax probe needs one Example workspace");
-      const uri=vscode.Uri.joinPath(folders[0].uri,"skills",
-        "establish-pdu-session","scripts","validate-subscription-request.py");
+      const fixtureRoot=vscode.Uri.joinPath(context.globalStorageUri,"browser-acceptance");
+      const uri=vscode.Uri.joinPath(fixtureRoot,"validate-subscription-request.py");
+      await vscode.workspace.fs.createDirectory(fixtureRoot);
+      await vscode.workspace.fs.writeFile(uri,new TextEncoder().encode(
+        "# Native Python syntax acceptance\ndef validate(value: int) -> bool:\n    return value == 1\n"));
       const doc=await openTextDocumentWithRetry(vscode,uri);
       const editor=await vscode.window.showTextDocument(doc,{
         viewColumn:vscode.ViewColumn.One,preserveFocus:false,preview:false
@@ -854,7 +858,7 @@ export function activate(context){
       // adaptation. Keep the editor-group baseline deterministic instead of
       // relying on filesystem enumeration order.
       const baseline=discoveredProcedures.find(uri=>
-        /\/skills\/establish-pdu-session\/assurance\/procedure\.yaml$/i.test(uri.path));
+        /\/skills\/establish-pdu-session-mas\/assurance\/procedure\.yaml$/i.test(uri.path));
       const procedures=baseline
         ? [baseline,...discoveredProcedures.filter(uri=>uri.toString()!==baseline.toString())
             .sort((a,b)=>a.path.localeCompare(b.path))]
@@ -881,13 +885,7 @@ export function activate(context){
       const firstRoot=procedureRoots[0].root;
       const firstPackageVisuals=visualUris.filter(uri=>uri.path.startsWith(firstRoot.path+"/"));
       for(const uri of firstPackageVisuals)await openNativeSource(vscode,uri,{viewColumn:vscode.ViewColumn.One,preserveFocus:false,preview:false});
-      const pythonFiles=await vscode.workspace.findFiles(
-        "**/scripts/validate-subscription-request.py","**/node_modules/**",5);
-      if(!pythonFiles.length)throw Error("CA-SL v1alpha5 Python acceptance fixture is missing");
-      const python=await openTextDocumentWithRetry(vscode,pythonFiles[0]);
-      await vscode.window.showTextDocument(python,{
-        viewColumn:vscode.ViewColumn.One,preserveFocus:false,preview:false
-      });
+      const python=await vscode.commands.executeCommand("skillStudio.internal.openPythonSyntaxAcceptance");
       const waitForPrimary=async uri=>{
         const started=Date.now();
         while(Date.now()-started<3000){
@@ -898,7 +896,7 @@ export function activate(context){
         }
         throw Error("Source-only editor did not open in the primary group: "+uri.toString());
       };
-      const pythonColumn=(await waitForPrimary(python.uri)).viewColumn;
+      const pythonColumn=(await waitForPrimary(vscode.Uri.parse(python.uri))).viewColumn;
       // Use a saved, temporary ordinary YAML file rather than an Untitled
       // buffer so the acceptance cleanup never opens an unsaved-changes dialog.
       const projectRoot=firstRoot.with({

@@ -104,7 +104,6 @@ test("Theia plugin is the exact Web extension, with native editor + view contrib
   for(const f of ["dist/extension-web.cjs","dist/extension-theia.js","dist/skill-language-server.js",
     "dist/compiler-worker.js","dist/skillc.wasm","dist/wasm_exec.js","media/procedure.js","media/procedure.css",
     "samples/v1alpha5/files.json","samples/v1alpha5/README.md",
-    "samples/v1alpha5/establish-pdu-session/assurance/procedure.yaml",
     "samples/v1alpha5/establish-pdu-session-mas/assurance/procedure.yaml",
     "samples/v1alpha5/modify-pdu-session-mas/assurance/procedure.yaml",
     "samples/v1alpha5/release-pdu-session-mas/assurance/procedure.yaml",
