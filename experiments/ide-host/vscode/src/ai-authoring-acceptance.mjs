@@ -1,5 +1,7 @@
 // Isolated native-Editor acceptance. This command is registered only in the
-// backend CI fixture host, and consumes the exact trusted Compiler v2.0.2 fixture.
+// backend CI fixture host. It consumes the trusted v1alpha5 BuildRequest fixture
+// produced by artifact generator 2.0.2, while all Check calls use the installed
+// Compiler product version exposed by compilerIntegration.
 // It does not claim any real 5GC Owner or Deployment Qualification.
 import {buildContextPack} from "../../../../authoring/core/context-pack.mjs";
 import {validateModelProposal} from "../../../../authoring/core/model-proposal.mjs";
@@ -25,7 +27,7 @@ export function registerSyntheticAuthoringAcceptance(vscode,context,compilerInte
   const command=vscode.commands.registerCommand(acceptanceCommand,async()=>{
     if(pendingUndo)throw Error("Previous synthetic acceptance Undo has not been verified");
     if(typeof compilerIntegration?.checkRequest!=="function"){
-      throw Error("The pinned Compiler v2.0.2 Check client is unavailable");
+      throw Error("The installed Compiler Check client is unavailable");
     }
     const fixtureUri=vscode.Uri.joinPath(context.extensionUri,"dist",
       "authoring-trusted-build-request.json");
@@ -129,7 +131,7 @@ export function registerSyntheticAuthoringAcceptance(vscode,context,compilerInte
       pendingUndo={document,original,temporary,uri};
       created=false; // ownership transfers to verify/cleanup command
       return {
-        compilerVersion:"v2.0.2",languageTarget:"connectionagent.io/v1alpha5",
+        compilerVersion:compilerIntegration.compilerVersion,artifactGeneratorVersion:"2.0.2",\n        languageTarget:"connectionagent.io/v1alpha5",
         qualification:"SYNTHETIC_TEST_ONLY",real5gcQualification:"NOT_CLAIMED",
         compilerBaseline:sourceCheck,compilerCandidate:candidateCheck,
         candidateDigest:candidate.digest,atomicGroupCount:patch.groups.length,
@@ -195,7 +197,7 @@ export function registerSyntheticAuthoringAcceptance(vscode,context,compilerInte
       if(trusted.apiVersion!=="connectionagent.io/compiler-build-request/v1alpha5"||
          trusted.languageTarget!=="connectionagent.io/v1alpha5"||
          !trusted.trustedBuildContext||!Array.isArray(trusted.files))
-        throw Error("Editor Tab acceptance requires the pinned v2.0.2 trusted fixture");
+        throw Error("Editor Tab acceptance requires the trusted v1alpha5 fixture");
       const file=trusted.files.find(item=>item.path===sourceRel);
       if(!file||typeof file.bytes!=="string")throw Error("Trusted fixture Procedure is missing");
       const original=Buffer.from(file.bytes,"base64").toString("utf8");
