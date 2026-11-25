@@ -1,0 +1,17 @@
+{
+  "$id": "urn:openamsm:mas:v1alpha4:ups-decide_anchor-output",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "up_anchor": {
+      "const": "1",
+      "maxLength": 255,
+      "minLength": 1,
+      "type": "string"
+    }
+  },
+  "required": [
+    "up_anchor"
+  ],
+  "type": "object"
+}

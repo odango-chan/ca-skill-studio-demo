@@ -1,0 +1,718 @@
+apiVersion: connectionagent.io/toolcatalog/v1alpha4
+kind: ToolCatalog
+metadata:
+  owner: openamsm.smf.mas
+  name: openamsm-mas
+spec:
+  contracts:
+  - kind: operation
+    id: SC.VALIDATE_SUBSCRIPTION
+    effect: MUTATION
+    ownerOutcomes:
+    - SUCCEEDED
+    - FAILED
+    - NOT_COMMITTED
+    inputSchema:
+      $ref: urn:openamsm:mas:v1alpha4:sc-validate_subscription-input
+    outputSchema:
+      $ref: urn:openamsm:mas:v1alpha4:sc-validate_subscription-output
+    guarantees:
+      evidence:
+        provides:
+        - guarantee: sc.subscription-validated
+          path: output
+    receiptSchema:
+      $ref: urn:openamsm:mas:v1alpha4:mutation-receipt
+    mutation:
+      commitProof:
+        schema: urn:openamsm:mas:v1alpha4:commit-proof
+        path: receipt.commit
+        bind: originalInvocationId
+      failureClassPath: receipt.failureClass
+      failureClasses:
+      - id: openamsm.mas.owner.rejected
+        outcome: NOT_COMMITTED
+        proofSchema: urn:openamsm:mas:v1alpha4:commit-proof
+        proofPath: receipt.commit
+        noSideEffect: true
+        retryable: false
+  - kind: operation
+    id: SAA.SECONDARY_AUTH
+    effect: MUTATION
+    ownerOutcomes:
+    - SUCCEEDED
+    - FAILED
+    - NOT_COMMITTED
+    inputSchema:
+      $ref: urn:openamsm:mas:v1alpha4:saa-secondary_auth-input
+    outputSchema:
+      $ref: urn:openamsm:mas:v1alpha4:saa-secondary_auth-output
+    guarantees:
+      evidence:
+        provides:
+        - guarantee: saa.secondary-auth-disposition
+          path: output
+    receiptSchema:
+      $ref: urn:openamsm:mas:v1alpha4:mutation-receipt
+    mutation:
+      commitProof:
+        schema: urn:openamsm:mas:v1alpha4:commit-proof
+        path: receipt.commit
+        bind: originalInvocationId
+      failureClassPath: receipt.failureClass
+      failureClasses:
+      - id: openamsm.mas.owner.rejected
+        outcome: NOT_COMMITTED
+        proofSchema: urn:openamsm:mas:v1alpha4:commit-proof
+        proofPath: receipt.commit
+        noSideEffect: true
+        retryable: false
+  - kind: operation
+    id: SC.CREATE_SM_CONTEXT
+    effect: MUTATION
+    ownerOutcomes:
+    - SUCCEEDED
+    - FAILED
+    - NOT_COMMITTED
+    inputSchema:
+      $ref: urn:openamsm:mas:v1alpha4:sc-create_sm_context-input
+    outputSchema:
+      $ref: urn:openamsm:mas:v1alpha4:sc-create_sm_context-output
+    guarantees:
+      evidence:
+        provides:
+        - guarantee: sc.context-created
+          path: output
+    receiptSchema:
+      $ref: urn:openamsm:mas:v1alpha4:mutation-receipt
+    mutation:
+      commitProof:
+        schema: urn:openamsm:mas:v1alpha4:commit-proof
+        path: receipt.commit
+        bind: originalInvocationId
+      failureClassPath: receipt.failureClass
+      failureClasses:
+      - id: openamsm.mas.owner.rejected
+        outcome: NOT_COMMITTED
+        proofSchema: urn:openamsm:mas:v1alpha4:commit-proof
+        proofPath: receipt.commit
+        noSideEffect: true
+        retryable: false
+  - kind: operation
+    id: SC.REGISTER_UECM
+    effect: MUTATION
+    ownerOutcomes:
+    - SUCCEEDED
+    - FAILED
+    - NOT_COMMITTED
+    inputSchema:
+      $ref: urn:openamsm:mas:v1alpha4:sc-register_uecm-input
+    outputSchema:
+      $ref: urn:openamsm:mas:v1alpha4:sc-register_uecm-output
+    guarantees:
+      evidence:
+        provides:
+        - guarantee: sc.uecm-registered
+          path: output
+    receiptSchema:
+      $ref: urn:openamsm:mas:v1alpha4:mutation-receipt
+    mutation:
+      commitProof:
+        schema: urn:openamsm:mas:v1alpha4:commit-proof
+        path: receipt.commit
+        bind: originalInvocationId
+      failureClassPath: receipt.failureClass
+      failureClasses:
+      - id: openamsm.mas.owner.rejected
+        outcome: NOT_COMMITTED
+        proofSchema: urn:openamsm:mas:v1alpha4:commit-proof
+        proofPath: receipt.commit
+        noSideEffect: true
+        retryable: false
+  - kind: operation
+    id: PA.CREATE_SM_POLICY
+    effect: MUTATION
+    ownerOutcomes:
+    - SUCCEEDED
+    - FAILED
+    - NOT_COMMITTED
+    inputSchema:
+      $ref: urn:openamsm:mas:v1alpha4:pa-create_sm_policy-input
+    outputSchema:
+      $ref: urn:openamsm:mas:v1alpha4:pa-create_sm_policy-output
+    guarantees:
+      evidence:
+        provides:
+        - guarantee: pa.policy-association-created
+          path: output
+    receiptSchema:
+      $ref: urn:openamsm:mas:v1alpha4:mutation-receipt
+    mutation:
+      commitProof:
+        schema: urn:openamsm:mas:v1alpha4:commit-proof
+        path: receipt.commit
+        bind: originalInvocationId
+      failureClassPath: receipt.failureClass
+      failureClasses:
+      - id: openamsm.mas.owner.rejected
+        outcome: NOT_COMMITTED
+        proofSchema: urn:openamsm:mas:v1alpha4:commit-proof
+        proofPath: receipt.commit
+        noSideEffect: true
+        retryable: false
+  - kind: operation
+    id: UPS.DECIDE_ANCHOR
+    effect: MUTATION
+    ownerOutcomes:
+    - SUCCEEDED
+    - FAILED
+    - NOT_COMMITTED
+    inputSchema:
+      $ref: urn:openamsm:mas:v1alpha4:ups-decide_anchor-input
+    outputSchema:
+      $ref: urn:openamsm:mas:v1alpha4:ups-decide_anchor-output
+    guarantees:
+      evidence:
+        provides:
+        - guarantee: ups.anchor-selected
+          path: output
+    receiptSchema:
+      $ref: urn:openamsm:mas:v1alpha4:mutation-receipt
+    mutation:
+      commitProof:
+        schema: urn:openamsm:mas:v1alpha4:commit-proof
+        path: receipt.commit
+        bind: originalInvocationId
+      failureClassPath: receipt.failureClass
+      failureClasses:
+      - id: openamsm.mas.owner.rejected
+        outcome: NOT_COMMITTED
+        proofSchema: urn:openamsm:mas:v1alpha4:commit-proof
+        proofPath: receipt.commit
+        noSideEffect: true
+        retryable: false
+  - kind: operation
+    id: IAM.ALLOCATE_ADDRESS
+    effect: MUTATION
+    ownerOutcomes:
+    - SUCCEEDED
+    - FAILED
+    - NOT_COMMITTED
+    inputSchema:
+      $ref: urn:openamsm:mas:v1alpha4:iam-allocate_address-input
+    outputSchema:
+      $ref: urn:openamsm:mas:v1alpha4:iam-allocate_address-output
+    guarantees:
+      evidence:
+        provides:
+        - guarantee: iam.address-allocated
+          path: output
+    receiptSchema:
+      $ref: urn:openamsm:mas:v1alpha4:mutation-receipt
+    mutation:
+      commitProof:
+        schema: urn:openamsm:mas:v1alpha4:commit-proof
+        path: receipt.commit
+        bind: originalInvocationId
+      failureClassPath: receipt.failureClass
+      failureClasses:
+      - id: openamsm.mas.owner.rejected
+        outcome: NOT_COMMITTED
+        proofSchema: urn:openamsm:mas:v1alpha4:commit-proof
+        proofPath: receipt.commit
+        noSideEffect: true
+        retryable: false
+  - kind: operation
+    id: PA.UPDATE_SM_POLICY
+    effect: MUTATION
+    ownerOutcomes:
+    - SUCCEEDED
+    - FAILED
+    - NOT_COMMITTED
+    inputSchema:
+      $ref: urn:openamsm:mas:v1alpha4:pa-update_sm_policy-input
+    outputSchema:
+      $ref: urn:openamsm:mas:v1alpha4:pa-update_sm_policy-output
+    guarantees:
+      evidence:
+        provides:
+        - guarantee: pa.policy-updated
+          path: output
+    receiptSchema:
+      $ref: urn:openamsm:mas:v1alpha4:mutation-receipt
+    mutation:
+      commitProof:
+        schema: urn:openamsm:mas:v1alpha4:commit-proof
+        path: receipt.commit
+        bind: originalInvocationId
+      failureClassPath: receipt.failureClass
+      failureClasses:
+      - id: openamsm.mas.owner.rejected
+        outcome: NOT_COMMITTED
+        proofSchema: urn:openamsm:mas:v1alpha4:commit-proof
+        proofPath: receipt.commit
+        noSideEffect: true
+        retryable: false
+  - kind: operation
+    id: CA.CREATE_CHARGING
+    effect: MUTATION
+    ownerOutcomes:
+    - SUCCEEDED
+    - FAILED
+    - NOT_COMMITTED
+    inputSchema:
+      $ref: urn:openamsm:mas:v1alpha4:ca-create_charging-input
+    outputSchema:
+      $ref: urn:openamsm:mas:v1alpha4:ca-create_charging-output
+    guarantees:
+      evidence:
+        provides:
+        - guarantee: ca.charging-step-skipped
+          path: output
+    receiptSchema:
+      $ref: urn:openamsm:mas:v1alpha4:mutation-receipt
+    mutation:
+      commitProof:
+        schema: urn:openamsm:mas:v1alpha4:commit-proof
+        path: receipt.commit
+        bind: originalInvocationId
+      failureClassPath: receipt.failureClass
+      failureClasses:
+      - id: openamsm.mas.owner.rejected
+        outcome: NOT_COMMITTED
+        proofSchema: urn:openamsm:mas:v1alpha4:commit-proof
+        proofPath: receipt.commit
+        noSideEffect: true
+        retryable: false
+  - kind: operation
+    id: UPN.CREATE_UP_SESSION
+    effect: MUTATION
+    ownerOutcomes:
+    - SUCCEEDED
+    - FAILED
+    - NOT_COMMITTED
+    inputSchema:
+      $ref: urn:openamsm:mas:v1alpha4:upn-create_up_session-input
+    outputSchema:
+      $ref: urn:openamsm:mas:v1alpha4:upn-create_up_session-output
+    guarantees:
+      evidence:
+        provides:
+        - guarantee: upn.n4-session-established
+          path: output
+    receiptSchema:
+      $ref: urn:openamsm:mas:v1alpha4:mutation-receipt
+    mutation:
+      commitProof:
+        schema: urn:openamsm:mas:v1alpha4:commit-proof
+        path: receipt.commit
+        bind: originalInvocationId
+      failureClassPath: receipt.failureClass
+      failureClasses:
+      - id: openamsm.mas.owner.rejected
+        outcome: NOT_COMMITTED
+        proofSchema: urn:openamsm:mas:v1alpha4:commit-proof
+        proofPath: receipt.commit
+        noSideEffect: true
+        retryable: false
+  - kind: operation
+    id: SSM.SIGNAL_UE_AN
+    effect: MUTATION
+    ownerOutcomes:
+    - SUCCEEDED
+    - FAILED
+    - NOT_COMMITTED
+    inputSchema:
+      $ref: urn:openamsm:mas:v1alpha4:ssm-signal_ue_an-input
+    outputSchema:
+      $ref: urn:openamsm:mas:v1alpha4:ssm-signal_ue_an-output
+    guarantees:
+      evidence:
+        provides:
+        - guarantee: ssm.access-network-ready
+          path: output
+    receiptSchema:
+      $ref: urn:openamsm:mas:v1alpha4:mutation-receipt
+    mutation:
+      commitProof:
+        schema: urn:openamsm:mas:v1alpha4:commit-proof
+        path: receipt.commit
+        bind: originalInvocationId
+      failureClassPath: receipt.failureClass
+      failureClasses:
+      - id: openamsm.mas.owner.rejected
+        outcome: NOT_COMMITTED
+        proofSchema: urn:openamsm:mas:v1alpha4:commit-proof
+        proofPath: receipt.commit
+        noSideEffect: true
+        retryable: false
+  - kind: operation
+    id: UPN.MODIFY_UP_SESSION
+    effect: MUTATION
+    ownerOutcomes:
+    - SUCCEEDED
+    - FAILED
+    - NOT_COMMITTED
+    inputSchema:
+      $ref: urn:openamsm:mas:v1alpha4:upn-modify_up_session-input
+    outputSchema:
+      $ref: urn:openamsm:mas:v1alpha4:upn-modify_up_session-output
+    guarantees:
+      evidence:
+        provides:
+        - guarantee: upn.n3-synchronized
+          path: output
+    receiptSchema:
+      $ref: urn:openamsm:mas:v1alpha4:mutation-receipt
+    mutation:
+      commitProof:
+        schema: urn:openamsm:mas:v1alpha4:commit-proof
+        path: receipt.commit
+        bind: originalInvocationId
+      failureClassPath: receipt.failureClass
+      failureClasses:
+      - id: openamsm.mas.owner.rejected
+        outcome: NOT_COMMITTED
+        proofSchema: urn:openamsm:mas:v1alpha4:commit-proof
+        proofPath: receipt.commit
+        noSideEffect: true
+        retryable: false
+  - kind: operation
+    id: SE.EMIT_EVENTS
+    effect: MUTATION
+    ownerOutcomes:
+    - SUCCEEDED
+    - FAILED
+    - NOT_COMMITTED
+    inputSchema:
+      $ref: urn:openamsm:mas:v1alpha4:se-emit_events-input
+    outputSchema:
+      $ref: urn:openamsm:mas:v1alpha4:se-emit_events-output
+    guarantees:
+      evidence:
+        provides:
+        - guarantee: se.establishment-event-recorded
+          path: output
+    receiptSchema:
+      $ref: urn:openamsm:mas:v1alpha4:mutation-receipt
+    mutation:
+      commitProof:
+        schema: urn:openamsm:mas:v1alpha4:commit-proof
+        path: receipt.commit
+        bind: originalInvocationId
+      failureClassPath: receipt.failureClass
+      failureClasses:
+      - id: openamsm.mas.owner.rejected
+        outcome: NOT_COMMITTED
+        proofSchema: urn:openamsm:mas:v1alpha4:commit-proof
+        proofPath: receipt.commit
+        noSideEffect: true
+        retryable: false
+  - kind: operation
+    id: SSM.PARSE_N1_MODIFY
+    effect: READ
+    ownerOutcomes:
+    - SUCCEEDED
+    - FAILED
+    inputSchema:
+      $ref: urn:openamsm:mas:v1alpha4:ssm-parse_n1_modify-input
+    outputSchema:
+      $ref: urn:openamsm:mas:v1alpha4:ssm-parse_n1_modify-output
+    guarantees:
+      evidence:
+        provides:
+        - guarantee: ssm.n1-modify-parsed
+          path: output
+  - kind: operation
+    id: UPN.MODIFY_QOS_DELTA
+    effect: MUTATION
+    ownerOutcomes:
+    - SUCCEEDED
+    - FAILED
+    - NOT_COMMITTED
+    inputSchema:
+      $ref: urn:openamsm:mas:v1alpha4:upn-modify_qos_delta-input
+    outputSchema:
+      $ref: urn:openamsm:mas:v1alpha4:upn-modify_qos_delta-output
+    guarantees:
+      evidence:
+        provides:
+        - guarantee: upn.qos-delta-applied
+          path: output
+    receiptSchema:
+      $ref: urn:openamsm:mas:v1alpha4:mutation-receipt
+    mutation:
+      commitProof:
+        schema: urn:openamsm:mas:v1alpha4:commit-proof
+        path: receipt.commit
+        bind: originalInvocationId
+      failureClassPath: receipt.failureClass
+      failureClasses:
+      - id: openamsm.mas.owner.rejected
+        outcome: NOT_COMMITTED
+        proofSchema: urn:openamsm:mas:v1alpha4:commit-proof
+        proofPath: receipt.commit
+        noSideEffect: true
+        retryable: false
+  - kind: operation
+    id: SSM.PARSE_N1_RELEASE
+    effect: READ
+    ownerOutcomes:
+    - SUCCEEDED
+    - FAILED
+    inputSchema:
+      $ref: urn:openamsm:mas:v1alpha4:ssm-parse_n1_release-input
+    outputSchema:
+      $ref: urn:openamsm:mas:v1alpha4:ssm-parse_n1_release-output
+    guarantees:
+      evidence:
+        provides:
+        - guarantee: ssm.n1-release-parsed
+          path: output
+  - kind: operation
+    id: SSM.BUILD_RELEASE_COMMAND
+    effect: MUTATION
+    ownerOutcomes:
+    - SUCCEEDED
+    - FAILED
+    - NOT_COMMITTED
+    inputSchema:
+      $ref: urn:openamsm:mas:v1alpha4:ssm-build_release_command-input
+    outputSchema:
+      $ref: urn:openamsm:mas:v1alpha4:ssm-build_release_command-output
+    guarantees:
+      evidence:
+        provides:
+        - guarantee: ssm.release-command-built
+          path: output
+    receiptSchema:
+      $ref: urn:openamsm:mas:v1alpha4:mutation-receipt
+    mutation:
+      commitProof:
+        schema: urn:openamsm:mas:v1alpha4:commit-proof
+        path: receipt.commit
+        bind: originalInvocationId
+      failureClassPath: receipt.failureClass
+      failureClasses:
+      - id: openamsm.mas.owner.rejected
+        outcome: NOT_COMMITTED
+        proofSchema: urn:openamsm:mas:v1alpha4:commit-proof
+        proofPath: receipt.commit
+        noSideEffect: true
+        retryable: false
+  - kind: operation
+    id: SSM.RELEASE_CONFIRM_N1
+    effect: MUTATION
+    ownerOutcomes:
+    - SUCCEEDED
+    - FAILED
+    - NOT_COMMITTED
+    inputSchema:
+      $ref: urn:openamsm:mas:v1alpha4:ssm-release_confirm_n1-input
+    outputSchema:
+      $ref: urn:openamsm:mas:v1alpha4:ssm-release_confirm_n1-output
+    guarantees:
+      evidence:
+        provides:
+        - guarantee: ssm.release-n1-confirmed
+          path: output
+    receiptSchema:
+      $ref: urn:openamsm:mas:v1alpha4:mutation-receipt
+    mutation:
+      commitProof:
+        schema: urn:openamsm:mas:v1alpha4:commit-proof
+        path: receipt.commit
+        bind: originalInvocationId
+      failureClassPath: receipt.failureClass
+      failureClasses:
+      - id: openamsm.mas.owner.rejected
+        outcome: NOT_COMMITTED
+        proofSchema: urn:openamsm:mas:v1alpha4:commit-proof
+        proofPath: receipt.commit
+        noSideEffect: true
+        retryable: false
+  - kind: operation
+    id: SSM.RELEASE_CONFIRM_N2
+    effect: MUTATION
+    ownerOutcomes:
+    - SUCCEEDED
+    - FAILED
+    - NOT_COMMITTED
+    inputSchema:
+      $ref: urn:openamsm:mas:v1alpha4:ssm-release_confirm_n2-input
+    outputSchema:
+      $ref: urn:openamsm:mas:v1alpha4:ssm-release_confirm_n2-output
+    guarantees:
+      evidence:
+        provides:
+        - guarantee: ssm.release-n2-confirmed
+          path: output
+    receiptSchema:
+      $ref: urn:openamsm:mas:v1alpha4:mutation-receipt
+    mutation:
+      commitProof:
+        schema: urn:openamsm:mas:v1alpha4:commit-proof
+        path: receipt.commit
+        bind: originalInvocationId
+      failureClassPath: receipt.failureClass
+      failureClasses:
+      - id: openamsm.mas.owner.rejected
+        outcome: NOT_COMMITTED
+        proofSchema: urn:openamsm:mas:v1alpha4:commit-proof
+        proofPath: receipt.commit
+        noSideEffect: true
+        retryable: false
+  - kind: operation
+    id: PA.DELETE_SM_POLICY_C
+    effect: MUTATION
+    ownerOutcomes:
+    - SUCCEEDED
+    - FAILED
+    - NOT_COMMITTED
+    inputSchema:
+      $ref: urn:openamsm:mas:v1alpha4:pa-delete_sm_policy_c-input
+    outputSchema:
+      $ref: urn:openamsm:mas:v1alpha4:pa-delete_sm_policy_c-output
+    guarantees:
+      evidence:
+        provides:
+        - guarantee: pa.policy-association-released
+          path: output
+    receiptSchema:
+      $ref: urn:openamsm:mas:v1alpha4:mutation-receipt
+    mutation:
+      commitProof:
+        schema: urn:openamsm:mas:v1alpha4:commit-proof
+        path: receipt.commit
+        bind: originalInvocationId
+      failureClassPath: receipt.failureClass
+      failureClasses:
+      - id: openamsm.mas.owner.rejected
+        outcome: NOT_COMMITTED
+        proofSchema: urn:openamsm:mas:v1alpha4:commit-proof
+        proofPath: receipt.commit
+        noSideEffect: true
+        retryable: false
+  - kind: operation
+    id: UPN.DELETE_UP_SESSION
+    effect: MUTATION
+    ownerOutcomes:
+    - SUCCEEDED
+    - FAILED
+    - NOT_COMMITTED
+    inputSchema:
+      $ref: urn:openamsm:mas:v1alpha4:upn-delete_up_session-input
+    outputSchema:
+      $ref: urn:openamsm:mas:v1alpha4:upn-delete_up_session-output
+    guarantees:
+      evidence:
+        provides:
+        - guarantee: upn.up-session-released
+          path: output
+    receiptSchema:
+      $ref: urn:openamsm:mas:v1alpha4:mutation-receipt
+    mutation:
+      commitProof:
+        schema: urn:openamsm:mas:v1alpha4:commit-proof
+        path: receipt.commit
+        bind: originalInvocationId
+      failureClassPath: receipt.failureClass
+      failureClasses:
+      - id: openamsm.mas.owner.rejected
+        outcome: NOT_COMMITTED
+        proofSchema: urn:openamsm:mas:v1alpha4:commit-proof
+        proofPath: receipt.commit
+        noSideEffect: true
+        retryable: false
+  - kind: operation
+    id: SE.EMIT_RELEASE_EVENT_C
+    effect: MUTATION
+    ownerOutcomes:
+    - SUCCEEDED
+    - FAILED
+    - NOT_COMMITTED
+    inputSchema:
+      $ref: urn:openamsm:mas:v1alpha4:se-emit_release_event_c-input
+    outputSchema:
+      $ref: urn:openamsm:mas:v1alpha4:se-emit_release_event_c-output
+    guarantees:
+      evidence:
+        provides:
+        - guarantee: se.release-event-marker-written
+          path: output
+    receiptSchema:
+      $ref: urn:openamsm:mas:v1alpha4:mutation-receipt
+    mutation:
+      commitProof:
+        schema: urn:openamsm:mas:v1alpha4:commit-proof
+        path: receipt.commit
+        bind: originalInvocationId
+      failureClassPath: receipt.failureClass
+      failureClasses:
+      - id: openamsm.mas.owner.rejected
+        outcome: NOT_COMMITTED
+        proofSchema: urn:openamsm:mas:v1alpha4:commit-proof
+        proofPath: receipt.commit
+        noSideEffect: true
+        retryable: false
+  - kind: operation
+    id: SC.RELEASE_SM_CONTEXT_C
+    effect: MUTATION
+    ownerOutcomes:
+    - SUCCEEDED
+    - FAILED
+    - NOT_COMMITTED
+    inputSchema:
+      $ref: urn:openamsm:mas:v1alpha4:sc-release_sm_context_c-input
+    outputSchema:
+      $ref: urn:openamsm:mas:v1alpha4:sc-release_sm_context_c-output
+    guarantees:
+      evidence:
+        provides:
+        - guarantee: sc.context-release-committed
+          path: output
+    receiptSchema:
+      $ref: urn:openamsm:mas:v1alpha4:mutation-receipt
+    mutation:
+      commitProof:
+        schema: urn:openamsm:mas:v1alpha4:commit-proof
+        path: receipt.commit
+        bind: originalInvocationId
+      failureClassPath: receipt.failureClass
+      failureClasses:
+      - id: openamsm.mas.owner.rejected
+        outcome: NOT_COMMITTED
+        proofSchema: urn:openamsm:mas:v1alpha4:commit-proof
+        proofPath: receipt.commit
+        noSideEffect: true
+        retryable: false
+  - kind: operation
+    id: MAS.RECEIPT_QUERY
+    effect: READ
+    ownerOutcomes:
+    - SUCCEEDED
+    - FAILED
+    inputSchema:
+      $ref: urn:openamsm:mas:v1alpha4:mas-receipt_query-input
+    outputSchema:
+      $ref: urn:openamsm:mas:v1alpha4:mas-receipt_query-output
+    guarantees:
+      evidence:
+        provides:
+        - guarantee: mas.receipt-query
+          path: output
+  - kind: operation
+    id: MAS.RECONCILE
+    effect: READ
+    ownerOutcomes:
+    - SUCCEEDED
+    - FAILED
+    inputSchema:
+      $ref: urn:openamsm:mas:v1alpha4:mas-reconcile-input
+    outputSchema:
+      $ref: urn:openamsm:mas:v1alpha4:mas-reconcile-output
+    guarantees:
+      evidence:
+        provides:
+        - guarantee: mas.exact-original-reconcile
+          path: output
