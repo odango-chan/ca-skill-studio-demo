@@ -30,7 +30,7 @@ async function fixtureInput(){
       id:rootAliases.get(snapshot.key.packageId)??"transitive-types",
       kind:"interface-package",
       snapshotDigest:studioSnapshot.snapshotDigest,
-      files:snapshot.files
+      files:snapshot.files.map(file=>({...file}))
     };
   }));
   return {
