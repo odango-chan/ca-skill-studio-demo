@@ -1,4 +1,5 @@
 import { isProcedurePath } from "./bridge.mjs";
+import { preferredProcedureDocument } from "./ai-authoring-editor.mjs";
 import { openNativeSource } from "./native-source.mjs";
 
 const preferenceKey = "skillStudio.workspaceMode";
@@ -17,13 +18,29 @@ export function registerWorkspaceMode(vscode, context, { authoring, showWelcome 
     try {
       if (next === "ai") {
         const editor = vscode.window.activeTextEditor;
-        if (editor) consoleEditor = editor;
+        if (editor?.document && isProcedurePath(editor.document.uri?.path)) {
+          consoleEditor = editor;
+        }
         if (!await authoring.open({ pick: !startup })) return false;
+
+        // Theia may report a non-Procedure native tab as active while the AI
+        // panel owns the current Procedure. Keep the actual AI write target as
+        // the Console return target instead of remembering that unrelated tab.
+        const procedure = authoring.getDocument?.();
+        if (procedure && isProcedurePath(procedure.uri?.path) &&
+            (consoleEditor?.document !== procedure || consoleEditor.document.isClosed)) {
+          consoleEditor = { document: procedure };
+        }
       } else {
         const savedDocument = consoleEditor?.document;
         const activeDocument = vscode.window.activeTextEditor?.document;
-        const document = mode === "ai" && savedDocument && !savedDocument.isClosed
-          ? savedDocument : activeDocument ?? authoring.getDocument();
+        const workbenchDocument = authoring.getDocument?.();
+        const document = mode === "ai"
+          ? preferredProcedureDocument(
+              savedDocument && !savedDocument.isClosed ? savedDocument : activeDocument,
+              workbenchDocument,
+            )
+          : activeDocument ?? workbenchDocument;
         if (document) {
           const options = {
             viewColumn: vscode.ViewColumn.One, preview: false, preserveFocus: false,
