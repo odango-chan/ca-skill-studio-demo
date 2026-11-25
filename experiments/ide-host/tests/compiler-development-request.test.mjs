@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {readFileSync} from "node:fs";
-import {decodeBase64,base64Bytes,calculateCompilerDependencySnapshotDigest}
+import {decodeBase64,base64Bytes,calculateSnapshot,calculateCompilerDependencySnapshotDigest}
   from "../vscode/src/dependency-snapshot.mjs";
 import {createCompilerDevelopmentBuildRequest,
   COMPILER_DEVELOPMENT_BUILD_REQUEST_API_VERSION,
@@ -116,5 +116,58 @@ test("root aliases must match the exact stable Package ID from the locked manife
   await assert.rejects(
     createCompilerDevelopmentBuildRequest(input),
     error=>error.code==="DEVELOPMENT_BUILD_ROOT_PACKAGE_ID_MISMATCH"
+  );
+});
+
+
+test("tampered resolver bytes and unsupported snapshot kinds fail closed",async()=>{
+  const tampered=fixtureInput();
+  const root=tampered.resolvedDependencies.snapshots.find(item=>item.id==="ca");
+  const source=root.files.find(item=>item.path==="tool-catalog.yaml");
+  source.bytes=base64Bytes(Uint8Array.from(decodeBase64(source.bytes),byte=>byte^1));
+  await assert.rejects(
+    createCompilerDevelopmentBuildRequest(tampered),
+    error=>error.code==="DEVELOPMENT_BUILD_SNAPSHOT_DIGEST_MISMATCH"
+  );
+
+  const unsupported=fixtureInput();
+  unsupported.resolvedDependencies.snapshots[0].kind="tool-catalog";
+  await assert.rejects(
+    createCompilerDevelopmentBuildRequest(unsupported),
+    error=>error.code==="DEVELOPMENT_BUILD_DEPENDENCY_KIND_UNSUPPORTED"
+  );
+});
+
+test("dependency cycles and conflicting package versions fail closed",async()=>{
+  const cycle=fixtureInput();
+  const transitive=cycle.resolvedDependencies.snapshots.find(item=>item.id==="transitive-types");
+  const manifestFile=transitive.files.find(item=>item.path==="package.json");
+  const manifest=JSON.parse(decoder.decode(decodeBase64(manifestFile.bytes)));
+  manifest.dependencies=[{alias:"tools",packageId:"urn:example:ca:tools",version:"1.0.0"}];
+  manifestFile.bytes=base64Bytes(new TextEncoder().encode(JSON.stringify(manifest)));
+  transitive.snapshotDigest=(await calculateSnapshot(transitive.files.map(file=>({
+    path:file.path,bytes:decodeBase64(file.bytes)
+  })))).snapshotDigest;
+  await assert.rejects(
+    createCompilerDevelopmentBuildRequest(cycle),
+    error=>error.code==="DEVELOPMENT_BUILD_DEPENDENCY_CYCLE"
+  );
+
+  const conflict=fixtureInput();
+  const contract=conflict.documents.find(item=>item.relativePath==="assurance/contract.yaml");
+  contract.text+="  types-v2: urn:example:ca:types\\n";
+  const typesV2=fixtureInput().resolvedDependencies.snapshots.find(item=>item.id==="transitive-types");
+  const typesManifestFile=typesV2.files.find(item=>item.path==="package.json");
+  const typesManifest=JSON.parse(decoder.decode(decodeBase64(typesManifestFile.bytes)));
+  typesManifest.version="2.0.0";
+  typesManifestFile.bytes=base64Bytes(new TextEncoder().encode(JSON.stringify(typesManifest)));
+  typesV2.id="types-v2";
+  typesV2.snapshotDigest=(await calculateSnapshot(typesV2.files.map(file=>({
+    path:file.path,bytes:decodeBase64(file.bytes)
+  })))).snapshotDigest;
+  conflict.resolvedDependencies.snapshots.push(typesV2);
+  await assert.rejects(
+    createCompilerDevelopmentBuildRequest(conflict),
+    error=>error.code==="DEVELOPMENT_BUILD_PACKAGE_VERSION_CONFLICT"
   );
 });
