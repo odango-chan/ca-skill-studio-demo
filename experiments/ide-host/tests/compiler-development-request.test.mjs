@@ -155,7 +155,7 @@ test("dependency cycles and conflicting package versions fail closed",async()=>{
 
   const conflict=fixtureInput();
   const contract=conflict.documents.find(item=>item.relativePath==="assurance/contract.yaml");
-  contract.text+="  types-v2: urn:example:ca:types\\n";
+  contract.text+="  types-v2: urn:example:ca:types\n";
   const typesV2=fixtureInput().resolvedDependencies.snapshots.find(item=>item.id==="transitive-types");
   const typesManifestFile=typesV2.files.find(item=>item.path==="package.json");
   const typesManifest=JSON.parse(decoder.decode(decodeBase64(typesManifestFile.bytes)));
