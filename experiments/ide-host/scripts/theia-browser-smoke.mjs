@@ -1409,9 +1409,10 @@ try{
   await command("Input.dispatchMouseEvent",{type:"mouseMoved",x:replacePosition.x,y:replacePosition.y});
   await command("Input.dispatchMouseEvent",{type:"mousePressed",x:replacePosition.x,y:replacePosition.y,button:"left",clickCount:1});
   await command("Input.dispatchMouseEvent",{type:"mouseReleased",x:replacePosition.x,y:replacePosition.y,button:"left",clickCount:1});
-  let upgradedIdentity=null,upgradedEvidence=null;
+  let upgradedIdentity=null,upgradedEvidence=null,exampleImport=null;
   for(let attempt=0;attempt<120;attempt++){
     try{
+      exampleImport=await evalJS("(()=>{const c=window.theia?.container;if(!c)return null;const k=[...(c._bindingDictionary?._map?.keys?.()??[])].find(x=>typeof x==='function'&&x.prototype?.executeCommand&&x.prototype?.registerCommand&&x.prototype?.getCommand);return k?c.get(k).executeCommand('skillStudio.internal.exampleLoadAcceptance'):null})()");
       upgradedIdentity=await evalJS("(()=>{const c=window.theia?.container;if(!c)return null;const k=[...(c._bindingDictionary?._map?.keys?.()??[])].find(x=>typeof x==='function'&&x.prototype?.executeCommand&&x.prototype?.registerCommand&&x.prototype?.getCommand);return k?c.get(k).executeCommand('skillStudio.internal.workspaceIdentityAcceptance'):null})()");
       if(upgradedIdentity?.contractCurrentShape===true&&
          upgradedIdentity?.procedureCurrentShape===true){
@@ -1429,7 +1430,8 @@ try{
      upgradedEvidence?.packageInventory?.packages?.length!==4||
      upgradedEvidence?.failures?.length)
     throw Error("Explicit Example replacement did not restore a clean current v1alpha5 project: "+
-      JSON.stringify({identity:upgradedIdentity,activation:upgradedEvidence}).slice(0,3200));
+      JSON.stringify({identity:upgradedIdentity,activation:upgradedEvidence,
+        exampleImport}).slice(0,4200));
   console.log("STUDIO_LEGACY_EXAMPLE_REPLACEMENT_CHROMIUM_PASS",JSON.stringify({
     menu:recoveryMenu,legacyVersion:legacyIdentity.contractApiVersion,
     cancelPreserved:afterCancel.contractApiVersion,
