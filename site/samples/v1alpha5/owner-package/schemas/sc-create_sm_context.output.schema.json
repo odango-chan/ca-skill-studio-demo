@@ -1,0 +1,28 @@
+{
+  "$id": "urn:openamsm:mas:v1alpha4:sc-create_sm_context-output",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "lifecycle": {
+      "const": "OPERATIONAL",
+      "maxLength": 255,
+      "minLength": 1,
+      "type": "string"
+    },
+    "session_keys": {
+      "maxLength": 255,
+      "minLength": 1,
+      "type": "string"
+    },
+    "sm_context_ref": {
+      "maxLength": 255,
+      "minLength": 1,
+      "type": "string"
+    }
+  },
+  "required": [
+    "session_keys",
+    "lifecycle"
+  ],
+  "type": "object"
+}

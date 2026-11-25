@@ -1,0 +1,17 @@
+{
+  "$id": "urn:openamsm:mas:v1alpha4:sc-register_uecm-output",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "uecm_registered": {
+      "const": "1",
+      "maxLength": 255,
+      "minLength": 1,
+      "type": "string"
+    }
+  },
+  "required": [
+    "uecm_registered"
+  ],
+  "type": "object"
+}
