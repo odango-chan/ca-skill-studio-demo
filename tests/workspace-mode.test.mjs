@@ -183,8 +183,8 @@ test("entering AI from Console preserves a selected non-Procedure source documen
   const vscode = {
     ViewColumn: { One: 1 },
     window: {
-      activeTextEditor: contractEditor,
-      visibleTextEditors: [procedureEditor],
+      activeTextEditor: procedureEditor,
+      visibleTextEditors: [contractEditor],
       showWarningMessage: message => assert.fail(message),
       showTextDocument: async (...args) => opened.push(args),
     },
