@@ -219,8 +219,18 @@ export function createSkillLanguageClient(vscode, context, handlers = {}) {
     }
     const provider={
       async provideCompletionItems(document,position,cancellationToken,context){
+        const lspContext=toLspCompletionContext(context);
+        const lineText=document.lineAt(position.line).text;
         handlers.onCompletionProviderRequest?.({
-          uri:document.uri.toString(),position:{line:position.line,character:position.character}
+          uri:document.uri.toString(),
+          languageId:document.languageId,
+          version:document.version,
+          position:{line:position.line,character:position.character},
+          lineText,
+          prefix:lineText.slice(0,position.character),
+          editorTriggerKind:context?.triggerKind??null,
+          lspTriggerKind:lspContext.triggerKind,
+          triggerCharacter:context?.triggerCharacter??null
         });
         if(stopped||terminalFailure||!started||cancellationToken?.isCancellationRequested)
           return [];
@@ -228,7 +238,7 @@ export function createSkillLanguageClient(vscode, context, handlers = {}) {
           const result=await client.sendRequest(CompletionRequest.type,{
             textDocument:{uri:document.uri.toString()},
             position:{line:position.line,character:position.character},
-            context:toLspCompletionContext(context)
+            context:lspContext
           },cancellationToken);
           if(cancellationToken?.isCancellationRequested)return [];
           const nativeItems=toNativeCompletionItems(result,vscode);
