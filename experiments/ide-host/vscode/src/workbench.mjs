@@ -1186,7 +1186,16 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
       await openNativeSource(vscode,procedureUri,{
         viewColumn:vscode.ViewColumn.One,preserveFocus:false,preview:false
       });
-      const editor=vscode.window.activeTextEditor;
+      // A completion-provider acceptance probe may leave the Output channel
+      // as the active editor in the browser-only host. Reassert the exact
+      // Source document through the public text-editor API before inspecting
+      // decoration application; this is acceptance setup, not editor logic.
+      let editor=vscode.window.activeTextEditor;
+      if(editor?.document?.uri?.toString()!==document.uri.toString()){
+        editor=await vscode.window.showTextDocument(document,{
+          viewColumn:vscode.ViewColumn.One,preserveFocus:false,preview:false
+        });
+      }
       return {
         uri:document.uri.toString(),
         languageId:document.languageId,
