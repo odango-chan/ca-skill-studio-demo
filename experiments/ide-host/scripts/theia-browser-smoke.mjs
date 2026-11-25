@@ -2187,7 +2187,7 @@ try{
     // Unlike the unqualified 5GC mock proposal above, this verifies an exact
     // Compiler-qualified candidate in the native VS Code/Theia editor.
     const synthetic=await nativeCommand("skillStudio.internal.syntheticAuthoringApplyAcceptance");
-    if(synthetic?.compilerVersion!=="v2.0.2"||
+    if(synthetic?.compilerVersion!=="2.1.0"||
        synthetic?.qualification!=="SYNTHETIC_TEST_ONLY"||
        synthetic?.compilerBaseline?.errors!==0||
        synthetic?.compilerCandidate?.errors!==0||
@@ -2221,7 +2221,7 @@ try{
 
     // This additional PASS must be produced from the actual standalone
     // AI Editor Tab, not from the independent native-edit acceptance command.
-    // The Node test host stages the official pinned Compiler v2.0.2 fixture
+    // The Node test host stages a trusted v1alpha5 fixture produced by artifact generator 2.0.2
     // under an isolated temporary directory, never a real 5GC Package.
     const prepared=await nativeCommand("skillStudio.internal.prepareSyntheticEditorTabAcceptance");
     if(prepared?.ready!==true||prepared?.syntheticOnly!==true)
@@ -2319,7 +2319,7 @@ try{
       while(Date.now()<qualifiedDeadline&&!readyView){
         const view=await readAiView();
         if(view?.candidateSource.includes("FAIL: FAILED")&&
-           view.compilerStatus.includes("Compiler v2.0.2 Check: PASS")&&
+           view.compilerStatus.includes("Compiler 2.1.0 Check: PASS")&&
            view.applyDisabled===false)readyView=view;
         if(!readyView)await sleep(100);
       }
@@ -2371,7 +2371,7 @@ try{
         JSON.stringify({
           qualification:"SYNTHETIC_TEST_ONLY",modelSource:"MOCK_GATEWAY",
           modelProposalSchema:"PASS",selectedPatch:"PASS",
-          compilerVersion:"v2.0.2",compilerCheck:"PASS",
+          compilerVersion:"2.1.0",artifactGeneratorVersion:"2.0.2",compilerCheck:"PASS",
           nativeWorkspaceEdit:"PASS",frontendUndo:"PASS",
           unsavedDiskUnchanged:true,autoSaved:false,
           undoCommand:undoCommandForTab,
