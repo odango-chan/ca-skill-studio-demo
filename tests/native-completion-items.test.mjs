@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { toNativeCompletionItems } from "../experiments/ide-host/lsp-browser/client/src/native-completion-items.mjs";
+import { toLspCompletionContext } from "../experiments/ide-host/lsp-browser/client/src/completion-context.mjs";
 
 class Range {
   constructor(startLine,startCharacter,endLine,endCharacter) {
@@ -66,4 +67,14 @@ test("native completion bridge preserves InsertReplaceEdit ranges and snippets",
 test("native completion bridge accepts an empty or absent CompletionList",()=>{
   assert.deepEqual(toNativeCompletionItems({items:[]},vscode),[]);
   assert.deepEqual(toNativeCompletionItems(null,vscode),[]);
+});
+
+test("native CompletionTriggerKind values are translated to the LSP enum",()=>{
+  assert.deepEqual(toLspCompletionContext({triggerKind:0}),{triggerKind:1});
+  assert.deepEqual(toLspCompletionContext({triggerKind:1}),{triggerKind:2});
+  assert.deepEqual(toLspCompletionContext({triggerKind:2}),{triggerKind:3});
+  assert.deepEqual(toLspCompletionContext({}),{triggerKind:1});
+  assert.deepEqual(toLspCompletionContext({
+    triggerKind:1,triggerCharacter:":"
+  }),{triggerKind:2,triggerCharacter:":"});
 });
