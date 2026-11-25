@@ -90,7 +90,8 @@ test("Pages stages and smoke-tests the exact Compiler v2.1.0 Development Worker 
   const compilerCommit="b67fbb56c34d15b8d5a0903c8a7ca93d608f8f65";
   assert.ok(workflow.includes("repository: odango-chan/ca-skill-compiler"));
   assert.ok(workflow.includes("ref: "+compilerCommit));
-  assert.ok(workflow.includes("Verify pinned CA Skill Compiler v2.1.0 source identity"));\n  assert.ok(workflow.includes("git rev-parse HEAD"));
+  assert.ok(workflow.includes("Verify pinned CA Skill Compiler v2.1.0 source identity"));
+  assert.ok(workflow.includes("git rev-parse HEAD"));
   assert.ok(workflow.includes(compilerCommit));
   assert.ok(workflow.includes("Download and verify official Compiler v2.1.0 Worker bundle"));
   assert.ok(workflow.includes("skillc-v2.1.0-web-worker.tar.gz"));
