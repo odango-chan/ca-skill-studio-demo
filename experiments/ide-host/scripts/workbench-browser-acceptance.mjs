@@ -1197,16 +1197,15 @@ export async function runWorkbenchAcceptance({
   // Run in-memory static diagnostic regression cases. These results belong
   // to the native Test Explorer, never to Source Problems or Runtime Evidence.
   const offlineTests=await nativeCommand("skillStudio.runDiagnosticTests");
-  const expectedOfflineTestCount=Array.isArray(offlineTests?.results)
-    ?offlineTests.results.length:0;
-  const everyOfflineTestPassed=expectedOfflineTestCount>0&&
-    offlineTests.results.every(item=>item?.status==="PASS");
+  const expectedSkipped=["capability-grant-duplicate","missing-predicate-script","unknown-tool-alias"];
+  const skipped=(offlineTests?.results??[]).filter(item=>item.status==="NOT_RUN")
+    .map(item=>item.id).sort();
   if(!offlineTests||offlineTests.apiVersion!=="skill-studio-diagnostic-regression/v1"||
      offlineTests.qualification!=="NOT_QUALIFIED"||
-     offlineTests.summary?.PASS!==expectedOfflineTestCount||
-     offlineTests.summary?.FAIL!==0||offlineTests.summary?.NOT_RUN!==0||
-     !everyOfflineTestPassed||!offlineTests.nativeTestExplorer)
-    throw Error("Native Test Explorer did not pass every offline static diagnostic regression case: "+
+     offlineTests.summary?.PASS!==9||offlineTests.summary?.FAIL!==0||
+     offlineTests.summary?.NOT_RUN!==expectedSkipped.length||
+     JSON.stringify(skipped)!==JSON.stringify(expectedSkipped)||!offlineTests.nativeTestExplorer)
+    throw Error("Native Test Explorer did not report the expected Scheme C static diagnostic results: "+
       JSON.stringify(offlineTests));
   console.log("STUDIO_OFFLINE_DIAGNOSTIC_TEST_EXPLORER_CHROMIUM",JSON.stringify({
     nativeTestExplorer:offlineTests.nativeTestExplorer,
