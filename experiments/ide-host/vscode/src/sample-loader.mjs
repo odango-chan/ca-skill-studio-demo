@@ -1,6 +1,7 @@
 // Explicit Example project import for VS Code desktop/web or Theia browser-only OPFS.
 // Replacing an existing Example is a deliberate, user-confirmed operation that
-// deletes the Example root and recreates it from the single pinned v1alpha5 source.
+// replaces all authored project contents from the pinned v1alpha5 source while
+// preserving host-owned workspace settings and immutable dependency snapshots.
 // Ordinary projects are never passed to this importer. It never creates lib/ or output/.
 import {writeImmutableSnapshot} from "./dependency-service.mjs";
 import {EXAMPLE_INTERFACE_ARCHIVE,prepareExampleInterfaceDependency,
