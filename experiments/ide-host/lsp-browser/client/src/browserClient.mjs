@@ -260,8 +260,11 @@ export function createSkillLanguageClient(vscode, context, handlers = {}) {
       }
     };
     completionRegistration=vscode.languages.registerCompletionItemProvider(
-      {language:"yaml",scheme:"file"},
-      provider,":","/","."
+      [
+        {scheme:"file",pattern:"**/*.yaml"},
+        {scheme:"file",pattern:"**/*.yml"}
+      ],
+      provider,":","/",".")
     );
     handlers.onCompletionProviderRegistered?.({registered:true,transport:"browser-lsp-worker"});
     output.appendLine("Registered Theia native YAML CompletionItemProvider over the shared Skill Language Worker");
@@ -331,7 +334,12 @@ export function createSkillLanguageClient(vscode, context, handlers = {}) {
       // Keep the standard LSP completion provider on VS Code only.
       ...(handlers.manualCompletionProvider===true?{
         middleware:{
-          provideCompletionItem(){return [];}
+          provideCompletionItem(document,position,context,token,next){
+            // The manual bridge owns YAML completion in Theia; preserve the
+            // standard LanguageClient provider for Python and other documents.
+            if(/\\.ya?ml$/i.test(document.uri.path))return [];
+            return next(document,position,context,token);
+          }
         }
       }:{}),
       initializationOptions: handlers.localSemanticTokens === true
