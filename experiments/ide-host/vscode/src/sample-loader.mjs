@@ -227,9 +227,9 @@ export async function ensureOpenedExampleDependencies(vscode,extensionUri,storag
   const candidate=validate(JSON.parse(decoder.decode(
     await readBundledResource(vscode,manifestUri))),{
       kind:"CA-SL v1alpha5",
-      sourceSha:"83d9e0c7d523189a1ae03186f8913277f0829d72",
+      sourceSha:"b06f72baae3eb3d578c489f950a325e2d63d556f",
       sourceStatus:"OWNER_LINKED_STATIC_BUILD_PASS_E2E_NOT_RERUN",
-      sourceRef:"refs/pull/86/head",
+      sourceRef:"refs/heads/main",
       languageVersion:"connectionagent.io/v1alpha5",
       projectReadme:"README.md"
     });
@@ -272,9 +272,9 @@ export async function seedExampleProject(vscode,extensionUri,storageUri,
       catch(error){fail("Cannot read CA-SL v1alpha5 manifest: "+JSON.stringify(describeError(error)));}
       return validate(JSON.parse(decoder.decode(bytes)),{
         kind:"CA-SL v1alpha5",
-        sourceSha:"83d9e0c7d523189a1ae03186f8913277f0829d72",
+        sourceSha:"b06f72baae3eb3d578c489f950a325e2d63d556f",
         sourceStatus:"OWNER_LINKED_STATIC_BUILD_PASS_E2E_NOT_RERUN",
-        sourceRef:"refs/pull/86/head",
+        sourceRef:"refs/heads/main",
         languageVersion:"connectionagent.io/v1alpha5",
         projectReadme:"README.md"
       });
