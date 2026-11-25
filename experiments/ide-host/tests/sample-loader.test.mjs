@@ -182,6 +182,11 @@ test("Existing Example stays untouched unless replacement is explicitly requeste
   seedFiles.push([root+"/examples/v1alpha4-candidate/README.md",
     new TextEncoder().encode("old candidate staging")]);
   seedFiles.push([root+"/local-note.md",new TextEncoder().encode("local Example note")]);
+  seedFiles.push([skillRoot+"/establish-pdu-session/assurance/retired-extra.yaml",
+    new TextEncoder().encode("retired skill content")]);
+  seedFolders.push(skillRoot+"/retired-skill",skillRoot+"/retired-skill/assurance");
+  seedFiles.push([skillRoot+"/retired-skill/assurance/procedure.yaml",
+    new TextEncoder().encode("retired skill procedure")]);
   const h=host(null,{files:seedFiles,folders:seedFolders});
 
   const kept=await seedExampleProject(h.vscode,uri("/extension"),uri("/global-storage"));
@@ -223,6 +228,10 @@ test("Existing Example stays untouched unless replacement is explicitly requeste
     root+"/examples/v1alpha4-candidate/README.md",
     root+"/local-note.md"
   ])assert.equal(h.files.has(retiredPath),false,"replacement removes "+retiredPath);
+  assert.equal(h.files.has(skillRoot+"/establish-pdu-session/assurance/retired-extra.yaml"),false,
+    "replacement removes retired files inside preserved active Skill directories");
+  assert.equal(h.folders.has(skillRoot+"/retired-skill"),false,
+    "replacement removes Skills outside the current pinned manifest");
   assert.deepEqual(h.files.get(skillRoot+"/establish-pdu-session-mas/SKILL.md"),
     bundled("establish-pdu-session-mas/SKILL.md"),
     "the active Skill path is recreated from the v1alpha5 snapshot");
