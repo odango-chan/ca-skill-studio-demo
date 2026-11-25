@@ -21,14 +21,14 @@ export function registerWorkspaceMode(vscode, context, { authoring, showWelcome 
   let mode = context.globalState.get(preferenceKey) === "console" ? "console" : "ai";
   let consoleEditor;
   let switching = false;
+  let suppressEditorEvents = false;
   let waitForProcedure;
 
-  // Track source navigation only while Console is the visible workspace mode.
-  // Theia may keep a different native tab in activeTextEditor while AI is open.
+  // Track user navigation while Console is active. Ignore the delayed native
+  // editor event caused by restoring Console itself; it may refer to a stale tab.
   const sourceEditorListener = vscode.window.onDidChangeActiveTextEditor(editor => {
-    if (mode !== "console") return;
-    const visible = visibleSourceEditor(vscode) ?? editor;
-    if (visible?.document) consoleEditor = visible;
+    if (mode !== "console" || switching || suppressEditorEvents || !editor?.document) return;
+    if (editor.document !== consoleEditor?.document) consoleEditor = editor;
   });
   context.subscriptions.push(sourceEditorListener);
 
@@ -39,15 +39,15 @@ export function registerWorkspaceMode(vscode, context, { authoring, showWelcome 
     switching = true;
     try {
       if (next === "ai") {
-        // Do not recapture a Console document that was already tracked. Theia
-        // can report a stale tab at the mode boundary; the saved editor is the
-        // authoritative return target until Console navigation changes it.
-        if (startup || (mode !== "ai" && (!consoleEditor?.document || consoleEditor.document.isClosed))) {
+        // Keep the last Console editor object (including selection/undo state).
+        // Only seed it if startup or no live Console source has been tracked.
+        if (startup || !consoleEditor?.document || consoleEditor.document.isClosed) {
           const editor = visibleSourceEditor(vscode);
           if (editor) consoleEditor = editor;
         }
         if (!await authoring.open({ pick: !startup })) return false;
       } else {
+        suppressEditorEvents = true;
         const savedDocument = consoleEditor?.document;
         const activeDocument = visibleSourceEditor(vscode)?.document;
         const document = mode === "ai" && savedDocument && !savedDocument.isClosed
@@ -63,9 +63,7 @@ export function registerWorkspaceMode(vscode, context, { authoring, showWelcome 
           // used by Preview and the semantic-token decoration renderer.
           if (document.isUntitled) await vscode.window.showTextDocument(document, options);
           else await openNativeSource(vscode, document.uri, options);
-          // Record the document we explicitly restored. Active-editor events
-          // emitted during the transition are ignored until Console is active.
-          if (previousEditor?.document !== document || document.isClosed) {
+          if (!previousEditor?.document || previousEditor.document.isClosed) {
             consoleEditor = { document };
           }
         } else if (await showWelcome() !== true) {
@@ -74,8 +72,16 @@ export function registerWorkspaceMode(vscode, context, { authoring, showWelcome 
       }
       mode = next;
       if (!startup) await context.globalState.update(preferenceKey, mode);
+      if (next === "console") {
+        // Allow Theia's restore-related active-editor event to settle before
+        // accepting subsequent user navigation as a new Console source.
+        setTimeout(() => { suppressEditorEvents = false; }, 300);
+      } else {
+        suppressEditorEvents = false;
+      }
       return true;
     } catch (error) {
+      suppressEditorEvents = false;
       void vscode.window.showWarningMessage("SKILL Studio mode: " + String(error?.message ?? error));
       return false;
     } finally {
