@@ -3,6 +3,7 @@ import { CompletionRequest, SemanticTokensRequest } from "vscode-languageserver-
 import { SKILL_SEMANTIC_TOKEN_TYPES, SKILL_SEMANTIC_TOKEN_MODIFIERS } from "../../../../../language/semantic-tokens.mjs";
 import studioLightTheme from "../../../../../extensions/skill-studio-theme/themes/skill-studio-light-color-theme.json";
 import { createSemanticTokenDecorationRenderer } from "./semantic-token-decorations.mjs";
+import { toNativeCompletionItems } from "./native-completion-items.mjs";
 
 export const PACKAGE_SNAPSHOT_NOTIFICATION = "skillStudio/packageSnapshot";
 export const PACKAGE_SNAPSHOT_ACCEPTED_NOTIFICATION = "skillStudio/packageSnapshotAccepted";
@@ -229,7 +230,7 @@ export function createSkillLanguageClient(vscode, context, handlers = {}) {
             }
           },cancellationToken);
           if(cancellationToken?.isCancellationRequested)return [];
-          return Array.isArray(result)?result:result?.items??[];
+          return toNativeCompletionItems(result,vscode);
         }catch(error){
           if(!stopped&&!terminalFailure)
             output.appendLine("Theia Schema completion request failed: "+
@@ -239,10 +240,7 @@ export function createSkillLanguageClient(vscode, context, handlers = {}) {
       }
     };
     completionRegistration=vscode.languages.registerCompletionItemProvider(
-      [
-        {scheme:"file",pattern:"**/*.yaml"},
-        {scheme:"file",pattern:"**/*.yml"}
-      ],
+      {language:"yaml",scheme:"file"},
       provider,":","/","."
     );
     handlers.onCompletionProviderRegistered?.({registered:true,transport:"browser-lsp-worker"});
