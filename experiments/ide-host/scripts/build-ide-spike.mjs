@@ -145,13 +145,13 @@ await rm(join(root,"samples","skills"),{recursive:true,force:true});
 await rm(join(root,"samples","v1alpha4"),{recursive:true,force:true});
 const sampleSets=[
   {kind:"v1alpha5",source:"site/samples/v1alpha5",destination:join(root,"samples","v1alpha5"),
-    status:"OWNER_LINKED_STATIC_BUILD_PASS_E2E_NOT_RERUN",ref:"refs/pull/86/head",
+    status:"OWNER_LINKED_STATIC_BUILD_PASS_E2E_NOT_RERUN",ref:"refs/heads/main",
     version:"connectionagent.io/v1alpha5"}
 ];
 for(const set of sampleSets){
   const manifest=JSON.parse(await readFile(join(set.source,"files.json"),"utf8"));
   if(manifest.schemaVersion!==1||manifest.sourceRepo!=="odango-chan/ca-skills"||
-     manifest.sourceSha!=="83d9e0c7d523189a1ae03186f8913277f0829d72"||
+     manifest.sourceSha!=="b06f72baae3eb3d578c489f950a325e2d63d556f"||
      manifest.sourceStatus!==set.status||manifest.sourceRef!==set.ref||
      (set.version&&manifest.languageVersion!==set.version)||
      JSON.stringify([...manifest.skills].sort())!==
