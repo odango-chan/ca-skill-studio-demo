@@ -21,9 +21,10 @@ const describeError=error=>({
   code:error?.code??null,
   message:String(error?.message??error)
 });
-async function clearDirectoryContents(vscode,fs,root,{preserveVscode=false}={}){
+async function clearDirectoryContents(vscode,fs,root,{preserveNames=[]}={}){
   if(typeof fs.readDirectory!=="function")
     fail("Host file system cannot enumerate the existing Example directory");
+  const preserved=new Set(preserveNames);
   let entries;
   try{entries=await fs.readDirectory(root);}
   catch(error){
@@ -34,19 +35,45 @@ async function clearDirectoryContents(vscode,fs,root,{preserveVscode=false}={}){
     if(typeof name!=="string"||!name||name==="."||name===".."||
        name.includes("/")||name.includes("\\"))
       fail("Host file system returned an unsafe Example child name");
-    // .vscode/settings.json controls the active Theia workspace. Deleting
-    // it during an explicit Example replacement can restart the extension
-    // host and abort the import halfway through. Replace it at the very end.
-    if(preserveVscode&&name===".vscode")continue;
+    // Keep the active workspace configuration and Skills directory handles
+    // stable. Theia's browser filesystem may have open editors beneath them;
+    // replacing their contents in place avoids deleting/recreating ancestors.
+    if(preserved.has(name))continue;
     const child=vscode.Uri.joinPath(root,name);
     await fs.delete(child,{recursive:true,useTrash:false});
   }
   const remaining=await fs.readDirectory(root);
-  if(remaining.some(([name])=>!preserveVscode||name!==".vscode")||
-     remaining.length>(preserveVscode?1:0))
+  if(remaining.some(([name])=>!preserved.has(name)))
     fail("Existing Example contents remain after replacement cleanup: "+
       remaining.map(([name])=>name).join(", "));
-  return entries.map(([name])=>name);
+  return entries.filter(([name])=>!preserved.has(name)).map(([name])=>name);
+}
+
+async function clearRetiredSkillFiles(vscode,fs,skillsRoot,keepFiles){
+  const entries=await fs.readDirectory(skillsRoot);
+  for(const [skillName] of entries){
+    if(!SKILLS.includes(skillName)){
+      await fs.delete(vscode.Uri.joinPath(skillsRoot,skillName),
+        {recursive:true,useTrash:false});
+      continue;
+    }
+    const skillRoot=vscode.Uri.joinPath(skillsRoot,skillName);
+    const visit=async(directory,relative)=>{
+      for(const [name,type] of await fs.readDirectory(directory)){
+        if(typeof name!=="string"||!name||name==="."||name===".."||
+           name.includes("/")||name.includes("\\"))
+          fail("Host file system returned an unsafe Skill child name");
+        const child=vscode.Uri.joinPath(directory,name);
+        const childRelative=relative?relative+"/"+name:name;
+        if(type===2){
+          await visit(child,childRelative);
+        }else if(!keepFiles.has(skillName+"/"+childRelative)){
+          await fs.delete(child,{recursive:true,useTrash:false});
+        }
+      }
+    };
+    await visit(skillRoot,"");
+  }
 }
 // Theia 1.76 browser-only currently supplies an HTTP(S) extensionUri in this
 // hosted-plugin worker. Fetch only same-origin extension assets in that case.
@@ -244,11 +271,13 @@ export async function seedExampleProject(vscode,extensionUri,storageUri,
     const replacedExisting=Boolean(replaceExisting&&hadExisting);
     if(replacedExisting){
       phase="replace-existing-example";
-      // The Example root is also the active workspace folder in Theia OPFS.
-      // Keep that directory handle/path stable and remove only its children;
-      // deleting the active workspace root itself is not a portable operation
-      // across VS Code and Theia filesystem providers.
-      await clearDirectoryContents(vscode,fs,root,{preserveVscode:true});
+      // The Example root, Skills root and current Skill folders can all have
+      // live Theia editor handles. Preserve those directory paths and replace
+      // their files in place; remove retired top-level Example content.
+      await clearDirectoryContents(vscode,fs,root,
+        {preserveNames:[".vscode","skills"]});
+      if(!(await exists(skillsRoot)))await fs.createDirectory(skillsRoot);
+      await clearRetiredSkillFiles(vscode,fs,skillsRoot,new Set(candidate.files));
     }else{
       phase="create-project-layout";
       await fs.createDirectory(root);
@@ -273,7 +302,7 @@ export async function seedExampleProject(vscode,extensionUri,storageUri,
       const parts=file.split("/");
       const destination=vscode.Uri.joinPath(skillsRoot,...parts);
       phase="stat-existing:"+file;
-      if(await exists(destination)){
+      if(await exists(destination)&&!replacedExisting){
         skipped++;
         report({phase:"files",completed:created+skipped,total});
         continue;
