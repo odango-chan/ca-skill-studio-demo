@@ -1483,7 +1483,8 @@ try{
     const restored=await sourceState('read');
     if(restored?.uri!==dirty.uri || restored.text!==dirty.text ||
         (dirty.dirty===true && restored.dirty!==true))
-      throw Error("Console round trip lost selected file or unsaved Source");
+      throw Error("Console round trip lost selected file or unsaved Source: "+
+        JSON.stringify({original,dirty,restored,mode:await readWorkspaceMode()}));
     await sourceState('undo');
     for(let attempt=0;attempt<40;attempt++){
       if((await sourceState('read'))?.text===original.text)break;
