@@ -143,7 +143,7 @@ await rm(join(root,"samples","skills"),{recursive:true,force:true});
 await rm(join(root,"samples","v1alpha4"),{recursive:true,force:true});
 const sampleSets=[
   {kind:"v1alpha5",source:"site/samples/v1alpha5",destination:join(root,"samples","v1alpha5"),
-    status:"RELEASED_NOT_QUALIFIED",ref:"refs/heads/main",
+    status:"OWNER_LINKED_STATIC_BUILD_PASS_E2E_NOT_RERUN",ref:"refs/pull/86/head",
     version:"connectionagent.io/v1alpha5"}
 ];
 for(const set of sampleSets){
@@ -153,10 +153,11 @@ for(const set of sampleSets){
      manifest.sourceStatus!==set.status||manifest.sourceRef!==set.ref||
      (set.version&&manifest.languageVersion!==set.version)||
      JSON.stringify([...manifest.skills].sort())!==
-       JSON.stringify(["establish-pdu-session","establish-pdu-session-mas",
+       JSON.stringify(["establish-pdu-session-mas",
          "modify-pdu-session-mas","release-pdu-session-mas"].sort())||
-     !manifest.blobs||!Array.isArray(manifest.files)||manifest.files.length<5||
-     manifest.files.length>100||new Set(manifest.files).size!==manifest.files.length||
+     !manifest.blobs||!Array.isArray(manifest.files)||manifest.files.length!==18||
+     new Set(manifest.files).size!==manifest.files.length||
+     !Array.isArray(manifest.dependencies)||manifest.dependencies.length!==2||
      !manifest.files.every(path=>
        typeof path==="string"&&!path.includes("\\")&&!path.startsWith("/")&&
        path.split("/").every(part=>part&&part!=="."&&part!=="..")&&
@@ -183,6 +184,41 @@ for(const set of sampleSets){
     await mkdir(dirname(target),{recursive:true});
     await writeFile(target,bytes);
   }
+  // Bundle the exact Owner ToolCatalog and Host context snapshots. They are
+  // dependencies, not authored Skill files, and must not be omitted from the
+  // browser/IDE extension package.
+  const dependencyDirectories=new Map([
+    ["mas","owner-package"],
+    ["ca-context","host-context"]
+  ]);
+  for(const dependency of manifest.dependencies){
+    const directory=dependencyDirectories.get(dependency.id);
+    if(!directory||!Array.isArray(dependency.files)||!dependency.blobs||
+       Object.keys(dependency.blobs).length!==dependency.files.length)
+      throw Error("Incomplete Example dependency snapshot: "+String(dependency.id));
+    for(const path of dependency.files){
+      const bytes=await readFile(join(set.source,directory,path));
+      const gitBlob=createHash("sha1").update("blob "+bytes.length+"\\0").update(bytes).digest("hex");
+      if(gitBlob!==dependency.blobs[path])
+        throw Error("Pinned Example dependency differs from source blob: "+dependency.id+"/"+path);
+      const target=join(set.destination,directory,path);
+      await mkdir(dirname(target),{recursive:true});
+      await writeFile(target,bytes);
+    }
+    if(dependency.id==="mas"){
+      const ownerManifest=JSON.parse(await readFile(join(set.source,directory,"manifest.json"),"utf8"));
+      if(ownerManifest.apiVersion!=="connectionagent.io/toolcatalog/v1alpha4"||
+         ownerManifest.buildIdentity!==dependency.source.buildIdentity||
+         Object.keys(ownerManifest.artifacts??{}).length!==58)
+        throw Error("Pinned OpenAMSM Owner ToolCatalog manifest is not the published v1alpha4 package");
+      for(const [path,expected] of Object.entries(ownerManifest.artifacts)){
+        const bytes=await readFile(join(set.source,directory,path));
+        const digest="sha256:"+createHash("sha256").update(bytes).digest("hex");
+        if(digest!==expected)
+          throw Error("Owner ToolCatalog artifact digest mismatch: "+path);
+      }
+    }
+  }
   // The release ZIP is a separate Provider artifact, NOT a ca-skills
   // authored Skill file. Ship its exact, independently SHA-verified bytes as
   // text so Theia/Pages and offline hosts seed the same immutable snapshot.
@@ -202,6 +238,9 @@ for(const set of sampleSets){
     kind:set.kind,root:set.destination,skills:manifest.skills,
     files:manifest.files.length,sourceSha:manifest.sourceSha,
     sourceStatus:manifest.sourceStatus,
+    dependencies:manifest.dependencies.map(item=>({
+      id:item.id,kind:item.kind,sourceRevision:item.resolvedRevision,files:item.files.length
+    })),
     exampleInterfaceAsset:artifact,exampleInterfaceSha256:digest
   }));
 }
