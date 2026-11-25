@@ -52,7 +52,7 @@ test("Compiler Worker client serializes requests and preserves response correlat
     const worker=FakeWorker.instances[0];
     assert.equal(worker.messages.length,2);
     assert.deepEqual(worker.messages.map(item=>item.command),["check","inspect"]);
-    assert.equal(worker.options.name,"skill-studio-compiler-v1alpha5");
+    assert.equal(worker.options.name,"skill-studio-compiler-v2.1.0");
   }finally{client.dispose();}
 });
 
@@ -138,7 +138,7 @@ test("Node extension hosts run the same pinned Go/WASM Compiler through worker_t
     const worker=FakeNodeWorker.instances[0];
     assert.equal(worker.path,"/extension/dist/compiler-node-worker.mjs");
     assert.equal(worker.options.workerData.wasmPath,"/extension/dist/skillc.wasm");
-    assert.equal(worker.options.name,"skill-studio-compiler-v1alpha5");
+    assert.equal(worker.options.name,"skill-studio-compiler-v2.1.0");
     assert.deepEqual(worker.messages.map(item=>item.command),["check","inspect"]);
   }finally{client.dispose();}
 });
