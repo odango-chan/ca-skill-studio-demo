@@ -59,12 +59,19 @@ export async function prepareExampleInterfaceDependency(encodedResource){
 }
 
 export function exampleWorkspaceSettingsContent(prepared){
-  if(!prepared?.settings||!prepared?.lock)
-    throw Error("Example Interface Package must be prepared and verified before seeding");
+  const items=Array.isArray(prepared)?prepared:[prepared];
+  if(!items.length||items.some(item=>!item?.declaration||!item?.lock))
+    throw Error("Every Example dependency must be prepared and verified before seeding");
+  const settings={
+    skillsRoot:"skills",
+    dependencies:items.map(item=>item.declaration),
+    dependencyLock:{version:"skillc.lock/v0.1",entries:items.map(item=>item.lock)}
+  };
+  validateProjectConfiguration(settings);
   const config={
     "connectionAgent.skillStudio.skillsRoot":"skills",
-    "connectionAgent.skillStudio.dependencies":prepared.settings.dependencies,
-    "connectionAgent.skillStudio.dependencyLock":prepared.settings.dependencyLock
+    "connectionAgent.skillStudio.dependencies":settings.dependencies,
+    "connectionAgent.skillStudio.dependencyLock":settings.dependencyLock
   };
   return new TextEncoder().encode(JSON.stringify(config,null,2)+"\n");
 }
