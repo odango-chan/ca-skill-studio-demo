@@ -245,6 +245,19 @@ export async function ensureOpenedExampleDependencies(vscode,extensionUri,storag
       languageVersion:"connectionagent.io/v1alpha5",
       projectReadme:"README.md"
     });
+  const skillsRoot=vscode.Uri.joinPath(root,"skills");
+  let names;
+  try{names=(await fs.readDirectory(skillsRoot)).map(([name])=>name).sort();}
+  catch(error){if(error?.code==="FileNotFound")return {status:"LEGACY_OR_UNKNOWN"};throw error;}
+  if(JSON.stringify(names)!==JSON.stringify([...SKILLS].sort()))
+    return {status:"LEGACY_OR_UNKNOWN"};
+  for(const relativePath of candidate.files){
+    let bytes;
+    try{bytes=await fs.readFile(vscode.Uri.joinPath(skillsRoot,...relativePath.split("/")));}
+    catch(error){if(error?.code==="FileNotFound")return {status:"LEGACY_OR_UNKNOWN"};throw error;}
+    if(await gitBlobSha1(bytes)!==candidate.blobs[relativePath])
+      return {status:"LEGACY_OR_UNKNOWN"};
+  }
   const prepared=await prepareExampleDependencies(vscode,extensionUri,candidate);
   const seeded=await persistExampleDependenciesIfAbsent(vscode,root,prepared);
   return {status:seeded?"SEEDED":"PRESERVED",
@@ -272,7 +285,7 @@ export async function seedExampleProject(vscode,extensionUri,storageUri,
       return validate(JSON.parse(decoder.decode(bytes)),{
         kind:"CA-SL v1alpha5",
         sourceSha:"83d9e0c7d523189a1ae03186f8913277f0829d72",
-        sourceStatus:"OWNER_LINKED_STATIC_BUILD_PASS_E2E_NOT_RUN",
+        sourceStatus:"OWNER_LINKED_STATIC_BUILD_PASS_E2E_NOT_RERUN",
         sourceRef:"refs/pull/86/head",
         languageVersion:"connectionagent.io/v1alpha5",
         projectReadme:"README.md"
@@ -281,7 +294,7 @@ export async function seedExampleProject(vscode,extensionUri,storageUri,
     const candidate=await readManifest();
     // Validate the EXACT bundled release ZIP before touching even an existing
     // Example. A missing/corrupt asset must never partially replace user work.
-    phase="verify-pinned-example-interface";
+    phase="verify-pinned-example-dependencies";
     const exampleDependencies=await prepareExampleDependencies(vscode,extensionUri,candidate);
     const root=vscode.Uri.joinPath(storageUri,EXAMPLE_PROJECT_NAME);
     const skillsRoot=vscode.Uri.joinPath(root,"skills");
