@@ -4,6 +4,7 @@ import { SKILL_SEMANTIC_TOKEN_TYPES, SKILL_SEMANTIC_TOKEN_MODIFIERS } from "../.
 import studioLightTheme from "../../../../../extensions/skill-studio-theme/themes/skill-studio-light-color-theme.json";
 import { createSemanticTokenDecorationRenderer } from "./semantic-token-decorations.mjs";
 import { toNativeCompletionItems } from "./native-completion-items.mjs";
+import { toLspCompletionContext } from "./completion-context.mjs";
 
 export const PACKAGE_SNAPSHOT_NOTIFICATION = "skillStudio/packageSnapshot";
 export const PACKAGE_SNAPSHOT_ACCEPTED_NOTIFICATION = "skillStudio/packageSnapshotAccepted";
@@ -227,10 +228,7 @@ export function createSkillLanguageClient(vscode, context, handlers = {}) {
           const result=await client.sendRequest(CompletionRequest.type,{
             textDocument:{uri:document.uri.toString()},
             position:{line:position.line,character:position.character},
-            context:{
-              triggerKind:context?.triggerKind??1,
-              ...(context?.triggerCharacter?{triggerCharacter:context.triggerCharacter}:{})
-            }
+            context:toLspCompletionContext(context)
           },cancellationToken);
           if(cancellationToken?.isCancellationRequested)return [];
           const nativeItems=toNativeCompletionItems(result,vscode);
