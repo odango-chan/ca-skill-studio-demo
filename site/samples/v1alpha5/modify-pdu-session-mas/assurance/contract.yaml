@@ -1,22 +1,21 @@
-# CA-SL v1alpha5. MAS exports and Evidence Guarantees are unpublished candidates.
+# CA-SL v1alpha5. The MAS dependency is the published OpenAMSM Owner contract
+# package (env-openamsm contracts/mas/v1alpha4).
 #
-# Goal scope: pdu_session.qos_delta_applied means the Owner accepted the PFCP
-# Update QER for the exact requested QFI/5QI/GBR/MBR target and dispatched the
-# native N1/N2 Modify (APPLIED), or authoritatively proved the exact target was
-# already in force (ALREADY). It does NOT prove RAN/UE acceptance and does NOT
-# prove an independent post-modification target read; those are separate
-# observations (RAN_MODIFICATION_CONFIRMED / TARGET_STATE_VERIFIED).
+# Goal scope: pdu_session.qos_delta_applied means the Owner decoded the exact
+# retained N1, accepted the PFCP Update QER for that exact QFI/5QI/GBR/MBR
+# target and dispatched the native N1/N2 Modify (APPLIED), or authoritatively
+# proved the exact target was already in force (ALREADY). It does NOT prove
+# RAN/UE acceptance and does NOT prove an independent post-modification target
+# read; those are separate observations.
 goal: pdu_session.qos_delta_applied
 precondition: validate-modify-request.precondition
 requestSchema: schemas/modify-request.schema.yaml
 contextSchema: ca-context::urn:connectionagent:ca:context:subject:v1
 dependencies:
   ca-context: urn:connectionagent:ca:host-context
-  mas: wtlab:packages:openamsm:mas-compiler-contract
+  mas: urn:openamsm:mas:tool-contracts
 capabilities:
-  - mas.sc.context.update
-  - mas.upn.up.session.modify
-  - mas.upn.up.qos.modify
-  - mas.ssm.ue.an.signal
+  - mas.ssm.n1.modify.parse
+  - mas.upn.up.qos.delta
 limits:
   maxActions: 16

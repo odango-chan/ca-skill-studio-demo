@@ -1,5 +1,10 @@
-# CA-SL v1alpha5. Operation nodes map only to declared OES steps.
-# The mas dependency and all new Owner exports remain unpublished candidates.
+# CA-SL v1alpha5. Scheme C occurrences of the merged OpenAMSM Owner.
+#
+# The Owner decodes the exact retained 5GSM PDU Session Modification Request
+# (0xc9) and applies the typed QoS delta in one native transaction
+# (`SSM.SIGNAL_UE_AN(parse_n1=1)` -> `UPN.MODIFY_UP_SESSION(qos_flows_delta=1)`).
+# The Host retains the original NAS bytes and the SUPI/PSI/generation; it never
+# derives the QoS target from an AMF JSON field.
 start: validate-modify-request
 nodes:
   validate-modify-request:
@@ -10,112 +15,61 @@ nodes:
             - context.supi
             - context.request.pduSessionId
             - context.request.entryKind
-            - context.request.qosFlowsDelta.qfi
       routes:
-        PASS: m0
+        PASS: parse-n1
         FAIL: FAILED
         UNKNOWN: UNRESOLVED
 
-  # OES m0: SC.UPDATE_SM_CONTEXT. ue_identity / psi are Owner scope bindings;
-  # the pinned OES step declares no operation inputs.
-  m0:
+  # Scheme C c-parse: read-only decode of the exact original N1. The Owner
+  # returns the typed GBR/MBR target; the Skill does not parse NAS.
+  parse-n1:
     operation:
-      tool: mas::SC.UPDATE_SM_CONTEXT
+      tool: mas::SSM.PARSE_N1_MODIFY
       arguments:
         ue_identity: context.supi
         psi: context.request.pduSessionId
+        parse_n1: "1"
       routes:
+        FAILED: FAILED
+        DENIED: FAILED
+    postcondition:
+      predicates:
+        - predicate: modify.mas.n1_parsed
+          arguments:
+            - parse-n1.operation.output
+      routes:
+        PASS: apply-qos-delta
+        FAIL: SAFE_STOPPED
+        UNKNOWN: SAFE_STOPPED
+
+  # Scheme C c-apply: the Owner validates the target against the authoritative
+  # flow, applies PFCP Session Modification 52/53 and dispatches N1 0xcb plus
+  # N2 PDU_RES_MOD_REQ through the agent relay. It completes only after the
+  # relay's Namf Transfer is accepted.
+  apply-qos-delta:
+    operation:
+      tool: mas::UPN.MODIFY_QOS_DELTA
+      arguments:
+        ue_identity: context.supi
+        psi: context.request.pduSessionId
+        qos_flows_delta: "1"
+        qfi: parse-n1.operation.output.qfi
+        five_qi: parse-n1.operation.output.five_qi
+        gfbr_ul: parse-n1.operation.output.gfbr_ul
+        gfbr_dl: parse-n1.operation.output.gfbr_dl
+        mfbr_ul: parse-n1.operation.output.mfbr_ul
+        mfbr_dl: parse-n1.operation.output.mfbr_dl
+      routes:
+        NOT_COMMITTED: FAILED
         FAILED: FAILED
         DENIED: FAILED
         OUTCOME_UNKNOWN: SAFE_STOPPED
     postcondition:
       predicates:
-        - predicate: modify.mas.sm_context_operational
-          arguments:
-            - m0.operation.output
-      routes:
-        PASS: m3
-        FAIL: SAFE_STOPPED
-        UNKNOWN: SAFE_STOPPED
-
-  # OES m3: UPN.MODIFY_UP_SESSION with up_intent=1 and no AN tunnel.
-  # This is a distinct typed callable profile from the existing s11 m5 export.
-  m3:
-    operation:
-      tool: mas::UPN.MODIFY_UP_SESSION_INTENT
-      arguments:
-        ue_identity: context.supi
-        psi: context.request.pduSessionId
-        upIntent: "1"
-      routes:
-        FAILED: SAFE_STOPPED
-        DENIED: SAFE_STOPPED
-        OUTCOME_UNKNOWN: SAFE_STOPPED
-    postcondition:
-      predicates:
-        - predicate: modify.mas.upn_intent_applied
-          arguments:
-            - m3.operation.output
-      routes:
-        PASS: m4
-        FAIL: SAFE_STOPPED
-        UNKNOWN: SAFE_STOPPED
-
-  # OES m4: SSM.SIGNAL_UE_AN. It is a Modify occurrence, not Establishment s10.
-  # The Owner completes this Operation only after the matching AN result is known.
-  m4:
-    operation:
-      tool: mas::SSM.SIGNAL_UE_AN_MODIFY
-      arguments:
-        ue_identity: context.supi
-        psi: context.request.pduSessionId
-      routes:
-        FAILED: SAFE_STOPPED
-        DENIED: SAFE_STOPPED
-        OUTCOME_UNKNOWN: SAFE_STOPPED
-    postcondition:
-      predicates:
-        - predicate: modify.mas.an_tunnel_ready
-          arguments:
-            - m4.operation.output
-      routes:
-        PASS: m5
-        FAIL: SAFE_STOPPED
-        UNKNOWN: SAFE_STOPPED
-
-  # OES m5: UPN.MODIFY_QOS_FLOWS applies the exact typed GBR/MBR delta on the
-  # target QFI and completes only after the PFCP/N1/N2 Owner transaction.
-  m5:
-    operation:
-      tool: mas::UPN.MODIFY_QOS_FLOWS
-      arguments:
-        ue_identity: context.supi
-        psi: context.request.pduSessionId
-        anTunnelTeid: m4.operation.output.an_tunnel_teid
-        anTunnelIp: m4.operation.output.an_tunnel_ip
-        n4Seid: m3.operation.output.n4_seid
-        qosFlowsDelta: "1"
-        qfi: context.request.qosFlowsDelta.qfi
-        fiveQi: context.request.qosFlowsDelta.fiveQi
-        gfbrUl: context.request.qosFlowsDelta.gfbrUl
-        gfbrDl: context.request.qosFlowsDelta.gfbrDl
-        mfbrUl: context.request.qosFlowsDelta.mfbrUl
-        mfbrDl: context.request.qosFlowsDelta.mfbrDl
-      routes:
-        FAILED: SAFE_STOPPED
-        DENIED: SAFE_STOPPED
-        OUTCOME_UNKNOWN: SAFE_STOPPED
-    postcondition:
-      predicates:
         - predicate: modify.mas.qos_delta_applied
           arguments:
-            - m5.operation.output
-            - context.request.qosFlowsDelta.qfi
-            - context.request.qosFlowsDelta.fiveQi
-            - context.request.qosFlowsDelta.gfbrUl
-            - context.request.qosFlowsDelta.gfbrDl
-            - context.request.qosFlowsDelta.mfbrUl
-            - context.request.qosFlowsDelta.mfbrDl
+            - apply-qos-delta.operation.output
+            - parse-n1.operation.output
       routes:
         PASS: verify-modify-completion
         FAIL: SAFE_STOPPED
@@ -124,25 +78,15 @@ nodes:
   verify-modify-completion:
     postcondition:
       predicates:
-        - predicate: modify.mas.sm_context_operational
+        - predicate: modify.mas.n1_parsed
           arguments:
-            - m0.operation.output
-        - predicate: modify.mas.upn_intent_applied
-          arguments:
-            - m3.operation.output
-        - predicate: modify.mas.an_tunnel_ready
-          arguments:
-            - m4.operation.output
+            - parse-n1.operation.output
         - predicate: modify.mas.qos_delta_applied
           arguments:
-            - m5.operation.output
-            - context.request.qosFlowsDelta.qfi
-            - context.request.qosFlowsDelta.fiveQi
-            - context.request.qosFlowsDelta.gfbrUl
-            - context.request.qosFlowsDelta.gfbrDl
-            - context.request.qosFlowsDelta.mfbrUl
-            - context.request.qosFlowsDelta.mfbrDl
+            - apply-qos-delta.operation.output
+            - parse-n1.operation.output
       routes:
         PASS: SUCCEEDED
         FAIL: SAFE_STOPPED
         UNKNOWN: SAFE_STOPPED
+

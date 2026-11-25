@@ -6,7 +6,6 @@ predicates:
       - supi: string
       - pduSessionId: integer
       - entryKind: string
-      - qfi: string
     evaluator:
       type: cel
       expression: >-
@@ -15,71 +14,46 @@ predicates:
         pduSessionId <= 15 &&
         (entryKind == "UE_INITIATED" ||
          entryKind == "AMF_INITIATED" ||
-         entryKind == "NETWORK_TRIGGERED") &&
-        qfi != ""
+         entryKind == "NETWORK_TRIGGERED")
 
-  modify.mas.sm_context_operational:
+  # The Owner decoded the exact original N1 and returned one GBR QoS flow
+  # description. A non-GBR or multi-flow request fails here rather than being
+  # mutated with an unrequested bitrate.
+  modify.mas.n1_parsed:
     parameters:
-      - result: mas::wtlab:openamsm:mas:v0.3.0:sc-update-sm-context-result
+      - result: mas::urn:openamsm:mas:v1alpha4:ssm-parse_n1_modify-output
     evidence:
       requires:
-        result: [mas::sc.context-updated]
-    evaluator:
-      type: cel
-      expression: result.lifecycle == "OPERATIONAL"
-
-  modify.mas.upn_intent_applied:
-    parameters:
-      - result: mas::wtlab:openamsm:mas:v0.3.0:upn-modify-intent-result
-    evidence:
-      requires:
-        result: [mas::upn.modify-intent-applied]
-    evaluator:
-      type: cel
-      expression: result.n4_seid != "" && result.n4_seid != "0"
-
-  modify.mas.an_tunnel_ready:
-    parameters:
-      - result: mas::wtlab:openamsm:mas:v0.2.0:ssm-signal-ue-an-result
-    evidence:
-      requires:
-        result: [mas::ssm.modify-an-tunnel-ready]
+        result: [mas::ssm.n1-modify-parsed]
     evaluator:
       type: cel
       expression: >-
-        result.an_tunnel == "1" &&
-        result.an_tunnel_teid != "" &&
-        result.an_tunnel_ip != ""
+        result.qfi != "" &&
+        result.requested_kind == "qos_flow_descriptions" &&
+        result.five_qi != "" &&
+        result.gfbr_ul != "" &&
+        result.gfbr_dl != "" &&
+        result.mfbr_ul != "" &&
+        result.mfbr_dl != ""
 
-  # The Postcondition compares every requested QoS target field, not only the
-  # Owner state string. The Owner contract constrains both the request values
-  # and the result values to canonical decimal strings (no sign, no leading
-  # zero), so CEL string equality is exact numeric equality. CA-SL CEL forbids
-  # implicit string/number conversion and ordering on strings, so no float or
-  # arbitrary-precision parsing is introduced here. The Skill request Schema
-  # does not redeclare `pattern` (unsupported by CA-SL v1alpha5): a
-  # non-canonical request can only fail closed, never create a false PASS.
-  #
-  # State semantics:
+  # State semantics (Owner contract):
   # - APPLIED: the PFCP Update QER was accepted AND the native N1/N2 Modify was
   #   dispatched (n1n2_dispatched == "1").
   # - ALREADY: the Owner's authoritative flow already equals the exact target;
-  #   no PFCP and no N1/N2 are dispatched (n1n2_dispatched absent).
-  # - PFCP_APPLIED_N1N2_FAILED: never satisfies this Goal.
-  # A missing target field, a mismatched target or an unknown state fails
-  # closed; the request parameters are Request/Host-exempt comparison inputs.
+  #   no PFCP and no N1/N2 were dispatched.
+  # - PFCP_APPLIED_N1N2_FAILED never satisfies this Goal.
+  # The applied result is compared field by field with the *parsed* N1 target
+  # (the Owner's decode of the request), using canonical decimal strings, so
+  # CEL string equality is exact equality. Both inputs are Owner Producer
+  # outputs with their own declared Evidence guarantees.
   modify.mas.qos_delta_applied:
     parameters:
-      - result: mas::wtlab:openamsm:mas:v0.3.0:upn-modify-qos-flows-result
-      - expectedQfi: string
-      - expectedFiveQi: string
-      - expectedGfbrUl: string
-      - expectedGfbrDl: string
-      - expectedMfbrUl: string
-      - expectedMfbrDl: string
+      - result: mas::urn:openamsm:mas:v1alpha4:upn-modify_qos_delta-output
+      - parsed: mas::urn:openamsm:mas:v1alpha4:ssm-parse_n1_modify-output
     evidence:
       requires:
         result: [mas::upn.qos-delta-applied]
+        parsed: [mas::ssm.n1-modify-parsed]
     evaluator:
       type: cel
       expression: >-
@@ -88,9 +62,9 @@ predicates:
           result.n1n2_dispatched == "1") ||
          (result.qos_delta_state == "ALREADY" &&
           !has(result.n1n2_dispatched))) &&
-        result.qfi == expectedQfi &&
-        has(result.five_qi) && result.five_qi == expectedFiveQi &&
-        result.gfbr_ul == expectedGfbrUl &&
-        result.gfbr_dl == expectedGfbrDl &&
-        result.mfbr_ul == expectedMfbrUl &&
-        result.mfbr_dl == expectedMfbrDl
+        result.qfi == parsed.qfi &&
+        has(result.five_qi) && result.five_qi == parsed.five_qi &&
+        result.gfbr_ul == parsed.gfbr_ul &&
+        result.gfbr_dl == parsed.gfbr_dl &&
+        result.mfbr_ul == parsed.mfbr_ul &&
+        result.mfbr_dl == parsed.mfbr_dl
