@@ -47,7 +47,7 @@ test("browser extension assets resolve through the hosted PluginWorker base path
     value:{pathname:"/studio/ide-preview/plugin-worker.js",origin:"https://studio.example.test"}
   });
   try{
-    const uri={toString(){return "https://studio.example.test/hostedPlugin/odango-chan.ca-skill-studio-ide-spike/dist/authoring-development-build-request.json";}};
+    const uri={scheme:"https",toString(){return "https://studio.example.test/hostedPlugin/odango-chan.ca-skill-studio-ide-spike/dist/authoring-development-build-request.json";}};
     assert.equal(workerResourceUrl(uri),
       "/studio/ide-preview/hostedPlugin/odango-chan.ca-skill-studio-ide-spike/dist/authoring-development-build-request.json");
   }finally{
