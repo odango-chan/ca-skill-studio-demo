@@ -112,3 +112,58 @@ test("a fresh workspace opens AI when its first Procedure becomes available", as
   host.activateEditor(host.editor);
   assert.equal(host.panels[0].reveals.length, 0);
 });
+
+
+test("Console restores the AI Procedure when Theia reports another native tab active", async () => {
+  const commands = new Map();
+  const preferences = new Map();
+  const procedure = {
+    uri: {
+      path: "/skills/demo/assurance/procedure.yaml",
+      toString() { return this.path; },
+    },
+    isClosed: false,
+  };
+  const contract = {
+    uri: { path: "/skills/demo/assurance/contract.yaml" },
+    isClosed: false,
+  };
+  const opened = [];
+  const vscode = {
+    ViewColumn: { One: 1 },
+    window: {
+      activeTextEditor: { document: contract },
+      showWarningMessage: message => assert.fail(message),
+      showTextDocument: async (...args) => opened.push(args),
+    },
+    commands: {
+      executeCommand: async (...args) => opened.push(args),
+      registerCommand(id, handler) {
+        commands.set(id, handler);
+        return { dispose() {} };
+      },
+    },
+  };
+  const context = {
+    globalState: {
+      get: key => preferences.get(key),
+      update: async (key, value) => preferences.set(key, value),
+    },
+    subscriptions: [],
+  };
+  const authoring = {
+    open: async () => true,
+    getDocument: () => procedure,
+  };
+  registerWorkspaceMode(vscode, context, {
+    authoring,
+    showWelcome: () => false,
+  });
+
+  assert.equal(await commands.get("skillStudio.openAiAuthoring")(), true);
+  assert.equal(await commands.get("skillStudio.openConsole")(), true);
+  assert.deepEqual(opened, [["vscode.openWith", procedure.uri, "default", {
+    viewColumn: 1, preview: false, preserveFocus: false,
+  }]]);
+  assert.equal(preferences.get("skillStudio.workspaceMode"), "console");
+});
