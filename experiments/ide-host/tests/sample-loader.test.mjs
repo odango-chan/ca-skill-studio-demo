@@ -209,6 +209,12 @@ test("Existing Example stays untouched unless replacement is explicitly requeste
   assert.deepEqual((await h.vscode.workspace.fs.readDirectory(uri(skillRoot)))
     .map(([name])=>name).sort(),["establish-pdu-session","establish-pdu-session-mas","modify-pdu-session-mas","release-pdu-session-mas"].sort(),
     "replacement restores all four current Skills");
+  assert.ok(h.folders.has(skillRoot),
+    "replacement keeps the active Skills directory handle stable");
+  assert.ok(h.folders.has(skillRoot+"/establish-pdu-session/assurance"),
+    "replacement keeps the active Procedure's ancestor directories stable");
+  assert.ok(h.folders.has(skillRoot+"/establish-pdu-session-mas/assurance"),
+    "replacement keeps the MAS Procedure's ancestor directories stable");
   assert.match(decode(h.files.get(procedurePath)),/^# Illustrative CA-SL v1alpha5/m);
   assert.match(decode(h.files.get(masProcedurePath)),/start: validate-sm-subscription/);
   assert.match(decode(h.files.get(root+"/README.md")),/CA-SL v1alpha5 PDU Session examples/);
