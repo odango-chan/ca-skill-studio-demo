@@ -26,7 +26,9 @@ export function registerWorkspaceMode(vscode, context, { authoring, showWelcome 
   // Track source navigation only while Console is the visible workspace mode.
   // Theia may keep a different native tab in activeTextEditor while AI is open.
   const sourceEditorListener = vscode.window.onDidChangeActiveTextEditor(editor => {
-    if (mode === "console" && editor?.document) consoleEditor = editor;
+    if (mode !== "console") return;
+    const visible = visibleSourceEditor(vscode) ?? editor;
+    if (visible?.document) consoleEditor = visible;
   });
   context.subscriptions.push(sourceEditorListener);
 
