@@ -1921,7 +1921,7 @@ try{
       });
       if(!tabNavigation.result?.value?.opened||!tabNavigation.result?.value?.keyboard||!tabNavigation.result?.value?.restored)
         throw Error("AI Workbench keyboard-accessible review tabs failed in Chromium");
-      if(!proposalView.compilerStatus.includes("Compiler v2.0.2 Check: FAIL")||
+      if(!proposalView.compilerStatus.includes("Compiler 2.1.0 Check: FAIL")||
          !proposalView.patchState.includes("Compiler Check failed")||
          !proposalView.applyDisabled)
         throw Error("Compiler failure did not keep the candidate PREVIEW ONLY: "+JSON.stringify({
