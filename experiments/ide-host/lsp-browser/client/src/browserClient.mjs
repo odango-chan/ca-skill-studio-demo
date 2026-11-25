@@ -264,7 +264,7 @@ export function createSkillLanguageClient(vscode, context, handlers = {}) {
         {scheme:"file",pattern:"**/*.yaml"},
         {scheme:"file",pattern:"**/*.yml"}
       ],
-      provider,":","/",".")
+      provider,":","/",".",
     );
     handlers.onCompletionProviderRegistered?.({registered:true,transport:"browser-lsp-worker"});
     output.appendLine("Registered Theia native YAML CompletionItemProvider over the shared Skill Language Worker");
