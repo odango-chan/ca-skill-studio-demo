@@ -1482,10 +1482,18 @@ try{
       throw Error("Unable to prepare native unsaved Source for mode acceptance");
     await switchWorkspaceMode('AI Workbench');
     await switchWorkspaceMode('Console');
-    const restored=await sourceState('read');
-    if(restored?.uri!==dirty.uri || restored.text!==dirty.text ||
-        (dirty.dirty===true && restored.dirty!==true))
-      throw Error("Console round trip lost selected file or unsaved Source");
+    const matchesDirtySource=state=>state?.uri===dirty.uri&&state.text===dirty.text&&
+      (dirty.dirty!==true||state.dirty===true);
+    let restored=null;
+    for(let attempt=0;attempt<50;attempt++){
+      restored=await sourceState('read');
+      if(matchesDirtySource(restored))break;
+      await sleep(100);
+    }
+    if(!matchesDirtySource(restored))
+      throw Error("Console round trip lost selected file or unsaved Source: "+
+        JSON.stringify({expectedUri:dirty.uri,actualUri:restored?.uri,
+          expectedDirty:dirty.dirty,actualDirty:restored?.dirty}));
     await sourceState('undo');
     for(let attempt=0;attempt<40;attempt++){
       if((await sourceState('read'))?.text===original.text)break;
@@ -1698,7 +1706,7 @@ try{
           await sleep(100);
         }
         throw Error("AI Authoring data-disclosure confirmation did not appear: "+
-          (await evalJS("document.body.innerText.slice(-1000)")));
+          JSON.stringify({workbench:await evalJS("document.body.innerText.slice(-1000)"),agent:(await readAiView())?.bodyText?.slice(-1000)}));
       };
       const sendPosition=await waitForDialogButton(["发送并生成提案"]);
       await command("Input.dispatchMouseEvent",{type:"mouseMoved",x:sendPosition.x,y:sendPosition.y});

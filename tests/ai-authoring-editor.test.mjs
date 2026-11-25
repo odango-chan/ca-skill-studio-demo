@@ -75,6 +75,18 @@ test("AI context inventory selects contract, predicates, schemas and verified de
   assert.ok(!resources.some((item) => item.label.includes("lib/")));
 });
 
+test("verified publications exceeding the context budget stay available without default selection", async () => {
+  const resolution = dependencyResolution();
+  resolution.snapshots[0].files = [
+    { path: "tool-catalog.yaml", bytes: base64("operations: " + "x".repeat(131072)) },
+  ];
+  const resources = await buildAuthoringResourceInventory(packageSnapshot(), resolution);
+  const dependency = resources.find(item => item.kind === "dependency");
+  assert.equal(dependency.verified, true);
+  assert.equal(dependency.selected, false);
+  assert.equal(resources.find(item => item.kind === "contract").selected, true);
+});
+
 test("verified dependency context includes only bounded text files and excludes sensitive or binary files", async () => {
   const resources = await buildAuthoringResourceInventory(packageSnapshot(), dependencyResolution());
   const dependency = resources.find((item) => item.kind === "dependency");
