@@ -271,3 +271,61 @@ test("entering AI from Console captures the visible Procedure when activeTextEdi
     viewColumn: 1, preview: false, preserveFocus: false, selection: procedureEditor.selection,
   });
 });
+
+
+test("Console navigation updates the saved return target before entering AI", async () => {
+  const commands = new Map();
+  const preferences = new Map([["skillStudio.workspaceMode", "console"]]);
+  const procedure = {
+    uri: { path: "/skills/demo/assurance/procedure.yaml" },
+    isClosed: false,
+  };
+  const contract = {
+    uri: { path: "/skills/demo/assurance/contract.yaml" },
+    isClosed: false,
+  };
+  const procedureEditor = { document: procedure, selection: { anchor: 1 }, viewColumn: 1 };
+  const contractEditor = { document: contract, selection: { anchor: 7 }, viewColumn: 1 };
+  const opened = [];
+  let onEditor;
+  const vscode = {
+    ViewColumn: { One: 1 },
+    window: {
+      activeTextEditor: procedureEditor,
+      onDidChangeActiveTextEditor(listener) {
+        onEditor = listener;
+        return { dispose() { onEditor = undefined; } };
+      },
+      showWarningMessage: message => assert.fail(message),
+      showTextDocument: async (...args) => opened.push(args),
+    },
+    commands: {
+      executeCommand: async (...args) => opened.push(args),
+      registerCommand(id, handler) {
+        commands.set(id, handler);
+        return { dispose() {} };
+      },
+    },
+  };
+  const context = {
+    globalState: {
+      get: key => preferences.get(key),
+      update: async (key, value) => preferences.set(key, value),
+    },
+    subscriptions: [],
+  };
+  const authoring = { open: async () => true, getDocument: () => procedure };
+  const mode = registerWorkspaceMode(vscode, context, {
+    authoring, showWelcome: () => false,
+  });
+
+  assert.equal(await mode.restore(), false);
+  vscode.window.activeTextEditor = contractEditor;
+  onEditor(contractEditor);
+  assert.equal(await commands.get("skillStudio.openAiAuthoring")(), true);
+  assert.equal(await commands.get("skillStudio.openConsole")(), true);
+  assert.equal(opened.at(-1)[1], contract.uri);
+  assert.deepEqual(opened.at(-1)[3], {
+    viewColumn: 1, preview: false, preserveFocus: false, selection: contractEditor.selection,
+  });
+});
