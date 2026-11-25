@@ -1,0 +1,35 @@
+{
+  "$id": "urn:openamsm:mas:v1alpha4:se-emit_events-input",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "event": {
+      "const": "ESTABLISHED",
+      "maxLength": 255,
+      "minLength": 1,
+      "type": "string"
+    },
+    "psi": {
+      "maximum": 15,
+      "minimum": 1,
+      "type": "integer"
+    },
+    "sessionKeys": {
+      "maxLength": 255,
+      "minLength": 1,
+      "type": "string"
+    },
+    "ue_identity": {
+      "maxLength": 32,
+      "minLength": 1,
+      "type": "string"
+    }
+  },
+  "required": [
+    "ue_identity",
+    "psi",
+    "event",
+    "sessionKeys"
+  ],
+  "type": "object"
+}
