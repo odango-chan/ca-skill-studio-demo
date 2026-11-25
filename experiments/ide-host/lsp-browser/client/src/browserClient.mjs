@@ -218,6 +218,9 @@ export function createSkillLanguageClient(vscode, context, handlers = {}) {
     }
     const provider={
       async provideCompletionItems(document,position,cancellationToken,context){
+        handlers.onCompletionProviderRequest?.({
+          uri:document.uri.toString(),position:{line:position.line,character:position.character}
+        });
         if(stopped||terminalFailure||!started||cancellationToken?.isCancellationRequested)
           return [];
         try{
@@ -230,8 +233,17 @@ export function createSkillLanguageClient(vscode, context, handlers = {}) {
             }
           },cancellationToken);
           if(cancellationToken?.isCancellationRequested)return [];
-          return toNativeCompletionItems(result,vscode);
+          const nativeItems=toNativeCompletionItems(result,vscode);
+          handlers.onCompletionProviderResult?.({
+            uri:document.uri.toString(),
+            labels:nativeItems.map(item=>item.label),
+            count:nativeItems.length
+          });
+          return nativeItems;
         }catch(error){
+          handlers.onCompletionProviderError?.({
+            uri:document.uri.toString(),message:String(error?.message??error)
+          });
           if(!stopped&&!terminalFailure)
             output.appendLine("Theia Schema completion request failed: "+
               String(error?.message??error));
