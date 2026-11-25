@@ -131,7 +131,8 @@ export function registerSyntheticAuthoringAcceptance(vscode,context,compilerInte
       pendingUndo={document,original,temporary,uri};
       created=false; // ownership transfers to verify/cleanup command
       return {
-        compilerVersion:compilerIntegration.compilerVersion,artifactGeneratorVersion:"2.0.2",\n        languageTarget:"connectionagent.io/v1alpha5",
+        compilerVersion:compilerIntegration.compilerVersion,artifactGeneratorVersion:"2.0.2",
+        languageTarget:"connectionagent.io/v1alpha5",
         qualification:"SYNTHETIC_TEST_ONLY",real5gcQualification:"NOT_CLAIMED",
         compilerBaseline:sourceCheck,compilerCandidate:candidateCheck,
         candidateDigest:candidate.digest,atomicGroupCount:patch.groups.length,
