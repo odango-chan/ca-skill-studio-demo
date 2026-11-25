@@ -88,11 +88,11 @@ test("Pages installs pinned browser LSP dependencies before bundling the Web ext
 test("Pages stages and smoke-tests the exact Compiler v2.1.0 Development Worker release",async()=>{
   const workflow=await readFile(new URL("../../../.github/workflows/pages.yml",import.meta.url),"utf8");
   const compilerCommit="b67fbb56c34d15b8d5a0903c8a7ca93d608f8f65";
-  assert.match(workflow,/repository: odango-chan\\/ca-skill-compiler[\\s\\S]*?ref: b67fbb56c34d15b8d5a0903c8a7ca93d608f8f65/);
-  assert.match(workflow,/Verify pinned CA Skill Compiler v2\\.1\\.0 source identity[\\s\\S]*?git rev-parse HEAD/);
+  assert.ok(workflow.includes("repository: odango-chan/ca-skill-compiler"));\n  assert.ok(workflow.includes("ref: "+compilerCommit));
+  assert.ok(workflow.includes("Verify pinned CA Skill Compiler v2.1.0 source identity"));\n  assert.ok(workflow.includes("git rev-parse HEAD"));
   assert.ok(workflow.includes(compilerCommit));
-  assert.match(workflow,/Download and verify official Compiler v2\\.1\\.0 Worker bundle/);
-  assert.match(workflow,/skillc-v2\\.1\\.0-web-worker\\.tar\\.gz/);
+  assert.ok(workflow.includes("Download and verify official Compiler v2.1.0 Worker bundle"));
+  assert.ok(workflow.includes("skillc-v2.1.0-web-worker.tar.gz"));
   assert.match(workflow,/SHA256SUMS/);
   const extensionBuild=workflow.indexOf("node experiments/ide-host/scripts/build-ide-spike.mjs");
   const stage=workflow.indexOf("node experiments/ide-host/scripts/prepare-theia-online.mjs");
@@ -112,9 +112,9 @@ test("all Compiler host workflows pin the same released v2.1.0 source commit",as
   ];
   for(const name of workflows){
     const workflow=await readFile(new URL("../../../.github/workflows/"+name,import.meta.url),"utf8");
-    assert.match(workflow,/repository: odango-chan\\/ca-skill-compiler[\\s\\S]*?ref: b67fbb56c34d15b8d5a0903c8a7ca93d608f8f65/,
+    assert.ok(workflow.includes("repository: odango-chan/ca-skill-compiler") && workflow.includes("ref: "+compilerCommit),
       name+" must check out the exact v2.1.0 commit");
-    assert.match(workflow,/Verify pinned CA Skill Compiler v2\\.1\\.0 source identity[\\s\\S]*?git rev-parse HEAD/,
+    assert.ok(workflow.includes("Verify pinned CA Skill Compiler v2.1.0 source identity") && workflow.includes("git rev-parse HEAD"),
       name+" must verify the staged Compiler source identity");
     assert.ok(workflow.includes(compilerCommit),name+" must retain the exact immutable source SHA");
   }
