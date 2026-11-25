@@ -3,6 +3,20 @@ import { openNativeSource } from "./native-source.mjs";
 
 const preferenceKey = "skillStudio.workspaceMode";
 
+function visibleSourceEditor(vscode) {
+  const active = vscode.window.activeTextEditor;
+  const visible = Array.isArray(vscode.window.visibleTextEditors)
+    ? vscode.window.visibleTextEditors.filter(editor => editor?.document)
+    : [];
+  if (visible.length === 0) return active;
+  const activeUri = active?.document?.uri?.toString?.();
+  const activeVisible = visible.find(editor =>
+    editor.document === active?.document ||
+    (activeUri && editor.document.uri?.toString?.() === activeUri));
+  if (activeVisible) return activeVisible;
+  return visible.find(editor => editor.viewColumn === vscode.ViewColumn.One) ?? visible[0];
+}
+
 export function registerWorkspaceMode(vscode, context, { authoring, showWelcome }) {
   let mode = context.globalState.get(preferenceKey) === "console" ? "console" : "ai";
   let consoleEditor;
@@ -16,17 +30,17 @@ export function registerWorkspaceMode(vscode, context, { authoring, showWelcome 
     switching = true;
     try {
       if (next === "ai") {
-        // Capture the Console source only when entering AI mode (or restoring
-        // it at startup). While AI is already visible, Theia may report another
-        // hidden native tab as active; that must not replace the saved source.
+        // Capture the actually visible Console Source. Theia can leave
+        // activeTextEditor pointing at another native tab while the fixed
+        // Source editor remains visible in group one.
         if (startup || mode !== "ai") {
-          const editor = vscode.window.activeTextEditor;
+          const editor = visibleSourceEditor(vscode);
           if (editor) consoleEditor = editor;
         }
         if (!await authoring.open({ pick: !startup })) return false;
       } else {
         const savedDocument = consoleEditor?.document;
-        const activeDocument = vscode.window.activeTextEditor?.document;
+        const activeDocument = visibleSourceEditor(vscode)?.document;
         const document = mode === "ai" && savedDocument && !savedDocument.isClosed
           ? savedDocument : activeDocument ?? authoring.getDocument();
         if (document) {
@@ -63,11 +77,12 @@ export function registerWorkspaceMode(vscode, context, { authoring, showWelcome 
     restore() {
       // Let the existing Welcome/Example flow establish a project and source.
       if (mode !== "ai") return Promise.resolve(false);
-      if (isProcedurePath(vscode.window.activeTextEditor?.document.uri.path)) {
+      if (isProcedurePath(visibleSourceEditor(vscode)?.document.uri.path)) {
         return select("ai", { startup: true });
       }
       waitForProcedure = vscode.window.onDidChangeActiveTextEditor(editor => {
-        if (isProcedurePath(editor?.document.uri.path)) void select("ai", { startup: true });
+        const visible = visibleSourceEditor(vscode) ?? editor;
+        if (isProcedurePath(visible?.document.uri.path)) void select("ai", { startup: true });
       });
       context.subscriptions.push(waitForProcedure);
       return Promise.resolve(false);
