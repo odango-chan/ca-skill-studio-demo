@@ -30,6 +30,7 @@ import {registerPackageOverview} from "./package-overview.mjs";
 import {registerDependencyIntegration} from "./dependency-integration.mjs";
 import {resolveLockedDependencies} from "./dependency-service.mjs";
 import {projectLockedInterfaceCompletionHints} from "./interface-schema-completion.mjs";
+import {projectLockedToolCatalog} from "./dependency-catalog-projection.mjs";
 import {registerCompilerIntegration} from "./compiler-integration.mjs";
 import {registerPackageDiagnosticTesting} from "./package-diagnostic-testing.mjs";
 import {registerPackageRouteTesting} from "./package-route-testing.mjs";
@@ -555,6 +556,10 @@ export function activate(context){
         item.id==="ca-client"&&item.kind==="interface-package");
       const interfaceHints=interfaceSnapshot
         ?projectLockedInterfaceCompletionHints(interfaceSnapshot):[];
+      const ownerSnapshot=dependencies?.snapshots?.find(item=>
+        item.id==="mas"&&item.kind==="tool-catalog");
+      const ownerCatalog=ownerSnapshot
+        ?projectLockedToolCatalog(ownerSnapshot):{available:false,operations:[]};
       return {
         workspaceName:vscode.workspace.name??null,
         workspaceFile:vscode.workspace.workspaceFile?.toString?.()??null,
@@ -579,6 +584,11 @@ export function activate(context){
           contextReadHint:interfaceHints.some(item=>
             item.id==="ca-client::openamsm.smf.mas.sc.query"&&
             item.argumentProperties?.some(p=>p.name==="supi")),
+          ownerToolCatalog:{
+            available:ownerCatalog.available,
+            operationCount:ownerCatalog.operations?.length??0,
+            operationIds:(ownerCatalog.operations??[]).map(item=>item.id)
+          },
           qualification:"AUTH_NOT_CHECKED",
           diagnostics:dependencies?.diagnostics?.map(item=>item.code)??[]
         }}:{}),
