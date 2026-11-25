@@ -1587,12 +1587,14 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
             interfaceArgumentCompletionDetails:requiredQueryArguments.map(item=>({
               label:typeof item.label==="string"?item.label:item.label?.label,
               detail:item.detail,
-              insertText:item.textEdit?.newText??null
+              insertText:typeof item.insertText==="string"?item.insertText:
+                item.insertText?.value??item.textEdit?.newText??null
             })),
             interfaceNativeArgumentCompletionDetails:nativeRequiredQueryArguments.map(item=>({
               label:typeof item.label==="string"?item.label:item.label?.label,
               detail:item.detail,
-              insertText:item.textEdit?.newText??null
+              insertText:typeof item.insertText==="string"?item.insertText:
+                item.insertText?.value??item.textEdit?.newText??null
             })),
             outcomeUnknownTargets:unknownTarget,
             contractDefinition:gateDefinition.length,
