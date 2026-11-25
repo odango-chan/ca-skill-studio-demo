@@ -47,8 +47,7 @@ async function clearDirectoryContents(vscode,fs,root,{preserveWorkspaceMetadata=
     await fs.delete(child,{recursive:true,useTrash:false});
   }
   const remaining=await fs.readDirectory(root);
-  if(remaining.some(([name])=>!preserveWorkspaceMetadata||!workspaceMetadata.has(name))||
-     remaining.some(([name])=>!workspaceMetadata.has(name)))
+  if(remaining.some(([name])=>!preserveWorkspaceMetadata||!workspaceMetadata.has(name)))
     fail("Existing Example contents remain after replacement cleanup: "+
       remaining.map(([name])=>name).join(", "));
   return entries.map(([name])=>name);
