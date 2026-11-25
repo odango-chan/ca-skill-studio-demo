@@ -1443,8 +1443,17 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
           if(queryToolStart<0)throw Error("Pinned ca-client Tool completion probe anchor is missing");
           const queryToolPosition=procedureDocument.positionAt(
             queryToolStart+queryToolNeedle.length);
+          // Theia 1.76.0's public executeCompletionItemProvider bridge passes
+          // the zero-based PluginPosition directly as Monaco's one-based
+          // {lineNumber,column}. Compensate only at this acceptance-command
+          // boundary; real editor providers continue to receive zero-based
+          // positions and must not apply this offset.
+          const nativeCompletionCommandPosition=position=>isTheiaHost
+            ?new vscode.Position(position.line+1,position.character+1)
+            :position;
           const nativeQueryToolResult=await vscode.commands.executeCommand(
-            "vscode.executeCompletionItemProvider",procedureDocument.uri,queryToolPosition);
+            "vscode.executeCompletionItemProvider",procedureDocument.uri,
+            nativeCompletionCommandPosition(queryToolPosition));
           const nativeQueryToolItems=Array.isArray(nativeQueryToolResult)
             ?nativeQueryToolResult
             :nativeQueryToolResult?.items??nativeQueryToolResult?.suggestions??[];
@@ -1462,7 +1471,7 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
             ?queryArgumentsResult:queryArgumentsResult?.items??[];
           const nativeQueryArgumentsResult=await vscode.commands.executeCommand(
             "vscode.executeCompletionItemProvider",procedureDocument.uri,
-            queryArgumentsPosition);
+            nativeCompletionCommandPosition(queryArgumentsPosition));
           const nativeQueryArgumentItems=Array.isArray(nativeQueryArgumentsResult)
             ?nativeQueryArgumentsResult
             :nativeQueryArgumentsResult?.items??nativeQueryArgumentsResult?.suggestions??[];
