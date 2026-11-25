@@ -1,0 +1,28 @@
+{
+  "$id": "urn:openamsm:mas:v1alpha4:ssm-release_confirm_n2-output",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "n1_released": {
+      "maxLength": 255,
+      "minLength": 1,
+      "type": "string"
+    },
+    "n2_released": {
+      "maxLength": 255,
+      "minLength": 1,
+      "type": "string"
+    },
+    "release_ready": {
+      "maxLength": 255,
+      "minLength": 1,
+      "type": "string"
+    }
+  },
+  "required": [
+    "release_ready",
+    "n1_released",
+    "n2_released"
+  ],
+  "type": "object"
+}

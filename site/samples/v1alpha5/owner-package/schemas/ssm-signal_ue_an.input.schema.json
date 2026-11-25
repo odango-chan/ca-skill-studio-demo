@@ -1,0 +1,40 @@
+{
+  "$id": "urn:openamsm:mas:v1alpha4:ssm-signal_ue_an-input",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "n4Seid": {
+      "maxLength": 255,
+      "minLength": 1,
+      "type": "string"
+    },
+    "psi": {
+      "maximum": 15,
+      "minimum": 1,
+      "type": "integer"
+    },
+    "sessionKeys": {
+      "maxLength": 255,
+      "minLength": 1,
+      "type": "string"
+    },
+    "ueAddrAllocated": {
+      "maxLength": 255,
+      "minLength": 1,
+      "type": "string"
+    },
+    "ue_identity": {
+      "maxLength": 32,
+      "minLength": 1,
+      "type": "string"
+    }
+  },
+  "required": [
+    "ue_identity",
+    "psi",
+    "sessionKeys",
+    "ueAddrAllocated",
+    "n4Seid"
+  ],
+  "type": "object"
+}
