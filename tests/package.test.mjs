@@ -30,8 +30,8 @@ test("only the current v1alpha5 Examples are selectable",()=>{
 test("built-in Example assets match the pinned ca-skills blob manifest",()=>{
   const manifest=JSON.parse(readFileSync(new URL("../site/samples/v1alpha5/files.json",import.meta.url),"utf8"));
   assert.equal(manifest.sourceRepo,"odango-chan/ca-skills");
-  assert.equal(manifest.sourceRef,"refs/pull/86/head");
-  assert.equal(manifest.sourceSha,"83d9e0c7d523189a1ae03186f8913277f0829d72");
+  assert.equal(manifest.sourceRef,"refs/heads/main");
+  assert.equal(manifest.sourceSha,"b06f72baae3eb3d578c489f950a325e2d63d556f");
   assert.equal(manifest.sourceStatus,"OWNER_LINKED_STATIC_BUILD_PASS_E2E_NOT_RERUN");
   for(const path of manifest.files){
     const content=readSample(path.split("/")[0],path.split("/").slice(1).join("/"));
