@@ -211,3 +211,38 @@ test("Theia decoration adapter applies cached semantic ranges to the active edit
   assert.equal(state.decorationStyles.skillOutcome.color,"#AD6517");
   renderer.dispose();
 });
+test("Theia decoration diagnostics stay scoped to the requested document when unrelated virtual documents render",()=>{
+  const procedureUri="file:///workspace/skills/establish-pdu-session/assurance/procedure.yaml";
+  const outputUri="output:/Skill%20Studio%20%C2%B7%20Language%20Service";
+  const procedure=fakeDocument(procedureUri);
+  const editor=fakeEditor(procedure);
+  const output=fakeDocument(outputUri);
+  const host=fakeHost([editor]);
+  const renderer=createSemanticTokenDecorationRenderer(
+    host.vscode,["skillPredicate","skillOutcome"],theme.semanticTokenColors
+  );
+
+  renderer.render(procedure,semanticData(procedure.lineAt(1).text));
+  const procedureState=renderer.diagnostics(procedureUri);
+  assert.equal(procedureState.lastUri,procedureUri);
+  assert.equal(procedureState.lastMatchingEditorCount,1);
+  assert.equal(procedureState.lastAppliedEditorCount,1);
+  assert.equal(procedureState.lastAppliedRangeCount,2);
+
+  // A later render for a virtual output document must not replace the
+  // evidence used to qualify the visible Procedure editor.
+  renderer.render(output,semanticData(output.lineAt(1).text));
+  const outputState=renderer.diagnostics(outputUri);
+  assert.equal(outputState.lastUri,outputUri);
+  assert.equal(outputState.lastMatchingEditorCount,0);
+  assert.equal(outputState.lastAppliedEditorCount,0);
+
+  const currentProcedureState=renderer.diagnostics(procedureUri);
+  assert.equal(currentProcedureState.lastUri,procedureUri);
+  assert.equal(currentProcedureState.lastAppliedEditorCount,1);
+  assert.equal(currentProcedureState.lastAppliedRangeCount,2);
+  assert.equal(renderer.diagnostics().lastUri,outputUri,
+    "unscoped diagnostics continue to describe the globally latest operation");
+
+  renderer.dispose();
+});
