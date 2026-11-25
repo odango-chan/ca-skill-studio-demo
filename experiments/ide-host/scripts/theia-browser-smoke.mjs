@@ -2320,6 +2320,7 @@ try{
         const view=await readAiView();
         if(view?.candidateSource.includes("FAIL: FAILED")&&
            view.compilerStatus.includes("Compiler 2.1.0 Check: PASS")&&
+           view.patchState.includes("Compiler 2.1.0 PASS")&&
            view.applyDisabled===false)readyView=view;
         if(!readyView)await sleep(100);
       }
