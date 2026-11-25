@@ -164,8 +164,11 @@ test("dependency cycles and conflicting package versions fail closed",async()=>{
 
   const conflict=await fixtureInput();
   const contract=conflict.documents.find(item=>item.relativePath==="assurance/contract.yaml");
-  contract.text=contract.text.replace("  ca: urn:example:ca:tools\ncapabilities:",
-    "  ca: urn:example:ca:tools\n  types-v2: urn:example:ca:types\ncapabilities:");
+  const contractLines=contract.text.split("\n");
+  const toolsRootIndex=contractLines.indexOf("  ca: urn:example:ca:tools");
+  assert.notEqual(toolsRootIndex,-1,"fixture Contract exposes the tools root");
+  contractLines.splice(toolsRootIndex+1,0,"  types-v2: urn:example:ca:types");
+  contract.text=contractLines.join("\n");
   const typesV2=(await fixtureInput()).resolvedDependencies.snapshots.find(item=>item.id==="transitive-types");
   const typesManifestFile=typesV2.files.find(item=>item.path==="package.json");
   const typesManifest=JSON.parse(decoder.decode(decodeBase64(typesManifestFile.bytes)));
