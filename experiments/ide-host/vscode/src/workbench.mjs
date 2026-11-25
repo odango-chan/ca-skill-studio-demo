@@ -63,7 +63,9 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
   };
   const nativeCompletionDiagnostics={
     registered:false,transport:null,requests:0,lastUri:null,lastLabels:[],
-    lastCount:0,lastError:null
+    lastCount:0,lastError:null,lastLanguageId:null,lastVersion:null,lastPosition:null,
+    lastLineText:null,lastPrefix:null,lastEditorTriggerKind:null,lastLspTriggerKind:null,
+    lastTriggerCharacter:null
   };
   function encodeNativeSemanticTokens(document,spans){
     const segments=[];
@@ -350,6 +352,14 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
             onCompletionProviderRequest:request=>{
               nativeCompletionDiagnostics.requests++;
               nativeCompletionDiagnostics.lastUri=request?.uri??null;
+              nativeCompletionDiagnostics.lastLanguageId=request?.languageId??null;
+              nativeCompletionDiagnostics.lastVersion=request?.version??null;
+              nativeCompletionDiagnostics.lastPosition=request?.position??null;
+              nativeCompletionDiagnostics.lastLineText=request?.lineText??null;
+              nativeCompletionDiagnostics.lastPrefix=request?.prefix??null;
+              nativeCompletionDiagnostics.lastEditorTriggerKind=request?.editorTriggerKind??null;
+              nativeCompletionDiagnostics.lastLspTriggerKind=request?.lspTriggerKind??null;
+              nativeCompletionDiagnostics.lastTriggerCharacter=request?.triggerCharacter??null;
             },
             onCompletionProviderResult:result=>{
               nativeCompletionDiagnostics.lastLabels=result?.labels??[];
