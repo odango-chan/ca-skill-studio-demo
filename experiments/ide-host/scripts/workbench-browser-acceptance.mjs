@@ -1561,7 +1561,7 @@ export async function runWorkbenchAcceptance({
   // Build must remain failure-atomic without trusted Owner/Deployment inputs.
   if(requireCompilerWorker){
     const smoke=await nativeCommand("skillStudio.internal.compilerWorkerAcceptance");
-    if(smoke?.compilerVersion!=="v2.0.2"||
+    if(smoke?.compilerVersion!=="2.1.0"||
        smoke?.languageTarget!=="connectionagent.io/v1alpha5"||
        smoke?.workerTransport!=="PASS"||
        smoke?.artifactFailureAtomicity!=="PASS")
