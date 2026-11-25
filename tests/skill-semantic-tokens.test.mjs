@@ -42,7 +42,7 @@ try{
 
 function sample(skill,path){
   return readFileSync(new URL(
-    "../site/samples/v1alpha5/"+skill+"/"+path,import.meta.url
+    (skill==="establish-pdu-session"?"./fixtures/v1alpha5-conventional/":"../site/samples/v1alpha5/")+skill+"/"+path,import.meta.url
   ),"utf8");
 }
 function observed(source,path){

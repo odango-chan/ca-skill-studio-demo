@@ -1,7 +1,7 @@
 $schema: https://json-schema.org/draft/2020-12/schema
 $id: urn:connectionagent:example:mas:release-request:v1alpha5
 title: ReleaseRequest
-description: Host-normalized release entry and OpenAMSM PFCP deletion trigger for an existing PDU Session.
+description: Host-normalized UE release entry. The raw N1 and the Host-private transaction identity stay in the Host's private execution context and are never Skill-authored request fields.
 type: object
 additionalProperties: false
 required: [pduSessionId, entryKind, trigger]
@@ -12,7 +12,8 @@ properties:
     maximum: 15
   entryKind:
     type: string
-    enum: [UE_INITIATED, AMF_INITIATED, NETWORK_TRIGGERED]
+    enum: [UE_INITIATED]
   trigger:
     type: integer
-    enum: [1, 2, 3, 4, 5, 6, 7]
+    minimum: 1
+    maximum: 7

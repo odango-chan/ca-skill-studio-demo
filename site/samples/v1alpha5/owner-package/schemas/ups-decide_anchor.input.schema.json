@@ -1,0 +1,48 @@
+{
+  "$id": "urn:openamsm:mas:v1alpha4:ups-decide_anchor-input",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "dnn": {
+      "maxLength": 255,
+      "minLength": 1,
+      "type": "string"
+    },
+    "psi": {
+      "maximum": 15,
+      "minimum": 1,
+      "type": "integer"
+    },
+    "sNssai": {
+      "additionalProperties": false,
+      "properties": {
+        "sd": {
+          "maxLength": 6,
+          "minLength": 6,
+          "type": "string"
+        },
+        "sst": {
+          "maximum": 255,
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "sst"
+      ],
+      "type": "object"
+    },
+    "ue_identity": {
+      "maxLength": 32,
+      "minLength": 1,
+      "type": "string"
+    }
+  },
+  "required": [
+    "ue_identity",
+    "psi",
+    "dnn",
+    "sNssai"
+  ],
+  "type": "object"
+}

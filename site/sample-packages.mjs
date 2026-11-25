@@ -1,25 +1,15 @@
 // Built-in Example manifest for the active CA-SL v1alpha5 authoring target.
 // The source assets are mirrored from ca-skills/main and are not a qualification claim.
 const core=["SKILL.md","assurance/contract.yaml","assurance/procedure.yaml","assurance/predicates.yaml"];
-const establishExtras=[
-  "schemas/establishment-request.schema.yaml",
-  "scripts/validate-smf-session-context-entry.py",
-  "scripts/validate-smf-session-context.py",
-  "scripts/validate-subscription-request.py"
-];
-const masExtras=[
-  "schemas/establishment-request.schema.yaml",
-  "references/openamsm-operation-mapping.md"
-];
+const schemeCPackage=(name,schema)=>Object.freeze({
+  name,entry:"assurance/procedure.yaml",sourceDir:"v1alpha5",
+  files:Object.freeze([...core,"schemas/"+schema+".schema.yaml",
+    "references/openamsm-operation-mapping.md"])
+});
 export const SAMPLE_PACKAGES=Object.freeze({
-  establish:Object.freeze({
-    name:"establish-pdu-session",entry:"assurance/procedure.yaml",sourceDir:"v1alpha5",
-    files:Object.freeze([...core,...establishExtras])
-  }),
-  mas:Object.freeze({
-    name:"establish-pdu-session-mas",entry:"assurance/procedure.yaml",sourceDir:"v1alpha5",
-    files:Object.freeze([...core,...masExtras])
-  })
+  mas:schemeCPackage("establish-pdu-session-mas","establishment-request"),
+  modify:schemeCPackage("modify-pdu-session-mas","modify-request"),
+  release:schemeCPackage("release-pdu-session-mas","release-request")
 });
 
 export function packageFilesForSample(key) {

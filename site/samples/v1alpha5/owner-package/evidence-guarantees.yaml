@@ -1,0 +1,816 @@
+sc.subscription-validated:
+  authority: openamsm.smf.mas
+  fact: sc.subscription-validated
+  producers:
+  - owner: openamsm.smf.mas
+    kind: operation
+    id: SC.VALIDATE_SUBSCRIPTION
+    outcome: SUCCEEDED
+    path: output
+  scope:
+    subject:
+      record: scope.subject
+      equals: arguments.ue_identity
+    originalProducer:
+      record: scope.originalProducer
+      equals: execution.producerInvocationId
+    pduSession:
+      record: scope.pduSession
+      equals: arguments.psi
+  correlation:
+    invocation:
+      record: invocationId
+      equals: execution.invocationId
+    producerInvocation:
+      record: producerInvocationId
+      equals: execution.producerInvocationId
+  factValue: value
+  selection:
+    mode: exact
+    orderBy: observedAt
+  freshness:
+    timestamp: observedAt
+    maxAgeMs: 10000
+saa.secondary-auth-disposition:
+  authority: openamsm.smf.mas
+  fact: saa.secondary-auth-disposition
+  producers:
+  - owner: openamsm.smf.mas
+    kind: operation
+    id: SAA.SECONDARY_AUTH
+    outcome: SUCCEEDED
+    path: output
+  scope:
+    subject:
+      record: scope.subject
+      equals: arguments.ue_identity
+    originalProducer:
+      record: scope.originalProducer
+      equals: execution.producerInvocationId
+  correlation:
+    invocation:
+      record: invocationId
+      equals: execution.invocationId
+    producerInvocation:
+      record: producerInvocationId
+      equals: execution.producerInvocationId
+  factValue: value
+  selection:
+    mode: exact
+    orderBy: observedAt
+  freshness:
+    timestamp: observedAt
+    maxAgeMs: 10000
+sc.context-created:
+  authority: openamsm.smf.mas
+  fact: sc.context-created
+  producers:
+  - owner: openamsm.smf.mas
+    kind: operation
+    id: SC.CREATE_SM_CONTEXT
+    outcome: SUCCEEDED
+    path: output
+  scope:
+    subject:
+      record: scope.subject
+      equals: arguments.ue_identity
+    originalProducer:
+      record: scope.originalProducer
+      equals: execution.producerInvocationId
+    pduSession:
+      record: scope.pduSession
+      equals: arguments.psi
+  correlation:
+    invocation:
+      record: invocationId
+      equals: execution.invocationId
+    producerInvocation:
+      record: producerInvocationId
+      equals: execution.producerInvocationId
+  factValue: value
+  selection:
+    mode: exact
+    orderBy: observedAt
+  freshness:
+    timestamp: observedAt
+    maxAgeMs: 10000
+sc.uecm-registered:
+  authority: openamsm.smf.mas
+  fact: sc.uecm-registered
+  producers:
+  - owner: openamsm.smf.mas
+    kind: operation
+    id: SC.REGISTER_UECM
+    outcome: SUCCEEDED
+    path: output
+  scope:
+    subject:
+      record: scope.subject
+      equals: arguments.ue_identity
+    originalProducer:
+      record: scope.originalProducer
+      equals: execution.producerInvocationId
+    pduSession:
+      record: scope.pduSession
+      equals: arguments.psi
+  correlation:
+    invocation:
+      record: invocationId
+      equals: execution.invocationId
+    producerInvocation:
+      record: producerInvocationId
+      equals: execution.producerInvocationId
+  factValue: value
+  selection:
+    mode: exact
+    orderBy: observedAt
+  freshness:
+    timestamp: observedAt
+    maxAgeMs: 10000
+pa.policy-association-created:
+  authority: openamsm.smf.mas
+  fact: pa.policy-association-created
+  producers:
+  - owner: openamsm.smf.mas
+    kind: operation
+    id: PA.CREATE_SM_POLICY
+    outcome: SUCCEEDED
+    path: output
+  scope:
+    subject:
+      record: scope.subject
+      equals: arguments.ue_identity
+    originalProducer:
+      record: scope.originalProducer
+      equals: execution.producerInvocationId
+    pduSession:
+      record: scope.pduSession
+      equals: arguments.psi
+  correlation:
+    invocation:
+      record: invocationId
+      equals: execution.invocationId
+    producerInvocation:
+      record: producerInvocationId
+      equals: execution.producerInvocationId
+  factValue: value
+  selection:
+    mode: exact
+    orderBy: observedAt
+  freshness:
+    timestamp: observedAt
+    maxAgeMs: 10000
+ups.anchor-selected:
+  authority: openamsm.smf.mas
+  fact: ups.anchor-selected
+  producers:
+  - owner: openamsm.smf.mas
+    kind: operation
+    id: UPS.DECIDE_ANCHOR
+    outcome: SUCCEEDED
+    path: output
+  scope:
+    subject:
+      record: scope.subject
+      equals: arguments.ue_identity
+    originalProducer:
+      record: scope.originalProducer
+      equals: execution.producerInvocationId
+    pduSession:
+      record: scope.pduSession
+      equals: arguments.psi
+  correlation:
+    invocation:
+      record: invocationId
+      equals: execution.invocationId
+    producerInvocation:
+      record: producerInvocationId
+      equals: execution.producerInvocationId
+  factValue: value
+  selection:
+    mode: exact
+    orderBy: observedAt
+  freshness:
+    timestamp: observedAt
+    maxAgeMs: 10000
+iam.address-allocated:
+  authority: openamsm.smf.mas
+  fact: iam.address-allocated
+  producers:
+  - owner: openamsm.smf.mas
+    kind: operation
+    id: IAM.ALLOCATE_ADDRESS
+    outcome: SUCCEEDED
+    path: output
+  scope:
+    subject:
+      record: scope.subject
+      equals: arguments.ue_identity
+    originalProducer:
+      record: scope.originalProducer
+      equals: execution.producerInvocationId
+    pduSession:
+      record: scope.pduSession
+      equals: arguments.psi
+  correlation:
+    invocation:
+      record: invocationId
+      equals: execution.invocationId
+    producerInvocation:
+      record: producerInvocationId
+      equals: execution.producerInvocationId
+  factValue: value
+  selection:
+    mode: exact
+    orderBy: observedAt
+  freshness:
+    timestamp: observedAt
+    maxAgeMs: 10000
+pa.policy-updated:
+  authority: openamsm.smf.mas
+  fact: pa.policy-updated
+  producers:
+  - owner: openamsm.smf.mas
+    kind: operation
+    id: PA.UPDATE_SM_POLICY
+    outcome: SUCCEEDED
+    path: output
+  scope:
+    subject:
+      record: scope.subject
+      equals: arguments.ue_identity
+    originalProducer:
+      record: scope.originalProducer
+      equals: execution.producerInvocationId
+    pduSession:
+      record: scope.pduSession
+      equals: arguments.psi
+  correlation:
+    invocation:
+      record: invocationId
+      equals: execution.invocationId
+    producerInvocation:
+      record: producerInvocationId
+      equals: execution.producerInvocationId
+  factValue: value
+  selection:
+    mode: exact
+    orderBy: observedAt
+  freshness:
+    timestamp: observedAt
+    maxAgeMs: 10000
+ca.charging-step-skipped:
+  authority: openamsm.smf.mas
+  fact: ca.charging-step-skipped
+  producers:
+  - owner: openamsm.smf.mas
+    kind: operation
+    id: CA.CREATE_CHARGING
+    outcome: SUCCEEDED
+    path: output
+  scope:
+    subject:
+      record: scope.subject
+      equals: arguments.ue_identity
+    originalProducer:
+      record: scope.originalProducer
+      equals: execution.producerInvocationId
+    pduSession:
+      record: scope.pduSession
+      equals: arguments.psi
+  correlation:
+    invocation:
+      record: invocationId
+      equals: execution.invocationId
+    producerInvocation:
+      record: producerInvocationId
+      equals: execution.producerInvocationId
+  factValue: value
+  selection:
+    mode: exact
+    orderBy: observedAt
+  freshness:
+    timestamp: observedAt
+    maxAgeMs: 10000
+upn.n4-session-established:
+  authority: openamsm.smf.mas
+  fact: upn.n4-session-established
+  producers:
+  - owner: openamsm.smf.mas
+    kind: operation
+    id: UPN.CREATE_UP_SESSION
+    outcome: SUCCEEDED
+    path: output
+  scope:
+    subject:
+      record: scope.subject
+      equals: arguments.ue_identity
+    originalProducer:
+      record: scope.originalProducer
+      equals: execution.producerInvocationId
+    pduSession:
+      record: scope.pduSession
+      equals: arguments.psi
+  correlation:
+    invocation:
+      record: invocationId
+      equals: execution.invocationId
+    producerInvocation:
+      record: producerInvocationId
+      equals: execution.producerInvocationId
+  factValue: value
+  selection:
+    mode: exact
+    orderBy: observedAt
+  freshness:
+    timestamp: observedAt
+    maxAgeMs: 10000
+ssm.access-network-ready:
+  authority: openamsm.smf.mas
+  fact: ssm.access-network-ready
+  producers:
+  - owner: openamsm.smf.mas
+    kind: operation
+    id: SSM.SIGNAL_UE_AN
+    outcome: SUCCEEDED
+    path: output
+  scope:
+    subject:
+      record: scope.subject
+      equals: arguments.ue_identity
+    originalProducer:
+      record: scope.originalProducer
+      equals: execution.producerInvocationId
+    pduSession:
+      record: scope.pduSession
+      equals: arguments.psi
+  correlation:
+    invocation:
+      record: invocationId
+      equals: execution.invocationId
+    producerInvocation:
+      record: producerInvocationId
+      equals: execution.producerInvocationId
+  factValue: value
+  selection:
+    mode: exact
+    orderBy: observedAt
+  freshness:
+    timestamp: observedAt
+    maxAgeMs: 10000
+upn.n3-synchronized:
+  authority: openamsm.smf.mas
+  fact: upn.n3-synchronized
+  producers:
+  - owner: openamsm.smf.mas
+    kind: operation
+    id: UPN.MODIFY_UP_SESSION
+    outcome: SUCCEEDED
+    path: output
+  scope:
+    subject:
+      record: scope.subject
+      equals: arguments.ue_identity
+    originalProducer:
+      record: scope.originalProducer
+      equals: execution.producerInvocationId
+    pduSession:
+      record: scope.pduSession
+      equals: arguments.psi
+  correlation:
+    invocation:
+      record: invocationId
+      equals: execution.invocationId
+    producerInvocation:
+      record: producerInvocationId
+      equals: execution.producerInvocationId
+  factValue: value
+  selection:
+    mode: exact
+    orderBy: observedAt
+  freshness:
+    timestamp: observedAt
+    maxAgeMs: 10000
+se.establishment-event-recorded:
+  authority: openamsm.smf.mas
+  fact: se.establishment-event-recorded
+  producers:
+  - owner: openamsm.smf.mas
+    kind: operation
+    id: SE.EMIT_EVENTS
+    outcome: SUCCEEDED
+    path: output
+  scope:
+    subject:
+      record: scope.subject
+      equals: arguments.ue_identity
+    originalProducer:
+      record: scope.originalProducer
+      equals: execution.producerInvocationId
+    pduSession:
+      record: scope.pduSession
+      equals: arguments.psi
+  correlation:
+    invocation:
+      record: invocationId
+      equals: execution.invocationId
+    producerInvocation:
+      record: producerInvocationId
+      equals: execution.producerInvocationId
+  factValue: value
+  selection:
+    mode: exact
+    orderBy: observedAt
+  freshness:
+    timestamp: observedAt
+    maxAgeMs: 10000
+ssm.n1-modify-parsed:
+  authority: openamsm.smf.mas
+  fact: ssm.n1-modify-parsed
+  producers:
+  - owner: openamsm.smf.mas
+    kind: operation
+    id: SSM.PARSE_N1_MODIFY
+    outcome: SUCCEEDED
+    path: output
+  scope:
+    subject:
+      record: scope.subject
+      equals: arguments.ue_identity
+    originalProducer:
+      record: scope.originalProducer
+      equals: execution.producerInvocationId
+    pduSession:
+      record: scope.pduSession
+      equals: arguments.psi
+  correlation:
+    invocation:
+      record: invocationId
+      equals: execution.invocationId
+    producerInvocation:
+      record: producerInvocationId
+      equals: execution.producerInvocationId
+  factValue: value
+  selection:
+    mode: exact
+    orderBy: observedAt
+  freshness:
+    timestamp: observedAt
+    maxAgeMs: 10000
+upn.qos-delta-applied:
+  authority: openamsm.smf.mas
+  fact: upn.qos-delta-applied
+  producers:
+  - owner: openamsm.smf.mas
+    kind: operation
+    id: UPN.MODIFY_QOS_DELTA
+    outcome: SUCCEEDED
+    path: output
+  scope:
+    subject:
+      record: scope.subject
+      equals: arguments.ue_identity
+    originalProducer:
+      record: scope.originalProducer
+      equals: execution.producerInvocationId
+    pduSession:
+      record: scope.pduSession
+      equals: arguments.psi
+  correlation:
+    invocation:
+      record: invocationId
+      equals: execution.invocationId
+    producerInvocation:
+      record: producerInvocationId
+      equals: execution.producerInvocationId
+  factValue: value
+  selection:
+    mode: exact
+    orderBy: observedAt
+  freshness:
+    timestamp: observedAt
+    maxAgeMs: 10000
+ssm.n1-release-parsed:
+  authority: openamsm.smf.mas
+  fact: ssm.n1-release-parsed
+  producers:
+  - owner: openamsm.smf.mas
+    kind: operation
+    id: SSM.PARSE_N1_RELEASE
+    outcome: SUCCEEDED
+    path: output
+  scope:
+    subject:
+      record: scope.subject
+      equals: arguments.ue_identity
+    originalProducer:
+      record: scope.originalProducer
+      equals: execution.producerInvocationId
+    pduSession:
+      record: scope.pduSession
+      equals: arguments.psi
+  correlation:
+    invocation:
+      record: invocationId
+      equals: execution.invocationId
+    producerInvocation:
+      record: producerInvocationId
+      equals: execution.producerInvocationId
+  factValue: value
+  selection:
+    mode: exact
+    orderBy: observedAt
+  freshness:
+    timestamp: observedAt
+    maxAgeMs: 10000
+ssm.release-command-built:
+  authority: openamsm.smf.mas
+  fact: ssm.release-command-built
+  producers:
+  - owner: openamsm.smf.mas
+    kind: operation
+    id: SSM.BUILD_RELEASE_COMMAND
+    outcome: SUCCEEDED
+    path: output
+  scope:
+    subject:
+      record: scope.subject
+      equals: arguments.ue_identity
+    originalProducer:
+      record: scope.originalProducer
+      equals: execution.producerInvocationId
+    pduSession:
+      record: scope.pduSession
+      equals: arguments.psi
+  correlation:
+    invocation:
+      record: invocationId
+      equals: execution.invocationId
+    producerInvocation:
+      record: producerInvocationId
+      equals: execution.producerInvocationId
+  factValue: value
+  selection:
+    mode: exact
+    orderBy: observedAt
+  freshness:
+    timestamp: observedAt
+    maxAgeMs: 10000
+ssm.release-n1-confirmed:
+  authority: openamsm.smf.mas
+  fact: ssm.release-n1-confirmed
+  producers:
+  - owner: openamsm.smf.mas
+    kind: operation
+    id: SSM.RELEASE_CONFIRM_N1
+    outcome: SUCCEEDED
+    path: output
+  scope:
+    subject:
+      record: scope.subject
+      equals: arguments.ue_identity
+    originalProducer:
+      record: scope.originalProducer
+      equals: execution.producerInvocationId
+    pduSession:
+      record: scope.pduSession
+      equals: arguments.psi
+  correlation:
+    invocation:
+      record: invocationId
+      equals: execution.invocationId
+    producerInvocation:
+      record: producerInvocationId
+      equals: execution.producerInvocationId
+  factValue: value
+  selection:
+    mode: exact
+    orderBy: observedAt
+  freshness:
+    timestamp: observedAt
+    maxAgeMs: 10000
+ssm.release-n2-confirmed:
+  authority: openamsm.smf.mas
+  fact: ssm.release-n2-confirmed
+  producers:
+  - owner: openamsm.smf.mas
+    kind: operation
+    id: SSM.RELEASE_CONFIRM_N2
+    outcome: SUCCEEDED
+    path: output
+  scope:
+    subject:
+      record: scope.subject
+      equals: arguments.ue_identity
+    originalProducer:
+      record: scope.originalProducer
+      equals: execution.producerInvocationId
+    pduSession:
+      record: scope.pduSession
+      equals: arguments.psi
+  correlation:
+    invocation:
+      record: invocationId
+      equals: execution.invocationId
+    producerInvocation:
+      record: producerInvocationId
+      equals: execution.producerInvocationId
+  factValue: value
+  selection:
+    mode: exact
+    orderBy: observedAt
+  freshness:
+    timestamp: observedAt
+    maxAgeMs: 10000
+pa.policy-association-released:
+  authority: openamsm.smf.mas
+  fact: pa.policy-association-released
+  producers:
+  - owner: openamsm.smf.mas
+    kind: operation
+    id: PA.DELETE_SM_POLICY_C
+    outcome: SUCCEEDED
+    path: output
+  scope:
+    subject:
+      record: scope.subject
+      equals: arguments.ue_identity
+    originalProducer:
+      record: scope.originalProducer
+      equals: execution.producerInvocationId
+    pduSession:
+      record: scope.pduSession
+      equals: arguments.psi
+  correlation:
+    invocation:
+      record: invocationId
+      equals: execution.invocationId
+    producerInvocation:
+      record: producerInvocationId
+      equals: execution.producerInvocationId
+  factValue: value
+  selection:
+    mode: exact
+    orderBy: observedAt
+  freshness:
+    timestamp: observedAt
+    maxAgeMs: 10000
+upn.up-session-released:
+  authority: openamsm.smf.mas
+  fact: upn.up-session-released
+  producers:
+  - owner: openamsm.smf.mas
+    kind: operation
+    id: UPN.DELETE_UP_SESSION
+    outcome: SUCCEEDED
+    path: output
+  scope:
+    subject:
+      record: scope.subject
+      equals: arguments.ue_identity
+    originalProducer:
+      record: scope.originalProducer
+      equals: execution.producerInvocationId
+    pduSession:
+      record: scope.pduSession
+      equals: arguments.psi
+  correlation:
+    invocation:
+      record: invocationId
+      equals: execution.invocationId
+    producerInvocation:
+      record: producerInvocationId
+      equals: execution.producerInvocationId
+  factValue: value
+  selection:
+    mode: exact
+    orderBy: observedAt
+  freshness:
+    timestamp: observedAt
+    maxAgeMs: 10000
+se.release-event-marker-written:
+  authority: openamsm.smf.mas
+  fact: se.release-event-marker-written
+  producers:
+  - owner: openamsm.smf.mas
+    kind: operation
+    id: SE.EMIT_RELEASE_EVENT_C
+    outcome: SUCCEEDED
+    path: output
+  scope:
+    subject:
+      record: scope.subject
+      equals: arguments.ue_identity
+    originalProducer:
+      record: scope.originalProducer
+      equals: execution.producerInvocationId
+    pduSession:
+      record: scope.pduSession
+      equals: arguments.psi
+  correlation:
+    invocation:
+      record: invocationId
+      equals: execution.invocationId
+    producerInvocation:
+      record: producerInvocationId
+      equals: execution.producerInvocationId
+  factValue: value
+  selection:
+    mode: exact
+    orderBy: observedAt
+  freshness:
+    timestamp: observedAt
+    maxAgeMs: 10000
+sc.context-release-committed:
+  authority: openamsm.smf.mas
+  fact: sc.context-release-committed
+  producers:
+  - owner: openamsm.smf.mas
+    kind: operation
+    id: SC.RELEASE_SM_CONTEXT_C
+    outcome: SUCCEEDED
+    path: output
+  scope:
+    subject:
+      record: scope.subject
+      equals: arguments.ue_identity
+    originalProducer:
+      record: scope.originalProducer
+      equals: execution.producerInvocationId
+    pduSession:
+      record: scope.pduSession
+      equals: arguments.psi
+  correlation:
+    invocation:
+      record: invocationId
+      equals: execution.invocationId
+    producerInvocation:
+      record: producerInvocationId
+      equals: execution.producerInvocationId
+  factValue: value
+  selection:
+    mode: exact
+    orderBy: observedAt
+  freshness:
+    timestamp: observedAt
+    maxAgeMs: 10000
+mas.receipt-query:
+  authority: openamsm.smf.mas
+  fact: mas.receipt-query
+  producers:
+  - owner: openamsm.smf.mas
+    kind: operation
+    id: MAS.RECEIPT_QUERY
+    outcome: SUCCEEDED
+    path: output
+  scope:
+    subject:
+      record: scope.subject
+      equals: arguments.ue_identity
+    originalProducer:
+      record: scope.originalProducer
+      equals: execution.producerInvocationId
+  correlation:
+    invocation:
+      record: invocationId
+      equals: execution.invocationId
+    producerInvocation:
+      record: producerInvocationId
+      equals: execution.producerInvocationId
+  factValue: value
+  selection:
+    mode: exact
+    orderBy: observedAt
+  freshness:
+    timestamp: observedAt
+    maxAgeMs: 10000
+mas.exact-original-reconcile:
+  authority: openamsm.smf.mas
+  fact: mas.exact-original-reconcile
+  producers:
+  - owner: openamsm.smf.mas
+    kind: operation
+    id: MAS.RECONCILE
+    outcome: SUCCEEDED
+    path: output
+  scope:
+    subject:
+      record: scope.subject
+      equals: arguments.ue_identity
+    originalProducer:
+      record: scope.originalProducer
+      equals: execution.producerInvocationId
+  correlation:
+    invocation:
+      record: invocationId
+      equals: execution.invocationId
+    producerInvocation:
+      record: producerInvocationId
+      equals: execution.producerInvocationId
+  factValue: value
+  selection:
+    mode: exact
+    orderBy: observedAt
+  freshness:
+    timestamp: observedAt
+    maxAgeMs: 10000

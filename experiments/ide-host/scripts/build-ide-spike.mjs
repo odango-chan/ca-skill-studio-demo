@@ -4,6 +4,8 @@ import {build} from "esbuild";
 import {mkdir,rm,cp,readFile,appendFile,writeFile,stat} from "node:fs/promises";
 import {createHash} from "node:crypto";
 import {dirname,join} from "node:path";
+import {prepareExampleOwnerDependency} from "../vscode/src/example-owner-dependency.mjs";
+import {prepareExampleHostContextDependency} from "../vscode/src/example-host-context-dependency.mjs";
 const root="experiments/ide-host/vscode";
 const buildId=JSON.stringify(process.env.GITHUB_SHA??"local");
 await rm(join(root,"dist"),{recursive:true,force:true});
@@ -143,20 +145,20 @@ await rm(join(root,"samples","skills"),{recursive:true,force:true});
 await rm(join(root,"samples","v1alpha4"),{recursive:true,force:true});
 const sampleSets=[
   {kind:"v1alpha5",source:"site/samples/v1alpha5",destination:join(root,"samples","v1alpha5"),
-    status:"RELEASED_NOT_QUALIFIED",ref:"refs/heads/main",
+    status:"OWNER_LINKED_STATIC_BUILD_PASS_E2E_NOT_RERUN",ref:"refs/heads/main",
     version:"connectionagent.io/v1alpha5"}
 ];
 for(const set of sampleSets){
   const manifest=JSON.parse(await readFile(join(set.source,"files.json"),"utf8"));
   if(manifest.schemaVersion!==1||manifest.sourceRepo!=="odango-chan/ca-skills"||
-     !/^[0-9a-f]{40}$/.test(manifest.sourceSha)||
+     manifest.sourceSha!=="b06f72baae3eb3d578c489f950a325e2d63d556f"||
      manifest.sourceStatus!==set.status||manifest.sourceRef!==set.ref||
      (set.version&&manifest.languageVersion!==set.version)||
      JSON.stringify([...manifest.skills].sort())!==
-       JSON.stringify(["establish-pdu-session","establish-pdu-session-mas",
+       JSON.stringify(["establish-pdu-session-mas",
          "modify-pdu-session-mas","release-pdu-session-mas"].sort())||
-     !manifest.blobs||!Array.isArray(manifest.files)||manifest.files.length<5||
-     manifest.files.length>100||new Set(manifest.files).size!==manifest.files.length||
+     !manifest.blobs||!Array.isArray(manifest.files)||manifest.files.length!==18||
+     !Array.isArray(manifest.dependencies)||manifest.dependencies.length!==2||new Set(manifest.files).size!==manifest.files.length||
      !manifest.files.every(path=>
        typeof path==="string"&&!path.includes("\\")&&!path.startsWith("/")&&
        path.split("/").every(part=>part&&part!=="."&&part!=="..")&&
@@ -198,10 +200,25 @@ for(const set of sampleSets){
   const targetAsset=join(set.destination,"interface-package",artifact);
   await mkdir(dirname(targetAsset),{recursive:true});
   await writeFile(targetAsset,base64+"\n");
+  const readBundled=relative=>readFile(join(set.source,relative));
+  const owner=await prepareExampleOwnerDependency(readBundled,
+    manifest.dependencies.find(entry=>entry.id==="mas"));
+  const context=await prepareExampleHostContextDependency(readBundled,
+    manifest.dependencies.find(entry=>entry.id==="ca-context"));
+  for(const [folder,snapshot] of [["owner-package",owner],["host-context",context]]){
+    for(const file of snapshot.files){
+      const target=join(set.destination,folder,file.path);
+      await mkdir(dirname(target),{recursive:true});
+      await writeFile(target,file.bytes);
+    }
+  }
   console.log("STUDIO_PREPARED_SAMPLE",JSON.stringify({
     kind:set.kind,root:set.destination,skills:manifest.skills,
     files:manifest.files.length,sourceSha:manifest.sourceSha,
     sourceStatus:manifest.sourceStatus,
+    dependencies:manifest.dependencies.map(item=>({
+      id:item.id,kind:item.kind,sourceRevision:item.resolvedRevision,files:item.files.length
+    })),
     exampleInterfaceAsset:artifact,exampleInterfaceSha256:digest
   }));
 }

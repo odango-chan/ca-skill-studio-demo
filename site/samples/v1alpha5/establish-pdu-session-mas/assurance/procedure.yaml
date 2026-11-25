@@ -35,6 +35,7 @@ nodes:
         dnn: context.request.dnn
         sNssai: context.request.sNssai
       routes:
+        NOT_COMMITTED: SAFE_STOPPED
         FAILED: SAFE_STOPPED
         OUTCOME_UNKNOWN: UNRESOLVED
         DENIED: FAILED
@@ -58,6 +59,7 @@ nodes:
         ue_identity: context.supi
         required: "0"
       routes:
+        NOT_COMMITTED: FAILED
         FAILED: FAILED
         OUTCOME_UNKNOWN: UNRESOLVED
         DENIED: FAILED
@@ -85,6 +87,7 @@ nodes:
         sNssai: context.request.sNssai
         subSummary: validate-sm-subscription.operation.output.sub_summary
       routes:
+        NOT_COMMITTED: SAFE_STOPPED
         FAILED: SAFE_STOPPED
         OUTCOME_UNKNOWN: SAFE_STOPPED
         DENIED: SAFE_STOPPED
@@ -109,6 +112,7 @@ nodes:
         psi: context.request.pduSessionId
         sessionKeys: create-sm-context.operation.output.session_keys
       routes:
+        NOT_COMMITTED: SAFE_STOPPED
         FAILED: SAFE_STOPPED
         OUTCOME_UNKNOWN: SAFE_STOPPED
         DENIED: SAFE_STOPPED
@@ -137,6 +141,7 @@ nodes:
         pduSessionType: context.request.requestedPduSessionType
         sessionKeys: create-sm-context.operation.output.session_keys
       routes:
+        NOT_COMMITTED: SAFE_STOPPED
         FAILED: SAFE_STOPPED
         OUTCOME_UNKNOWN: SAFE_STOPPED
         DENIED: SAFE_STOPPED
@@ -162,6 +167,7 @@ nodes:
         dnn: context.request.dnn
         sNssai: context.request.sNssai
       routes:
+        NOT_COMMITTED: SAFE_STOPPED
         FAILED: SAFE_STOPPED
         OUTCOME_UNKNOWN: SAFE_STOPPED
         DENIED: SAFE_STOPPED
@@ -189,6 +195,7 @@ nodes:
         allocator: "LOCAL_POOL"
         upAnchorReady: select-upf-anchor.operation.output.up_anchor
       routes:
+        NOT_COMMITTED: SAFE_STOPPED
         FAILED: SAFE_STOPPED
         OUTCOME_UNKNOWN: SAFE_STOPPED
         DENIED: SAFE_STOPPED
@@ -218,6 +225,7 @@ nodes:
         ueAddrAllocated: allocate-pdu-session-address.operation.output.ue_addr
         policyAssociationId: establish-sm-policy-association.operation.output.policy_assoc_id
       routes:
+        NOT_COMMITTED: SAFE_STOPPED
         FAILED: SAFE_STOPPED
         OUTCOME_UNKNOWN: SAFE_STOPPED
         DENIED: SAFE_STOPPED
@@ -244,6 +252,7 @@ nodes:
         psi: context.request.pduSessionId
         ratingGroupRefs: "default"
       routes:
+        NOT_COMMITTED: SAFE_STOPPED
         FAILED: SAFE_STOPPED
         OUTCOME_UNKNOWN: SAFE_STOPPED
         DENIED: SAFE_STOPPED
@@ -274,6 +283,7 @@ nodes:
         sNssai: context.request.sNssai
         pduSessionType: context.request.requestedPduSessionType
       routes:
+        NOT_COMMITTED: SAFE_STOPPED
         FAILED: SAFE_STOPPED
         OUTCOME_UNKNOWN: SAFE_STOPPED
         DENIED: SAFE_STOPPED
@@ -302,6 +312,7 @@ nodes:
         ueAddrAllocated: allocate-pdu-session-address.operation.output.ue_addr
         n4Seid: establish-n4-session.operation.output.n4_seid
       routes:
+        NOT_COMMITTED: SAFE_STOPPED
         FAILED: SAFE_STOPPED
         OUTCOME_UNKNOWN: SAFE_STOPPED
         DENIED: SAFE_STOPPED
@@ -328,6 +339,7 @@ nodes:
         anTunnelIp: signal-ue-and-access-network.operation.output.an_tunnel_ip
         n4Seid: establish-n4-session.operation.output.n4_seid
       routes:
+        NOT_COMMITTED: SAFE_STOPPED
         FAILED: SAFE_STOPPED
         OUTCOME_UNKNOWN: SAFE_STOPPED
         DENIED: SAFE_STOPPED
@@ -353,6 +365,7 @@ nodes:
         event: "ESTABLISHED"
         sessionKeys: create-sm-context.operation.output.session_keys
       routes:
+        NOT_COMMITTED: SAFE_STOPPED
         FAILED: SAFE_STOPPED
         OUTCOME_UNKNOWN: SAFE_STOPPED
         DENIED: SAFE_STOPPED

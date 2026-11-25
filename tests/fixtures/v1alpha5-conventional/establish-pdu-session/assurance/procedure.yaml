@@ -1,0 +1,346 @@
+# Illustrative CA-SL v1alpha5 deterministic DAG, NOT linked to qualified Owners.
+# The authored graph covers the supported success profile. Failure-only cleanup is documented
+# below and in SKILL.md; it is not expanded into a second set of business Nodes in this example.
+# After any confirmed resource creation, failure/unknown routes stop safely. Host/Owner retains
+# the exact resource, callback and late-result responsibility; no cleanup is claimed as completed.
+# Runtime Wait delivery lifecycle (durable admission, occurrence isolation, correlation),
+# Hold/Claim/Waiter/Journal/Reconcile and invocation identity remain Host/Owner internals.
+# The v1alpha5 Node-entry Wait is authored below; it exposes only its typed wait.output.
+# Non-SMF context required by an Operation stays inside its responsible Tool/Owner adapter.
+# Host performs ingress admission, identity/instance association, duplicate suppression and
+# execution lifecycle before this graph starts. Host execution metadata is not a Procedure input.
+# 3GPP reference: TS 23.502 V19.9.0 (Release 19); per-NF Stage 3 API versions are pinned
+# independently in SKILL.md. Host/Integration owns wire request/response handling.
+start: get-sm-subscription-data
+nodes:
+  # Primary action: 3GPP_NATIVE — TS 23.502 V19.9.0 §4.3.2.2.1 step 4; SMF → UDM Nudm_SDM_Get.
+  # Supplementary Observation: CA_EXTENSION — exact UE/PSI SM Context presence read, after this
+  # read-only Operation and before the first session-creating or session-mutating Operation.
+  # 404 SESSION_NOT_FOUND is normalized to evidenced ABSENT; 200 AVAILABLE/UNAVAILABLE is PRESENT.
+  # PRESENT is not an initial-creation path; until an idempotent/recovery Owner contract exists,
+  # stop rather than replaying the initial mutation chain. Query failure is not ABSENT.
+  # 3GPP: 3GPP_NATIVE — TS 23.502 V19.9.0 §4.3.2.2.1 step 4; SMF → UDM Nudm_SDM_Get. UDM API: TS 29.503 V19.7.0, SDM service §6.1 / OpenAPI Annex A.2. The supplementary CA_EXTENSION Observation remains in this same Node.
+  get-sm-subscription-data:
+    precondition:
+      predicates:
+        - predicate: establishment.request.supported
+          arguments:
+            - context.request.requestType
+            - context.request.requestedPduSessionType
+            - context.request.requestedSscMode
+      routes:
+        FAIL: FAILED
+        UNKNOWN: UNRESOLVED
+    operation:
+      tool: ca::sbi.udm.sm_data.get
+      arguments:
+        supi: context.supi
+        dnn: context.request.dnn
+        sNssai: context.request.sNssai
+        servingPlmn: context.request.servingPlmn
+      routes:
+        FAILED: FAILED
+        UNKNOWN: UNRESOLVED
+        DENIED: FAILED
+    observation:
+      tool: ca-session-context::context.smf.session.read
+      arguments:
+        supi: context.supi
+        pduSessionId: context.request.pduSessionId
+      routes:
+        FAILED: UNRESOLVED
+        UNKNOWN: UNRESOLVED
+    postcondition:
+      predicates:
+        - predicate: establishment.udm.response_valid
+          arguments:
+            - get-sm-subscription-data.operation.output
+        - predicate: establishment.subscription.request_valid
+          arguments:
+            - get-sm-subscription-data.operation.output
+            - context.request.dnn
+            - context.request.sNssai
+            - context.request.requestedPduSessionType
+            - context.request.requestedSscMode
+        - predicate: establishment.smf.session_context_absent
+          arguments:
+            - get-sm-subscription-data.observation.output
+      routes:
+        PASS: subscribe-sm-data
+        FAIL: FAILED
+        UNKNOWN: UNRESOLVED
+
+  # The UDM Owner binds the exact original Get/Subscribe transaction privately.
+  # Only the SUPI, requested selection and validated business result are Skill inputs.
+  # 3GPP: 3GPP_NATIVE — TS 23.502 V19.9.0 §4.3.2.2.1 step 4; SMF → UDM Nudm_SDM_Subscribe. UDM API: TS 29.503 V19.7.0, SDM service §6.1 / OpenAPI Annex A.2.
+  subscribe-sm-data:
+    operation:
+      tool: ca::sbi.udm.sdm_subscription.create
+      arguments:
+        supi: context.supi
+        selection: context.request
+        udmReadResult: get-sm-subscription-data.operation.output.result
+      routes:
+        FAILED: FAILED
+        OUTCOME_UNKNOWN: UNRESOLVED
+        DENIED: FAILED
+    postcondition:
+      predicates:
+        - predicate: establishment.udm.subscription_owned
+          arguments:
+            - subscribe-sm-data.operation.output
+      routes:
+        PASS: establish-sm-policy-association
+        FAIL: SAFE_STOPPED
+        UNKNOWN: SAFE_STOPPED
+
+  # The PCF Owner consumes the validated UDM result and request. It resolves its own SDM
+  # subscription state internally, checks the Step 6 profile gate before dispatch, and
+  # exposes whether a Step 9 modification trigger applies. This profile admits only no-trigger.
+  # 3GPP: 3GPP_NATIVE — TS 23.502 V19.9.0 §4.3.2.2.1 step 7b; Npcf_SMPolicyControl_Create. PCF API: TS 29.512 V19.6.0 / OpenAPI Annex A.2.
+  establish-sm-policy-association:
+    operation:
+      tool: ca::sbi.pcf.sm_policy.create
+      arguments:
+        supi: context.supi
+        request: context.request
+        udmReadResult: get-sm-subscription-data.operation.output.result
+      routes:
+        FAILED: SAFE_STOPPED
+        OUTCOME_UNKNOWN: SAFE_STOPPED
+        DENIED: SAFE_STOPPED
+    postcondition:
+      predicates:
+        - predicate: establishment.pcf.association_owned
+          arguments:
+            - establish-sm-policy-association.operation.output
+      routes:
+        PASS: establish-n4-session
+        FAIL: SAFE_STOPPED
+        UNKNOWN: SAFE_STOPPED
+
+  # The SMF N4 Owner performs native Step 8 UPF/session-address selection and steps 10a–10b
+  # N4 Session Establishment as one business interaction. It returns the effective session
+  # configuration, allocated IPv4 address and a digest consumed by the AMF N1/N2 Tool.
+  # No internal SMF module name or owner handle is exposed to the Skill.
+  # 3GPP: CA_ADAPTER — TS 23.502 V19.9.0 §4.3.2.2.1 step 8 and steps 10a–10b; §4.4.1.2. N4/PFCP: TS 29.244 V19.6.0. Step 8 selection is SMF-local work inside this Owner operation; the N4 Request/Response is steps 10a–10b.
+  establish-n4-session:
+    operation:
+      tool: smf::n4.session.establish
+      arguments:
+        supi: context.supi
+        request: context.request
+        udmReadResult: get-sm-subscription-data.operation.output.result
+        policyResult: establish-sm-policy-association.operation.output.policyResult
+      routes:
+        FAILED: SAFE_STOPPED
+        OUTCOME_UNKNOWN: SAFE_STOPPED
+        DENIED: SAFE_STOPPED
+    postcondition:
+      predicates:
+        - predicate: establishment.n4.initial_resources_ready
+          arguments:
+            - establish-n4-session.operation.output
+            - context.request.dnn
+            - context.request.sNssai.sst
+            - context.request.requestedPduSessionType
+            - context.request.requestedSscMode
+      routes:
+        PASS: transfer-n1n2-message
+        FAIL: SAFE_STOPPED
+        UNKNOWN: SAFE_STOPPED
+
+  # The AMF Tool consumes the exact effective configuration returned by the N4 Owner.
+  # Its Evidence binds the transferred N1/N2 payload to that configuration digest.
+  # An AMF transfer acknowledgement is initiation only; it never proves RAN adoption.
+  # 3GPP: 3GPP_NATIVE — TS 23.502 V19.9.0 §4.3.2.2.1 step 11; Namf_Communication_N1N2MessageTransfer. AMF API: TS 29.518 V19.8.0, Namf_Communication §5.2 / §6.1.2.4 / OpenAPI Annex A.2; TS 29.571 V19.7.0 §5.4.4.14 `RefToBinaryData` for referenced N1/N2 binary body parts.
+  transfer-n1n2-message:
+    operation:
+      tool: ca::sbi.amf.n1n2.transfer
+      arguments:
+        supi: context.supi
+        pduSessionId: context.request.pduSessionId
+        pti: context.request.pti
+        request: context.request
+        initialN4Result: establish-n4-session.operation.output
+      routes:
+        FAILED: SAFE_STOPPED
+        OUTCOME_UNKNOWN: SAFE_STOPPED
+        DENIED: SAFE_STOPPED
+    postcondition:
+      predicates:
+        - predicate: establishment.amf.transfer_initiated
+          arguments:
+            - transfer-n1n2-message.operation.output
+            - establish-n4-session.operation.output
+      routes:
+        PASS: update-sm-context
+        FAIL: SAFE_STOPPED
+        UNKNOWN: SAFE_STOPPED
+
+  # Step 15 is admitted as a Node-entry Event Wait, not a new Skill invocation.
+  # The preceding Step 11 transfer Operation is the declared trigger in the trusted
+  # Integration IngressCatalog dependency. The normalized request is exposed only as
+  # update-sm-context.wait.output after EVENT_ACCEPTED for this exact Wait occurrence.
+  # Step 17 is committed at prepare-step17-response, after all applicable Step 16 work.
+  # 3GPP: CA_ADAPTER — TS 23.502 V19.9.0 §4.3.2.2.1 step 15; Nsmf_PDUSession_UpdateSMContext.
+  # SMF API: TS 29.502 V19.7.0 §5.2/§6.1/§6.1.2.4 / OpenAPI Annex A.2.
+  update-sm-context:
+    wait:
+      event:
+        source: AMF
+        service: Nsmf_PDUSession
+        operation: UpdateSMContext
+      timeout: PT30S
+      response:
+        after: prepare-step17-response
+      routes:
+        TIMEOUT: SAFE_STOPPED
+    operation:
+      tool: ca::smf.session.update_from_amf
+      arguments:
+        request: update-sm-context.wait.output
+        supi: context.supi
+        pduSessionId: context.request.pduSessionId
+      routes:
+        FAILED: SAFE_STOPPED
+        OUTCOME_UNKNOWN: SAFE_STOPPED
+        DENIED: SAFE_STOPPED
+    observation:
+      tool: ca-session-context::context.smf.session.read
+      arguments:
+        supi: context.supi
+        pduSessionId: context.request.pduSessionId
+      routes:
+        FAILED: SAFE_STOPPED
+        UNKNOWN: SAFE_STOPPED
+    postcondition:
+      predicates:
+        - predicate: establishment.ran.adopted
+          arguments:
+            - update-sm-context.operation.output
+        - predicate: establishment.smf.session_context_profile_ready
+          arguments:
+            - update-sm-context.observation.output
+            - context.request.dnn
+            - context.request.sNssai.sst
+      routes:
+        PASS: modify-n4-session
+        FAIL: SAFE_STOPPED
+        UNKNOWN: SAFE_STOPPED
+
+  # 3GPP: CA_ADAPTER — TS 23.502 V19.9.0 §4.3.2.2.1 steps 16a–16b; §4.4.1.3 N4 Session Modification. N4/PFCP: TS 29.244 V19.6.0.
+  modify-n4-session:
+    operation:
+      tool: smf::n4.session.modify
+      arguments:
+        supi: context.supi
+        pduSessionId: context.request.pduSessionId
+        initialN4Result: establish-n4-session.operation.output
+        ranResult: update-sm-context.operation.output
+      routes:
+        FAILED: SAFE_STOPPED
+        OUTCOME_UNKNOWN: SAFE_STOPPED
+        DENIED: SAFE_STOPPED
+    postcondition:
+      predicates:
+        - predicate: establishment.n4.forwarding_ready
+          arguments:
+            - modify-n4-session.operation.output
+            - establish-n4-session.operation.output
+            - update-sm-context.operation.output
+      routes:
+        PASS: ensure-uecm-registration
+        FAIL: SAFE_STOPPED
+        UNKNOWN: SAFE_STOPPED
+
+  # Step 16c: for a non-emergency initial PDU Session, ensure the exact per-SUPI/PSI
+  # SMF registration in UDM. The Owner checks the current SMF context flag: if already
+  # registered it returns ALREADY_REGISTERED; otherwise it performs Nudm_UECM_Registration.
+  # The SMF instance identity and UDM transaction handles remain Owner-private.
+  # 3GPP: 3GPP_NATIVE — TS 23.502 V19.9.0 §4.3.2.2.1 step 16c; Nudm_UECM_Registration. UDM API: TS 29.503 V19.7.0, UECM service §6.2 / OpenAPI Annex A.3.
+  ensure-uecm-registration:
+    operation:
+      tool: ca::sbi.udm.uecm.register
+      arguments:
+        supi: context.supi
+        pduSessionId: context.request.pduSessionId
+        dnn: context.request.dnn
+        sNssai: context.request.sNssai
+        uecmRegistered: update-sm-context.observation.output.context.uecmRegistered
+        udmReadResult: get-sm-subscription-data.operation.output.result
+      routes:
+        FAILED: SAFE_STOPPED
+        OUTCOME_UNKNOWN: SAFE_STOPPED
+        DENIED: SAFE_STOPPED
+    postcondition:
+      predicates:
+        - predicate: establishment.udm.uecm_registration_satisfied
+          arguments:
+            - ensure-uecm-registration.operation.output
+            - context.supi
+            - context.request.pduSessionId
+      routes:
+        PASS: prepare-step17-response
+        FAIL: SAFE_STOPPED
+        UNKNOWN: SAFE_STOPPED
+
+  # Step 17 paired response boundary. The Integration IngressCatalog maps this
+  # exact Observation Producer to the TS 29.502 response representation.
+  # The response is committed after Step 16 work and before later Run/Goal completion.
+  prepare-step17-response:
+    observation:
+      tool: ca::smf.session.observe_step17_response
+      arguments:
+        request: update-sm-context.wait.output
+        update: update-sm-context.operation.output
+        n4Modification: modify-n4-session.operation.output
+        uecmRegistration: ensure-uecm-registration.operation.output
+      routes:
+        SUCCEEDED: verify-pdu-session-establishment
+        FAILED: SAFE_STOPPED
+        DENIED: SAFE_STOPPED
+        UNKNOWN: SAFE_STOPPED
+
+  # Final business proof. Host/Runtime separately enforces its terminal resource-responsibility
+  # gate before publishing SUCCEEDED; this is a §12.8 publish gate, not a Skill Node.
+  # This success-path example does not expand failure-only cleanup into business Nodes:
+  # Step 17 reject response, Step 18 SM Context Status Notify and Step 21 unsubscribe remain
+  # explicit protocol responsibilities. Host/Runtime retains outstanding responsibility and
+  # gates terminal publication; it does not implement 3GPP cleanup or decide Step 21 eligibility.
+  # The failure Procedure must evaluate Step 21 against the exact (SUPI, DNN, HPLMN S-NSSAI)
+  # session set, then invoke Nudm_SDM_Unsubscribe through the UDM Owner. UDM may further
+  # execute Nudr_DM_Unsubscribe; Step 18 and other resource cleanup use responsible Owner
+  # contracts. SAFE_STOPPED preserves responsibility; it does not claim cleanup completed.
+  # 3GPP: CA_EXTENSION — final Goal proof over authoritative network and UDM registration facts.
+  verify-pdu-session-establishment:
+    postcondition:
+      predicates:
+        - predicate: establishment.amf.transfer_initiated
+          arguments:
+            - transfer-n1n2-message.operation.output
+            - establish-n4-session.operation.output
+        - predicate: establishment.ran.adopted
+          arguments:
+            - update-sm-context.operation.output
+        - predicate: establishment.n4.initial_resources_ready
+          arguments:
+            - establish-n4-session.operation.output
+            - context.request.dnn
+            - context.request.sNssai.sst
+            - context.request.requestedPduSessionType
+            - context.request.requestedSscMode
+        - predicate: establishment.n4.forwarding_ready
+          arguments:
+            - modify-n4-session.operation.output
+            - establish-n4-session.operation.output
+            - update-sm-context.operation.output
+        - predicate: establishment.udm.uecm_registration_satisfied
+          arguments:
+            - ensure-uecm-registration.operation.output
+            - context.supi
+            - context.request.pduSessionId
+      routes:
+        PASS: SUCCEEDED
+        FAIL: SAFE_STOPPED
+        UNKNOWN: SAFE_STOPPED

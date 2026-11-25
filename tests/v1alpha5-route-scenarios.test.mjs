@@ -7,7 +7,7 @@ import {
 
 const root=new URL("../site/samples/v1alpha5/",import.meta.url);
 const source=name=>new Map([["assurance/procedure.yaml",{
-  text:readFileSync(new URL(name+"/assurance/procedure.yaml",root),"utf8")
+  text:readFileSync(new URL(name+"/assurance/procedure.yaml",name==="establish-pdu-session"?new URL("./fixtures/v1alpha5-conventional/",import.meta.url):root),"utf8")
 }]]);
 const normal=[
  ["get-sm-subscription-data",["precondition","operation","observation","postcondition"]],

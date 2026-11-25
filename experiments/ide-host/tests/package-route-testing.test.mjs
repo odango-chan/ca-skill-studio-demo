@@ -4,7 +4,7 @@ import {readFileSync} from "node:fs";
 import {registerPackageRouteTesting}
   from "../vscode/src/package-route-testing.mjs";
 
-const path=new URL("../../../site/samples/v1alpha5/establish-pdu-session/assurance/procedure.yaml",import.meta.url);
+const path=new URL("../../../tests/fixtures/v1alpha5-conventional/establish-pdu-session/assurance/procedure.yaml",import.meta.url);
 const document={uri:{path:"/workspace/skills/establish-pdu-session/assurance/procedure.yaml"}};
 const snapshot={
   completeness:"complete",packageName:"establish-pdu-session",

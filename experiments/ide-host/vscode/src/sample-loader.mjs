@@ -1,13 +1,16 @@
 // Explicit Example project import for VS Code desktop/web or Theia browser-only OPFS.
 // Replacing an existing Example is a deliberate, user-confirmed operation that
-// deletes the Example root and recreates it from the single pinned v1alpha5 source.
+// refreshes authored files in the Example root from the single pinned v1alpha5 source.
 // Ordinary projects are never passed to this importer. It never creates lib/ or output/.
 import {writeImmutableSnapshot} from "./dependency-service.mjs";
 import {EXAMPLE_INTERFACE_ARCHIVE,prepareExampleInterfaceDependency,
   exampleWorkspaceSettingsContent} from "./example-interface-dependency.mjs";
+import {prepareExampleOwnerDependency} from "./example-owner-dependency.mjs";
+import {prepareExampleHostContextDependency} from "./example-host-context-dependency.mjs";
+import {gitBlobSha1} from "./dependency-snapshot.mjs";
 
 export const EXAMPLE_PROJECT_NAME="skill-studio-demo";
-const SKILLS=Object.freeze(["establish-pdu-session","establish-pdu-session-mas","modify-pdu-session-mas","release-pdu-session-mas"]);
+const SKILLS=Object.freeze(["establish-pdu-session-mas","modify-pdu-session-mas","release-pdu-session-mas"]);
 const decoder=new TextDecoder();
 const fail=reason=>{throw Error(reason);};
 const describeUri=uri=>({
@@ -21,32 +24,20 @@ const describeError=error=>({
   code:error?.code??null,
   message:String(error?.message??error)
 });
-async function clearDirectoryContents(vscode,fs,root,{preserveVscode=false}={}){
-  if(typeof fs.readDirectory!=="function")
-    fail("Host file system cannot enumerate the existing Example directory");
-  let entries;
-  try{entries=await fs.readDirectory(root);}
-  catch(error){
-    fail("Cannot enumerate the existing Example directory: "+
-      JSON.stringify(describeError(error)));
-  }
-  for(const [name] of entries){
+async function pruneExampleDirectory(vscode,fs,root,allowedPaths){
+  for(const [name,type] of await fs.readDirectory(root)){
     if(typeof name!=="string"||!name||name==="."||name===".."||
        name.includes("/")||name.includes("\\"))
       fail("Host file system returned an unsafe Example child name");
-    // .vscode/settings.json controls the active Theia workspace. Deleting
-    // it during an explicit Example replacement can restart the extension
-    // host and abort the import halfway through. Replace it at the very end.
-    if(preserveVscode&&name===".vscode")continue;
+    if(allowedPaths.includes(name))continue;
     const child=vscode.Uri.joinPath(root,name);
-    await fs.delete(child,{recursive:true,useTrash:false});
+    const prefix=name+"/";
+    const descendants=allowedPaths.filter(file=>file.startsWith(prefix))
+      .map(file=>file.slice(prefix.length));
+    if(descendants.length&&type===2)await pruneExampleDirectory(vscode,fs,child,descendants);
+    else if(!descendants.length)await fs.delete(child,{recursive:true,useTrash:false});
+    else fail("Confirmed Example directory is unavailable: "+name);
   }
-  const remaining=await fs.readDirectory(root);
-  if(remaining.some(([name])=>!preserveVscode||name!==".vscode")||
-     remaining.length>(preserveVscode?1:0))
-    fail("Existing Example contents remain after replacement cleanup: "+
-      remaining.map(([name])=>name).join(", "));
-  return entries.map(([name])=>name);
 }
 // Theia 1.76 browser-only currently supplies an HTTP(S) extensionUri in this
 // hosted-plugin worker. Fetch only same-origin extension assets in that case.
@@ -95,6 +86,18 @@ async function readBundledResource(vscode,uri){
   }
   return vscode.workspace.fs.readFile(uri);
 }
+async function prepareExampleDependencies(vscode,extensionUri,candidate){
+  const sampleRoot=vscode.Uri.joinPath(extensionUri,"samples","v1alpha5");
+  const read=relative=>readBundledResource(vscode,
+    vscode.Uri.joinPath(sampleRoot,...relative.split("/")));
+  const client=await prepareExampleInterfaceDependency(
+    await read("interface-package/"+EXAMPLE_INTERFACE_ARCHIVE+".b64"));
+  const ownerEntry=candidate.dependencies.find(item=>item.id==="mas");
+  const contextEntry=candidate.dependencies.find(item=>item.id==="ca-context");
+  const owner=await prepareExampleOwnerDependency(read,ownerEntry);
+  const context=await prepareExampleHostContextDependency(read,contextEntry);
+  return [client,context,owner];
+}
 function validate(manifest,{sourceSha,sourceStatus,sourceRef,languageVersion,projectReadme}={}){
   if(manifest?.schemaVersion!==1||manifest?.sourceRepo!=="odango-chan/ca-skills"||
      manifest?.sourceSha!==sourceSha||manifest?.sourceStatus!==sourceStatus||
@@ -103,8 +106,10 @@ function validate(manifest,{sourceSha,sourceStatus,sourceRef,languageVersion,pro
      (projectReadme&&manifest?.projectReadme!==projectReadme)||
      !Array.isArray(manifest.skills)||
      JSON.stringify(manifest.skills)!==JSON.stringify(SKILLS)||
-     !Array.isArray(manifest.files)||manifest.files.length<5||
-     manifest.files.length>100||!manifest.blobs||typeof manifest.blobs!=="object")
+     !Array.isArray(manifest.files)||manifest.files.length!==18||
+     !manifest.blobs||typeof manifest.blobs!=="object"||
+     Object.keys(manifest.blobs).length!==manifest.files.length||
+     !Array.isArray(manifest.dependencies)||manifest.dependencies.length!==2)
     fail("Unrecognized or stale pinned sample manifest");
   const seen=new Set();
   for(const item of manifest.files){
@@ -119,11 +124,41 @@ function validate(manifest,{sourceSha,sourceStatus,sourceRef,languageVersion,pro
     for(const required of ["SKILL.md","assurance/contract.yaml",
       "assurance/procedure.yaml","assurance/predicates.yaml"])
       if(!seen.has(skill+"/"+required))fail("Missing required "+skill+"/"+required);
+  const owner=manifest.dependencies.find(item=>item?.id==="mas");
+  const hostContext=manifest.dependencies.find(item=>item?.id==="ca-context");
+  if(owner?.kind!=="tool-catalog"||
+     owner.source?.repository!=="odango-chan/ca-client-tools"||
+     owner.source?.ref!=="refs/tags/v1.2.0"||
+     owner.source?.path!=="contracts/owner/openamsm-mas/v1alpha4"||
+     owner.source?.packageId!=="urn:openamsm:mas:tool-contracts"||
+     owner.source?.owner!=="openamsm.smf.mas"||
+     owner.resolvedRevision!=="fc44c3a745c68443fcfb12054c7eadf0ed7cc3f7"||
+     !Array.isArray(owner.files)||owner.files.length!==59||
+     !owner.blobs||Object.keys(owner.blobs).length!==owner.files.length)
+    fail("Unrecognized pinned OpenAMSM Owner ToolCatalog dependency");
+  if(hostContext?.kind!=="schema-bundle"||
+     hostContext.source?.repository!=="odango-chan/ca-agent-demo"||
+     hostContext.source?.path!=="tests/fixtures/compiler/mas-v1alpha5-scheme-c/trusted/snapshots/ca-context"||
+     hostContext.source?.packageId!=="urn:connectionagent:ca:host-context"||
+     hostContext.source?.owner!=="urn:connectionagent:owner:ca-context"||
+     hostContext.source?.sourceStatus!=="DEVELOPMENT_FIXTURE"||
+     hostContext.resolvedRevision!=="57e277ff9094dad93543df46910a12a1dbbaf560"||
+     JSON.stringify(hostContext.files)!==JSON.stringify(["subject.schema.json"])||
+     !hostContext.blobs||Object.keys(hostContext.blobs).length!==1)
+    fail("Unrecognized pinned Host context Schema dependency");
+  for(const dependency of manifest.dependencies){
+    for(const path of dependency.files){
+      if(typeof path!=="string"||path.length>240||path.startsWith("/")||
+         path.includes("\\")||path.split("/").some(part=>!part||part==="."||part==="..")||
+         !/^[a-f0-9]{40}$/.test(dependency.blobs[path]??""))
+        fail("Unsafe or unpinned dependency snapshot path");
+    }
+  }
   return manifest;
 }
 // Seed only a missing default lock. An existing settings.json is the user's
 // explicit configuration and is NEVER rewritten, even if ca-client is absent.
-async function persistExampleInterfaceIfAbsent(vscode,root,prepared,
+async function persistExampleDependenciesIfAbsent(vscode,root,prepared,
   {replaceSettings=false}={}){
   const fs=vscode.workspace.fs;
   const settingsUri=vscode.Uri.joinPath(root,".vscode","settings.json");
@@ -132,10 +167,11 @@ async function persistExampleInterfaceIfAbsent(vscode,root,prepared,
     catch(error){if(error?.code==="FileNotFound")return false;throw error;}
   };
   if(!replaceSettings&&await exists(settingsUri))return false;
-  const persisted=await writeImmutableSnapshot(vscode,root,prepared.files);
-  if(persisted.snapshotDigest!==prepared.snapshotDigest)
-    fail("Example Interface Package snapshot digest mismatch");
-  // A second startup/import task may have created user settings meanwhile.
+  for(const dependency of prepared){
+    const persisted=await writeImmutableSnapshot(vscode,root,dependency.files);
+    if(persisted.snapshotDigest!==dependency.snapshotDigest)
+      fail("Example "+dependency.declaration.id+" dependency snapshot digest mismatch");
+  }
   if(!replaceSettings&&await exists(settingsUri))return false;
   const settingsFolder=vscode.Uri.joinPath(root,".vscode");
   await fs.createDirectory(settingsFolder);
@@ -151,9 +187,6 @@ async function persistExampleInterfaceIfAbsent(vscode,root,prepared,
         {recursive:true,useTrash:false});
     }
   }
-  // Replace settings only AFTER every Skill and immutable snapshot exists.
-  // Rewriting identical bytes causes a pointless Theia configuration reload
-  // during Example reset, which can interrupt its pending navigation.
   const desired=exampleWorkspaceSettingsContent(prepared);
   if(replaceSettings&&await exists(settingsUri)){
     const old=await fs.readFile(settingsUri);
@@ -167,7 +200,7 @@ async function persistExampleInterfaceIfAbsent(vscode,root,prepared,
 // Safe one-time migration for a previously opened CURRENT Example after an
 // online Studio upgrade. Never replace sources, settings or ordinary projects.
 // Stale legacy Example data is intentionally left for explicit Replace Example.
-export async function ensureOpenedExampleInterface(vscode,extensionUri,storageUri){
+export async function ensureOpenedExampleDependencies(vscode,extensionUri,storageUri){
   const root=vscode.Uri.joinPath(storageUri,EXAMPLE_PROJECT_NAME);
   const folders=vscode.workspace.workspaceFolders??[];
   if(vscode.workspace.workspaceFile||folders.length!==1||
@@ -177,9 +210,9 @@ export async function ensureOpenedExampleInterface(vscode,extensionUri,storageUr
   const settingsUri=vscode.Uri.joinPath(root,".vscode","settings.json");
   try{await fs.stat(settingsUri);return {status:"PRESERVED"};}
   catch(error){if(error?.code!=="FileNotFound")throw error;}
-  const procedure=vscode.Uri.joinPath(root,"skills","establish-pdu-session",
+  const procedure=vscode.Uri.joinPath(root,"skills",SKILLS[0],
     "assurance","procedure.yaml");
-  const contract=vscode.Uri.joinPath(root,"skills","establish-pdu-session",
+  const contract=vscode.Uri.joinPath(root,"skills",SKILLS[0],
     "assurance","contract.yaml");
   const [procedureText,contractText]=await Promise.all([procedure,contract].map(async uri=>{
     try{return decoder.decode(await fs.readFile(uri));}
@@ -190,13 +223,35 @@ export async function ensureOpenedExampleInterface(vscode,extensionUri,storageUr
      /^\s*apiVersion\s*:/m.test(procedureText)||
      !/^\s*requestSchema\s*:/m.test(contractText))
     return {status:"LEGACY_OR_UNKNOWN"};
-  const prepared=await prepareExampleInterfaceDependency(
-    await readBundledResource(vscode,vscode.Uri.joinPath(extensionUri,
-      "samples","v1alpha5","interface-package",EXAMPLE_INTERFACE_ARCHIVE+".b64"))
-  );
-  const seeded=await persistExampleInterfaceIfAbsent(vscode,root,prepared);
+  const manifestUri=vscode.Uri.joinPath(extensionUri,"samples","v1alpha5","files.json");
+  const candidate=validate(JSON.parse(decoder.decode(
+    await readBundledResource(vscode,manifestUri))),{
+      kind:"CA-SL v1alpha5",
+      sourceSha:"b06f72baae3eb3d578c489f950a325e2d63d556f",
+      sourceStatus:"OWNER_LINKED_STATIC_BUILD_PASS_E2E_NOT_RERUN",
+      sourceRef:"refs/heads/main",
+      languageVersion:"connectionagent.io/v1alpha5",
+      projectReadme:"README.md"
+    });
+  const skillsRoot=vscode.Uri.joinPath(root,"skills");
+  let names;
+  try{names=(await fs.readDirectory(skillsRoot)).map(([name])=>name).sort();}
+  catch(error){if(error?.code==="FileNotFound")return {status:"LEGACY_OR_UNKNOWN"};throw error;}
+  if(JSON.stringify(names)!==JSON.stringify([...SKILLS].sort()))
+    return {status:"LEGACY_OR_UNKNOWN"};
+  for(const relativePath of candidate.files){
+    let bytes;
+    try{bytes=await fs.readFile(vscode.Uri.joinPath(skillsRoot,...relativePath.split("/")));}
+    catch(error){if(error?.code==="FileNotFound")return {status:"LEGACY_OR_UNKNOWN"};throw error;}
+    if(await gitBlobSha1(bytes)!==candidate.blobs[relativePath])
+      return {status:"LEGACY_OR_UNKNOWN"};
+  }
+  const prepared=await prepareExampleDependencies(vscode,extensionUri,candidate);
+  const seeded=await persistExampleDependenciesIfAbsent(vscode,root,prepared);
   return {status:seeded?"SEEDED":"PRESERVED",
-    id:prepared.declaration.id,snapshotDigest:prepared.snapshotDigest};
+    dependencyIds:prepared.map(item=>item.declaration.id),
+    snapshotDigests:Object.fromEntries(prepared.map(item=>
+      [item.declaration.id,item.snapshotDigest]))};
 }
 
 export async function seedExampleProject(vscode,extensionUri,storageUri,
@@ -217,8 +272,8 @@ export async function seedExampleProject(vscode,extensionUri,storageUri,
       catch(error){fail("Cannot read CA-SL v1alpha5 manifest: "+JSON.stringify(describeError(error)));}
       return validate(JSON.parse(decoder.decode(bytes)),{
         kind:"CA-SL v1alpha5",
-        sourceSha:"a1ed951b1e677f824c644541a26f08be4dc4847f",
-        sourceStatus:"RELEASED_NOT_QUALIFIED",
+        sourceSha:"b06f72baae3eb3d578c489f950a325e2d63d556f",
+        sourceStatus:"OWNER_LINKED_STATIC_BUILD_PASS_E2E_NOT_RERUN",
         sourceRef:"refs/heads/main",
         languageVersion:"connectionagent.io/v1alpha5",
         projectReadme:"README.md"
@@ -227,13 +282,8 @@ export async function seedExampleProject(vscode,extensionUri,storageUri,
     const candidate=await readManifest();
     // Validate the EXACT bundled release ZIP before touching even an existing
     // Example. A missing/corrupt asset must never partially replace user work.
-    phase="verify-pinned-example-interface";
-    const exampleInterface=await prepareExampleInterfaceDependency(
-      await readBundledResource(vscode,vscode.Uri.joinPath(
-        extensionUri,"samples","v1alpha5","interface-package",
-        EXAMPLE_INTERFACE_ARCHIVE+".b64"
-      ))
-    );
+    phase="verify-pinned-example-dependencies";
+    const exampleDependencies=await prepareExampleDependencies(vscode,extensionUri,candidate);
     const root=vscode.Uri.joinPath(storageUri,EXAMPLE_PROJECT_NAME);
     const skillsRoot=vscode.Uri.joinPath(root,"skills");
     const exists=async uri=>{
@@ -242,30 +292,27 @@ export async function seedExampleProject(vscode,extensionUri,storageUri,
     };
     const hadExisting=await exists(root);
     const replacedExisting=Boolean(replaceExisting&&hadExisting);
-    if(replacedExisting){
-      phase="replace-existing-example";
-      // The Example root is also the active workspace folder in Theia OPFS.
-      // Keep that directory handle/path stable and remove only its children;
-      // deleting the active workspace root itself is not a portable operation
-      // across VS Code and Theia filesystem providers.
-      await clearDirectoryContents(vscode,fs,root,{preserveVscode:true});
-    }else{
-      phase="create-project-layout";
-      await fs.createDirectory(root);
+    phase="verify-pinned-example-source";
+    const sourceRoot=vscode.Uri.joinPath(extensionUri,"samples","v1alpha5");
+    const readSource=file=>readBundledResource(vscode,
+      vscode.Uri.joinPath(sourceRoot,...file.split("/")));
+    const readme=await readSource(candidate.projectReadme);
+    const sources=new Map();
+    for(const file of candidate.files){
+      const bytes=await readSource(file);
+      if(!(bytes instanceof Uint8Array)||await gitBlobSha1(bytes)!==candidate.blobs[file])
+        fail("Bundled Skill source does not match pinned ca-skills blob: "+file);
+      sources.set(file,bytes);
     }
     phase="create-project-layout";
     await fs.createDirectory(skillsRoot);
 
-    const readmeSource=vscode.Uri.joinPath(extensionUri,"samples","v1alpha5",candidate.projectReadme);
     const readmeDestination=vscode.Uri.joinPath(root,"README.md");
     let readmeUpdated=false;
-    // After an explicit replacement, recursive deletion may leave a stale
-    // stat result in some hosted filesystem providers. The user has approved
-    // replacing this Example, so write the pinned README unconditionally.
+    // Confirmed replacement always restores the pinned README.
     if(replacedExisting||!(await exists(readmeDestination))){
       phase="write-v1alpha5-project-readme";
-      const bytes=await readBundledResource(vscode,readmeSource);
-      await fs.writeFile(readmeDestination,bytes);
+      await fs.writeFile(readmeDestination,readme);
       readmeUpdated=true;
     }
 
@@ -276,23 +323,16 @@ export async function seedExampleProject(vscode,extensionUri,storageUri,
       const parts=file.split("/");
       const destination=vscode.Uri.joinPath(skillsRoot,...parts);
       phase="stat-existing:"+file;
-      // Do not trust cached stat results after clearing the Example root.
-      // Explicit replacement writes every exact bundled file; writeFile is
-      // allowed to replace a stale provider entry.
+      // Confirmed replacement always restores the exact bundled bytes.
       if(!replacedExisting&&await exists(destination)){
         skipped++;
         report({phase:"files",completed:created+skipped,total});
         continue;
       }
-      phase="read-bundled-file:"+file;
-      const bytes=await readBundledResource(vscode,
-        vscode.Uri.joinPath(extensionUri,"samples","v1alpha5",...parts));
-      if(!(bytes instanceof Uint8Array))fail("Unrecognized v1alpha5 sample file");
+      const bytes=sources.get(file);
       if(parts.length>1)
         await fs.createDirectory(vscode.Uri.joinPath(skillsRoot,...parts.slice(0,-1)));
-      // For a confirmed replacement, stale stat cache entries are expected
-      // after recursive deletion; this is an intentional overwrite of the
-      // exact pinned Example bytes, not an unconfirmed concurrent import.
+      // Protect against a concurrent write on an unconfirmed import.
       if(!replacedExisting){
         try{await fs.stat(destination);fail("v1alpha5 sample file changed during import");}
         catch(error){if(error?.code!=="FileNotFound")throw error;}
@@ -303,13 +343,21 @@ export async function seedExampleProject(vscode,extensionUri,storageUri,
       report({phase:"files",completed:created+skipped,total});
     }
 
+    if(replacedExisting){
+      phase="prune-retired-example-files";
+      // Keep active directory handles and immutable snapshots in place.
+      await pruneExampleDirectory(vscode,fs,root,[
+        ".vscode",".skill-studio","README.md",...candidate.files.map(file=>"skills/"+file)
+      ]);
+    }
+
     // Only the built-in Example gets this dependency. A fresh or explicitly
     // replaced Example receives a pinned snapshot + .vscode/settings.json.
     // Existing user settings are never rewritten on a non-replacing reopen;
     // this also respects users who intentionally removed ca-client.
     phase="persist-example-interface-lock";
-    const exampleDependencySeeded=await persistExampleInterfaceIfAbsent(
-      vscode,root,exampleInterface,{replaceSettings:replacedExisting});
+    const exampleDependencySeeded=await persistExampleDependenciesIfAbsent(
+      vscode,root,exampleDependencies,{replaceSettings:replacedExisting});
 
     if(replacedExisting){
       phase="verify-replaced-example";
@@ -334,12 +382,18 @@ export async function seedExampleProject(vscode,extensionUri,storageUri,
       root,skillsRoot,procedure:procedures[SKILLS[0]],procedures,
       skills:[...SKILLS],
       sourceSha:candidate.sourceSha,
-      sourceShas:{v1alpha5:candidate.sourceSha},
+      sourceShas:{v1alpha5:candidate.sourceSha,
+        ownerToolCatalog:candidate.dependencies.find(item=>item.id==="mas").resolvedRevision,
+        hostContext:candidate.dependencies.find(item=>item.id==="ca-context").resolvedRevision},
       candidateFiles:candidate.files.length,
       files:total,created,skipped,replacedExisting,readmeUpdated,
       exampleDependencySeeded,
-      exampleDependencyId:exampleInterface.declaration.id,
-      exampleDependencySnapshotDigest:exampleInterface.snapshotDigest
+      exampleDependencyIds:exampleDependencies.map(item=>item.declaration.id),
+      exampleDependencySnapshotDigests:Object.fromEntries(exampleDependencies.map(item=>
+        [item.declaration.id,item.snapshotDigest])),
+      exampleDependencyId:"ca-client",
+      exampleDependencySnapshotDigest:exampleDependencies.find(item=>
+        item.declaration.id==="ca-client").snapshotDigest
     };
   }catch(error){throw Error(phase+": "+String(error?.message??error));}
 }

@@ -1,0 +1,34 @@
+{
+  "$id": "urn:openamsm:mas:v1alpha4:ssm-signal_ue_an-output",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "an_tunnel": {
+      "const": "1",
+      "maxLength": 255,
+      "minLength": 1,
+      "type": "string"
+    },
+    "an_tunnel_ip": {
+      "maxLength": 255,
+      "minLength": 1,
+      "type": "string"
+    },
+    "an_tunnel_teid": {
+      "maxLength": 255,
+      "minLength": 1,
+      "type": "string"
+    },
+    "ran_teid": {
+      "maxLength": 255,
+      "minLength": 1,
+      "type": "string"
+    }
+  },
+  "required": [
+    "an_tunnel",
+    "an_tunnel_teid",
+    "an_tunnel_ip"
+  ],
+  "type": "object"
+}

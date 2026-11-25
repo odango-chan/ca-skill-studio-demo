@@ -1,0 +1,361 @@
+{
+  "apiVersion": "connectionagent.io/toolcatalog/v1alpha4",
+  "artifacts": {
+    "capability-contracts.yaml": "sha256:d0778350cb9217faea1549bca6680031cf3c6b78ad107850ddea9ae815a8728d",
+    "deployment-binding.schema.json": "sha256:9f0707262be51ed67a179d847e4150087603e9ddcbd2e56c94764270d614d68c",
+    "deployment-binding.yaml": "sha256:b00f4b86a5bdaa539022dc87e57fb85cc721051861aa95382469fd0a04bf4d61",
+    "evidence-guarantees.yaml": "sha256:ce59a6e28740df4de016c14875e137b96c4afc91a70f919bf01138b98fa4478a",
+    "proof.schema.json": "sha256:e21038e2687fea618e618beffeeace3839ec62f8f3fe096551b27027e2c6bd4d",
+    "receipt.schema.json": "sha256:d52795d3aa7cfae5d9ff8cbccf579177ad1e5de0bc36f268dc6889c0d377c4d6",
+    "reconcile-decision.schema.json": "sha256:274877bbf40c0816c280f16094eb30f003123c80ee0bd6c854e053e9d8bc2f15",
+    "schemas/ca-create_charging.input.schema.json": "sha256:008549912bd2467e55fdb5d76e50f9647b725941d8ae59b537444404f2087a48",
+    "schemas/ca-create_charging.output.schema.json": "sha256:709b9549a4d478cbd499a6cb5fa51d1a64f3e5eb99a2a48622571f1477b86885",
+    "schemas/iam-allocate_address.input.schema.json": "sha256:f734217f8f06362aa18eb7fa7c7056ee40a15e5249a76c42e12e8f975192f5f1",
+    "schemas/iam-allocate_address.output.schema.json": "sha256:b7ec0b282ef8fe2a1b8c0e732234e360ad23dac8f06f4357101977177b44ecf2",
+    "schemas/mas-receipt_query.input.schema.json": "sha256:6385047417698899c4f036cc1fe96692e7c0f4d7af9ae0d162e5d8de97382b47",
+    "schemas/mas-receipt_query.output.schema.json": "sha256:4cd2730b40f06b3aaf415363d3bf0c827716e9a481892492b7b72b170197c8ce",
+    "schemas/mas-reconcile.input.schema.json": "sha256:1f295c0adb80fa9626b6b3bb8785c7f81fe05740b086b26f4f635972a565782e",
+    "schemas/mas-reconcile.output.schema.json": "sha256:da8c5c7f913bdea8cd2015a0c6d07998435b4b225621ef8d9d59e20eb1b187d3",
+    "schemas/pa-create_sm_policy.input.schema.json": "sha256:43a7ffd2aa7f056d729c64b74ef12e7be9f00097716b298c994476cfd99e6722",
+    "schemas/pa-create_sm_policy.output.schema.json": "sha256:b62461a381fb8d08b2678b9a698440c11cbc22f33ce6ae21e4a20cb7f802efdd",
+    "schemas/pa-delete_sm_policy_c.input.schema.json": "sha256:115dfb2336afefa18b16fd3266b04c482666d2ef0fca3813c41b7953e144ef02",
+    "schemas/pa-delete_sm_policy_c.output.schema.json": "sha256:2366eb97cb25b1f3ff379a9c22710d65a1d8f2786bd96558001b484b74ea4177",
+    "schemas/pa-update_sm_policy.input.schema.json": "sha256:bf1415cab2109e500ea82206b28a2852c2660697f37675861db898b1d3150b43",
+    "schemas/pa-update_sm_policy.output.schema.json": "sha256:c04d75641ec5528f65b33071baab27efe31ff1d398ac0d4d787a7411190d3630",
+    "schemas/saa-secondary_auth.input.schema.json": "sha256:d599e6e929e69493d177a0ec77a8f9d1da62246f39bec06cab24c8281162df94",
+    "schemas/saa-secondary_auth.output.schema.json": "sha256:9774d415688320f9953f8ca6e95456abbc30955cf987f243ced6a4b74e63ea40",
+    "schemas/sc-create_sm_context.input.schema.json": "sha256:aa854d0dc49726ba5f805cb5c5f1115c538e28b2863de58a76132581596c9788",
+    "schemas/sc-create_sm_context.output.schema.json": "sha256:f5551cfca649b49400cbf55b66bab2c65a25ef63fd8c7016d773a693edabe2d5",
+    "schemas/sc-register_uecm.input.schema.json": "sha256:dc0933d3aadf3115af127105c72a7a8af4cfeef0a6b71fa9e14448bd0cd35fed",
+    "schemas/sc-register_uecm.output.schema.json": "sha256:674ebbbd95bf203f69b0900dd646838df7a2b469fa1971cafff9294353050d47",
+    "schemas/sc-release_sm_context_c.input.schema.json": "sha256:965b157ded5f957c5038f65ddc7f164bf2173a6199f28d2f42beb1f7364dc7aa",
+    "schemas/sc-release_sm_context_c.output.schema.json": "sha256:1dcb34426ac7035b6e76f5e455a25540ac15e016d01f9649151aeabb3a42f1b1",
+    "schemas/sc-validate_subscription.input.schema.json": "sha256:5fc82c6877b8060e01efa5f14d9e38112519121965ee184fb452e786eecd5cd6",
+    "schemas/sc-validate_subscription.output.schema.json": "sha256:e7ddac6de100c419ee476a306626d511dc85c406ef7b443e4a973e9b466c0551",
+    "schemas/se-emit_events.input.schema.json": "sha256:43b375fdccda843014116b3d12fbeaf6075e550f5a9ef773f57216203071fd95",
+    "schemas/se-emit_events.output.schema.json": "sha256:a4d64e834b0acf9080489e3ae35ed56475fd7c386a8493df3c6855539e304315",
+    "schemas/se-emit_release_event_c.input.schema.json": "sha256:29111fc4aa57ad5ade21a7ceca21bd5730cfdb0bfb570bfb237dcca0d55ed7b0",
+    "schemas/se-emit_release_event_c.output.schema.json": "sha256:a90fc6642447c61e5c4771c548ea312e69fb7bc5386359ac4ebcf7bc9350baa8",
+    "schemas/ssm-build_release_command.input.schema.json": "sha256:9a71e7fa06216218990cfdb216cdbf8779ce4d2fd42130486ea773b3d5dff480",
+    "schemas/ssm-build_release_command.output.schema.json": "sha256:8cb26e73dd8d89126531a359df2fa674aaeabc3ecf8a4c4c6698953faa3b906c",
+    "schemas/ssm-parse_n1_modify.input.schema.json": "sha256:aced286221ab112951f2fbfc18b37830d571aed22a9d03210df437f349f0c643",
+    "schemas/ssm-parse_n1_modify.output.schema.json": "sha256:d4a6a475b000f92ed892b2fd3707eee7157445303e16fabdb0121e1db090f8f2",
+    "schemas/ssm-parse_n1_release.input.schema.json": "sha256:aa6582c7c97a05daa0a8f24c0f5b14646b41763a9b10fb5dce0f20836dc8a84f",
+    "schemas/ssm-parse_n1_release.output.schema.json": "sha256:835afde3e12b7c304a48a911118715363d47200949048b2e456d641e766712ca",
+    "schemas/ssm-release_confirm_n1.input.schema.json": "sha256:74787e59f6394b39c3c9f864e4fba1a952a8f4514b37faab9d0b9dce0e8e564b",
+    "schemas/ssm-release_confirm_n1.output.schema.json": "sha256:0a99d78a6edd9f6bc73019cb1289f26b84af3296bde28b37b6a5cf0d31eef337",
+    "schemas/ssm-release_confirm_n2.input.schema.json": "sha256:a319b75c65c643efa807f526db187461e8f3b8bcc570901f70f0394e3fd11da6",
+    "schemas/ssm-release_confirm_n2.output.schema.json": "sha256:1e957848d157b8a25d08df9dbfa9425c3837c733ce9bce762e007af2c15bf85b",
+    "schemas/ssm-signal_ue_an.input.schema.json": "sha256:66819edeee78b4a13e1b2ceba7d182c43c5c2bc035758081ab46b1dc2f4403da",
+    "schemas/ssm-signal_ue_an.output.schema.json": "sha256:fd33e36ac8c6eb794a8c5d1cf9ac9dc9c9c0b904a32615888c61137316b5e91b",
+    "schemas/upn-create_up_session.input.schema.json": "sha256:234f1ab343ceb5733f100d0095802d84bde3bbe5efffffa21a43cd0184b4805b",
+    "schemas/upn-create_up_session.output.schema.json": "sha256:09feb011123f756a51df5eee5684b1f00acb6f528ff9ae54ffc31de17fc0bb4d",
+    "schemas/upn-delete_up_session.input.schema.json": "sha256:c085d7592a159ce1f914d66d5dac9474129aa5427da82c6e31561508ee09482f",
+    "schemas/upn-delete_up_session.output.schema.json": "sha256:5c52607e2ee86c0738b26b9618a47f8b8a6a976a397060020b19f9b29da3685b",
+    "schemas/upn-modify_qos_delta.input.schema.json": "sha256:71ad4980c647546ea011f4fea0b2d0e8c5d8a93578a5691dd92b7c39b0c235cd",
+    "schemas/upn-modify_qos_delta.output.schema.json": "sha256:ba1acf39220d73920635a2005a0fd7a9ffe7b2bd6bceeaa6ccd14e6ca7dde978",
+    "schemas/upn-modify_up_session.input.schema.json": "sha256:389cd2b3c7ef9896c699b19351a9288ff811be5b4f816c91dbe49f447e680209",
+    "schemas/upn-modify_up_session.output.schema.json": "sha256:52a46e85549fa2613a559005599c6b521a6389b8b2b103704c83be4f183cddd8",
+    "schemas/ups-decide_anchor.input.schema.json": "sha256:5ce58143cf09be327a37325a97c186d6cfe6e0ca8dcccac7cb4358544d4ae3f9",
+    "schemas/ups-decide_anchor.output.schema.json": "sha256:a3607fe8f97a4e3cbec6bde1c7163514db7eed749f35838122e78c1421e43d18",
+    "tool-catalog.yaml": "sha256:ed9f2a0adbe4f32c405be89fd390cc4d6ebff1895c7a399fb2e9700f249ce93e"
+  },
+  "buildIdentity": "sha256:ac834080f31ff0fa91b9eb846fa47c889a94837fc1f37ec2034190e4e83085c0",
+  "notPublished": [
+    {
+      "callable": "SC.UPDATE_SM_CONTEXT",
+      "reason": "legacy OES step m0; no merged Scheme C transaction"
+    },
+    {
+      "callable": "UPN.MODIFY_UP_SESSION_INTENT",
+      "reason": "legacy OES step m3; no merged Scheme C transaction"
+    },
+    {
+      "callable": "SSM.SIGNAL_UE_AN_MODIFY",
+      "reason": "legacy OES step m4; Scheme C Modify uses UPN.MODIFY_QOS_DELTA"
+    },
+    {
+      "callable": "SSM.SIGNAL_UE_AN_RELEASE",
+      "reason": "legacy OES step r3; Scheme C Release uses parse/build/confirm"
+    },
+    {
+      "callable": "PA.DELETE_SM_POLICY",
+      "reason": "legacy OES step r4; Scheme C uses PA.DELETE_SM_POLICY_C"
+    },
+    {
+      "callable": "SC.RELEASE_SM_CONTEXT",
+      "reason": "legacy OES step r5; Scheme C uses SC.RELEASE_SM_CONTEXT_C"
+    },
+    {
+      "callable": "SE.EMIT_RELEASE_EVENT",
+      "reason": "legacy OES step r6; Scheme C uses SE.EMIT_RELEASE_EVENT_C"
+    }
+  ],
+  "operationCount": 25,
+  "operations": [
+    {
+      "callable": "SC.VALIDATE_SUBSCRIPTION",
+      "capability": "mas.sc.subscription.validate",
+      "commitBasis": "LOCAL_STATE",
+      "effect": "MUTATION",
+      "guarantee": "sc.subscription-validated",
+      "source": "src/smf/mas/sc/session_context.c",
+      "step": "s1",
+      "table": "mas"
+    },
+    {
+      "callable": "SAA.SECONDARY_AUTH",
+      "capability": "mas.saa.secondary.auth",
+      "commitBasis": "LOCAL_STATE",
+      "effect": "MUTATION",
+      "guarantee": "saa.secondary-auth-disposition",
+      "source": "src/smf/mas/saa/session_auth.c",
+      "step": "s2",
+      "table": "mas"
+    },
+    {
+      "callable": "SC.CREATE_SM_CONTEXT",
+      "capability": "mas.sc.context.create",
+      "commitBasis": "LOCAL_STATE",
+      "effect": "MUTATION",
+      "guarantee": "sc.context-created",
+      "source": "src/smf/mas/sc/session_context.c",
+      "step": "s3",
+      "table": "mas"
+    },
+    {
+      "callable": "SC.REGISTER_UECM",
+      "capability": "mas.sc.uecm.register",
+      "commitBasis": "LOCAL_STATE",
+      "effect": "MUTATION",
+      "guarantee": "sc.uecm-registered",
+      "source": "src/smf/mas/sc/session_context.c",
+      "step": "s3r",
+      "table": "mas"
+    },
+    {
+      "callable": "PA.CREATE_SM_POLICY",
+      "capability": "mas.pa.sm.policy.create",
+      "commitBasis": "PCF_TRANSACTION",
+      "effect": "MUTATION",
+      "guarantee": "pa.policy-association-created",
+      "source": "src/smf/mas/pa/policy_adapter.c",
+      "step": "s3p",
+      "table": "mas"
+    },
+    {
+      "callable": "UPS.DECIDE_ANCHOR",
+      "capability": "mas.ups.anchor.decide",
+      "commitBasis": "LOCAL_STATE",
+      "effect": "MUTATION",
+      "guarantee": "ups.anchor-selected",
+      "source": "src/smf/mas/ups/up_selector.c",
+      "step": "s4",
+      "table": "mas"
+    },
+    {
+      "callable": "IAM.ALLOCATE_ADDRESS",
+      "capability": "mas.iam.address.allocate",
+      "commitBasis": "LOCAL_STATE",
+      "effect": "MUTATION",
+      "guarantee": "iam.address-allocated",
+      "source": "src/smf/mas/iam/iam_query_context.c",
+      "step": "s5",
+      "table": "mas"
+    },
+    {
+      "callable": "PA.UPDATE_SM_POLICY",
+      "capability": "mas.pa.sm.policy.update",
+      "commitBasis": "PCF_TRANSACTION",
+      "effect": "MUTATION",
+      "guarantee": "pa.policy-updated",
+      "source": "src/smf/mas/pa/policy_adapter.c",
+      "step": "s6u",
+      "table": "mas"
+    },
+    {
+      "callable": "CA.CREATE_CHARGING",
+      "capability": "mas.ca.charging.create",
+      "commitBasis": "LOCAL_MARKER",
+      "effect": "MUTATION",
+      "guarantee": "ca.charging-step-skipped",
+      "source": "src/smf/mas/ca/charge_adapter.c",
+      "step": "s7",
+      "table": "mas"
+    },
+    {
+      "callable": "UPN.CREATE_UP_SESSION",
+      "capability": "mas.upn.up.session.create",
+      "commitBasis": "PFCP_TRANSACTION",
+      "effect": "MUTATION",
+      "guarantee": "upn.n4-session-established",
+      "source": "src/smf/mas/upn/upnode.c",
+      "step": "s8",
+      "table": "mas"
+    },
+    {
+      "callable": "SSM.SIGNAL_UE_AN",
+      "capability": "mas.ssm.ue.an.signal",
+      "commitBasis": "LOCAL_STATE",
+      "effect": "MUTATION",
+      "guarantee": "ssm.access-network-ready",
+      "source": "src/smf/mas/ssm/ssm_ran.c",
+      "step": "s10",
+      "table": "mas"
+    },
+    {
+      "callable": "UPN.MODIFY_UP_SESSION",
+      "capability": "mas.upn.up.session.modify",
+      "commitBasis": "PFCP_TRANSACTION",
+      "effect": "MUTATION",
+      "guarantee": "upn.n3-synchronized",
+      "source": "src/smf/mas/upn/upnode.c",
+      "step": "s11",
+      "table": "mas"
+    },
+    {
+      "callable": "SE.EMIT_EVENTS",
+      "capability": "mas.se.events.emit",
+      "commitBasis": "LOCAL_MARKER",
+      "effect": "MUTATION",
+      "guarantee": "se.establishment-event-recorded",
+      "source": "src/smf/mas/se/session_exposure.c",
+      "step": "s13",
+      "table": "mas"
+    },
+    {
+      "callable": "SSM.PARSE_N1_MODIFY",
+      "capability": "mas.ssm.n1.modify.parse",
+      "commitBasis": "READ",
+      "effect": "READ",
+      "guarantee": "ssm.n1-modify-parsed",
+      "source": "src/smf/mas/ssm/ssm_ue.c",
+      "step": "c-parse",
+      "table": "mas"
+    },
+    {
+      "callable": "UPN.MODIFY_QOS_DELTA",
+      "capability": "mas.upn.up.qos.delta",
+      "commitBasis": "PFCP_TRANSACTION",
+      "effect": "MUTATION",
+      "guarantee": "upn.qos-delta-applied",
+      "source": "src/smf/mas/upn/upnode.c",
+      "step": "c-apply",
+      "table": "mas"
+    },
+    {
+      "callable": "SSM.PARSE_N1_RELEASE",
+      "capability": "mas.ssm.n1.release.parse",
+      "commitBasis": "READ",
+      "effect": "READ",
+      "guarantee": "ssm.n1-release-parsed",
+      "source": "src/smf/mas/ssm/ssm_ue.c",
+      "step": "r-parse",
+      "table": "mas"
+    },
+    {
+      "callable": "SSM.BUILD_RELEASE_COMMAND",
+      "capability": "mas.ssm.n1.release.build",
+      "commitBasis": "LOCAL_STATE",
+      "effect": "MUTATION",
+      "guarantee": "ssm.release-command-built",
+      "source": "src/smf/mas/ssm/ssm_ue.c",
+      "step": "r-build",
+      "table": "mas"
+    },
+    {
+      "callable": "SSM.RELEASE_CONFIRM_N1",
+      "capability": "mas.ssm.n1.release.confirm.n1",
+      "commitBasis": "LOCAL_STATE",
+      "effect": "MUTATION",
+      "guarantee": "ssm.release-n1-confirmed",
+      "source": "src/smf/mas/ssm/ssm_ue.c",
+      "step": "r-confirm-n1",
+      "table": "mas"
+    },
+    {
+      "callable": "SSM.RELEASE_CONFIRM_N2",
+      "capability": "mas.ssm.n1.release.confirm.n2",
+      "commitBasis": "LOCAL_STATE",
+      "effect": "MUTATION",
+      "guarantee": "ssm.release-n2-confirmed",
+      "source": "src/smf/mas/ssm/ssm_ue.c",
+      "step": "r-confirm-n2",
+      "table": "mas"
+    },
+    {
+      "callable": "PA.DELETE_SM_POLICY_C",
+      "capability": "mas.pa.sm.policy.delete",
+      "commitBasis": "PCF_TRANSACTION",
+      "effect": "MUTATION",
+      "guarantee": "pa.policy-association-released",
+      "source": "src/smf/mas/pa/policy_adapter.c",
+      "step": "r-pa",
+      "table": "mas"
+    },
+    {
+      "callable": "UPN.DELETE_UP_SESSION",
+      "capability": "mas.upn.up.session.delete",
+      "commitBasis": "PFCP_DELETE",
+      "effect": "MUTATION",
+      "guarantee": "upn.up-session-released",
+      "source": "src/smf/mas/upn/upnode.c",
+      "step": "r2",
+      "table": "mas"
+    },
+    {
+      "callable": "SE.EMIT_RELEASE_EVENT_C",
+      "capability": "mas.se.events.emit",
+      "commitBasis": "LOCAL_MARKER",
+      "effect": "MUTATION",
+      "guarantee": "se.release-event-marker-written",
+      "source": "src/smf/mas/se/session_exposure.c",
+      "step": "r-se",
+      "table": "mas"
+    },
+    {
+      "callable": "SC.RELEASE_SM_CONTEXT_C",
+      "capability": "mas.sc.context.release",
+      "commitBasis": "LOCAL_STATE",
+      "effect": "MUTATION",
+      "guarantee": "sc.context-release-committed",
+      "source": "src/smf/mas/sc/session_context.c",
+      "step": "r-sc",
+      "table": "mas"
+    },
+    {
+      "callable": "MAS.RECEIPT_QUERY",
+      "capability": "mas.receipt.query",
+      "commitBasis": "READ",
+      "effect": "READ",
+      "guarantee": "mas.receipt-query",
+      "source": "src/smf/mas/common/mas-orchestration-sbi.c",
+      "step": "receipt-query",
+      "table": "evidence"
+    },
+    {
+      "callable": "MAS.RECONCILE",
+      "capability": "mas.reconcile.exact_original",
+      "commitBasis": "READ",
+      "effect": "READ",
+      "guarantee": "mas.exact-original-reconcile",
+      "source": "src/smf/mas/common/mas-orchestration-sbi.c",
+      "step": "reconcile",
+      "table": "evidence"
+    }
+  ],
+  "owner": {
+    "id": "openamsm.smf.mas",
+    "product": "OpenAMSM",
+    "upstreamCommit": "c27e1761ae09957a474cc2b0208d227cde64aabf",
+    "upstreamTreeSha256": "7dfe5a3db4d4bc920bfaa7b844b80336698f90f6c7086b060b93afa4c8556c8d",
+    "version": "2.8.0"
+  },
+  "package": {
+    "stableId": "urn:openamsm:mas:tool-contracts",
+    "version": "v1alpha4"
+  },
+  "publicationDigest": "sha256:3841f44c50b2db3222feb1a5b626c646980ffa75a3d19aaddf34bd5726655a5c",
+  "release": "2026-11-23",
+  "schemaVersion": "openamsm.mas-publication/v1"
+}

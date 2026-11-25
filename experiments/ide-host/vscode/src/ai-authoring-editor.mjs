@@ -210,6 +210,7 @@ export async function buildAuthoringResourceInventory(snapshot, dependencyResolu
     });
   }
 
+  const procedure = snapshot.documents?.find(item => item.relativePath === "assurance/procedure.yaml");
   const decoder = new TextDecoder("utf-8", { fatal: true });
   for (const dependency of dependencyResolution.snapshots ?? []) {
     const files = [];
@@ -231,7 +232,7 @@ export async function buildAuthoringResourceInventory(snapshot, dependencyResolu
       files,
     }, null, 2);
     const id = dependency.id;
-    resources.push({
+    const resource = {
       id,
       kind: "dependency",
       version: dependency.snapshotDigest,
@@ -240,7 +241,23 @@ export async function buildAuthoringResourceInventory(snapshot, dependencyResolu
       selected: true,
       label: "dependency:" + dependency.id + "@" + dependency.snapshotDigest,
       bytes: encoder.encode(content).byteLength,
-    });
+    };
+    if (procedure) {
+      // Keep verified dependencies available in the picker, while leaving
+      // oversized publications out of the default model disclosure.
+      try {
+        await buildContextPack({
+          taskId: "00000000-0000-0000-0000-000000000000",
+          revision: procedure.version, languageTarget: LANGUAGE_TARGET,
+          procedure: { path: procedure.relativePath, documentVersion: procedure.version, text: procedure.text },
+          resources: [...resources, resource], maxBytes: MAX_CONTEXT_PACK_BYTES,
+        });
+      } catch (error) {
+        if (error?.code !== "context_too_large") throw error;
+        resource.selected = false;
+      }
+    }
+    resources.push(resource);
   }
 
   if (resources.length > MAX_CONTEXT_ITEMS) {

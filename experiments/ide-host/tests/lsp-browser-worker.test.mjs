@@ -4,7 +4,6 @@ import { Worker } from "node:worker_threads";
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { readFileSync } from "node:fs";
-import { SAMPLE_PACKAGES } from "../../../site/sample-packages.mjs";
 
 const workerEntry = new URL("./lsp-server-worker-thread.mjs", import.meta.url);
 const serverBundle = pathToFileURL(resolve(
@@ -267,19 +266,21 @@ test("built browser Worker is isolated from Node filesystem and process transpor
 });
 
 function samplePackageSnapshot() {
-  const spec=SAMPLE_PACKAGES.establish;
-  const rootUri="file:///workspace/"+spec.name;
+  const fixtureRoot=new URL("../../../tests/fixtures/v1alpha5-conventional/",import.meta.url);
+  const manifest=JSON.parse(readFileSync(new URL("files.json",fixtureRoot),"utf8"));
+  const [name]=manifest.skills;
+  const rootUri="file:///workspace/"+name;
   return {
-    rootUri,packageName:spec.name,generation:1,completeness:"complete",
-    documents:spec.files.map(relativePath=>{
+    rootUri,packageName:name,generation:1,completeness:"complete",
+    documents:manifest.files.map(file=>{
+      const relativePath=file.slice(name.length+1);
       const languageId=relativePath.endsWith(".py")?"python":
         relativePath.endsWith(".yaml")||relativePath.endsWith(".yml")?"yaml":
         relativePath.endsWith(".json")?"json":"plaintext";
       return {
         uri:rootUri+"/"+relativePath,relativePath,languageId,
         version:relativePath==="assurance/procedure.yaml"?1:0,
-        text:readFileSync(new URL("../../../site/samples/v1alpha5/"+
-          spec.name+"/"+relativePath,import.meta.url),"utf8")
+        text:readFileSync(new URL(file,fixtureRoot),"utf8")
       };
     })
   };

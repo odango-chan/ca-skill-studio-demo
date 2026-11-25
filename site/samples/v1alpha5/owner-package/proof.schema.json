@@ -1,0 +1,24 @@
+{
+  "$id": "urn:openamsm:mas:v1alpha4:commit-proof",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "commitState": {
+      "enum": [
+        "COMMITTED",
+        "NOT_COMMITTED"
+      ],
+      "type": "string"
+    },
+    "originalInvocationId": {
+      "minLength": 1,
+      "type": "string"
+    }
+  },
+  "required": [
+    "originalInvocationId",
+    "commitState"
+  ],
+  "title": "OpenAMSM MAS commit proof",
+  "type": "object"
+}

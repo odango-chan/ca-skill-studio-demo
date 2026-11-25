@@ -1,0 +1,14 @@
+{
+  "$id": "urn:openamsm:mas:v1alpha4:mas-reconcile-output",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "decision": {
+      "$ref": "urn:openamsm:mas:v1alpha4:reconcile-decision"
+    }
+  },
+  "required": [
+    "decision"
+  ],
+  "type": "object"
+}

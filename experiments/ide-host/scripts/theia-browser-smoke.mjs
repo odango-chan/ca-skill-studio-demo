@@ -837,9 +837,9 @@ try{
      identity.workspaceFolders[0]!==identity.root||
      !identity.defaultProcedureExists||!identity.masProcedureExists||
      !String(identity.defaultProcedure??"").endsWith(
-       "/skills/establish-pdu-session/assurance/procedure.yaml")||
-     !String(identity.masProcedure??"").endsWith(
        "/skills/establish-pdu-session-mas/assurance/procedure.yaml")||
+     !String(identity.masProcedure??"").endsWith(
+       "/skills/modify-pdu-session-mas/assurance/procedure.yaml")||
      !afterImport.documentTitle.includes("skill-studio-demo")||
      afterImport.documentTitle.includes("Untitled"))
     throw Error("Example did not open as the named single-folder v1alpha5 workspace: "+
@@ -853,12 +853,16 @@ try{
 
   if(identity.exampleInterface?.status!=="READY"||
      identity.exampleInterface?.imported!==true||
+     identity.exampleInterface?.lockedDependencyCount!==3||
      identity.exampleInterface?.availableCompletionCallables<11||
      identity.exampleInterface?.contextReadHint!==true||
+     identity.exampleInterface?.ownerToolCatalog?.available!==true||
+     !["SC.CREATE_SM_CONTEXT","UPN.MODIFY_QOS_DELTA","SC.RELEASE_SM_CONTEXT_C"]
+       .every(id=>identity.exampleInterface.ownerToolCatalog.operationIds.includes(id))||
      identity.exampleInterface?.qualification!=="AUTH_NOT_CHECKED")
-    throw Error("Default Example did not load its exact immutable ca-client-tools v1.1.0 Schema dependency: "+
+    throw Error("Default Example did not load its exact Client, Host-context and Owner ToolCatalog snapshots: "+
       JSON.stringify(identity.exampleInterface));
-  console.log("STUDIO_EXAMPLE_PINNED_INTERFACE_READY_CHROMIUM",JSON.stringify(
+  console.log("STUDIO_EXAMPLE_DEPENDENCIES_READY_CHROMIUM",JSON.stringify(
     identity.exampleInterface
   ));
   const frameTree=await command("Page.getFrameTree");
@@ -892,7 +896,7 @@ try{
     }catch(error){webviewFrames.push({frame,error:String(error)});}
   }
   const defaultGraphFrame=webviewFrames.find(item=>
-    item.view?.procedureRoot&&item.view.procedureValue==="establish-pdu-session");
+    item.view?.procedureRoot&&item.view.procedureValue==="establish-pdu-session-mas");
   const defaultWebviewView=defaultGraphFrame?.view??null;
   if(requireEditor&&(!defaultGraphFrame||!(defaultWebviewView?.graphNodes>0)))
     throw Error("The default CA-SL Procedure did not render: "+
@@ -923,7 +927,7 @@ try{
             expression:"Boolean(document.querySelector('#downloadPackageZip')&&"+
               "document.querySelector('#exportPackageZip')&&"+
               "document.querySelector('#reactFlowRoot')&&"+
-              "document.querySelector('#procedureList')?.value==='establish-pdu-session')"
+              "document.querySelector('#procedureList')?.value==='establish-pdu-session-mas')"
           });
           latest.push({frame:frame.id,url:frame.url,hasV1alpha5Graph:probe.result?.value===true});
           if(probe.result?.value!==true)continue;
@@ -965,7 +969,7 @@ try{
       }catch(error){pythonOpenError=String(error?.message??error);}
       await sleep(250);
     }
-    if(!opened?.uri?.endsWith("/scripts/validate-subscription-request.py")||
+    if(!opened?.uri?.endsWith("/browser-acceptance/validate-subscription-request.py")||
        opened.languageId!=="python"||opened.viewColumn!==1)
       throw Error("Exact native Python Source did not open in the primary group after "+
         pythonOpenAttempts+" attempts: "+JSON.stringify({opened,pythonOpenError}));
@@ -998,7 +1002,7 @@ try{
         JSON.stringify(pythonTextMate));
   }
   const packageOverviewEvidence=workbenchEvidence?.packageOverview
-    ?{required:true,fourSkills:true,evidence:workbenchEvidence.packageOverview}
+    ?{required:true,threeSkills:true,evidence:workbenchEvidence.packageOverview}
     :{required:false};
   const nativeMarkdownActivation=requireEditor
     ?await evalJS("(async()=>{const c=window.theia.container;"+
@@ -1093,17 +1097,17 @@ try{
   const importedNotification=afterImport.notificationText.some(message=>
     (message.includes("示例项目已载入并打开工作区：skill-studio-demo/")&&
      message.includes("默认已打开 CA-SL current Procedure（DRAFT / NOT_QUALIFIED）")&&
-     message.includes("导入当前 CA-SL Skill 文件 26 个"))||
+     message.includes("导入当前 CA-SL Skill 文件 18 个"))||
     (message.includes("Example project opened: skill-studio-demo/")&&
      message.includes("CA-SL current Procedure is open (DRAFT / NOT_QUALIFIED)")&&
-     message.includes("Imported 26 current CA-SL Skill files")));
+     message.includes("Imported 18 current CA-SL Skill files")));
   if(!importedNotification||!afterImport.explorerText.includes("skills")||
-     !afterImport.explorerText.includes("establish-pdu-session"))
+     !afterImport.explorerText.includes("establish-pdu-session-mas"))
     throw Error("Theia did not open the current CA-SL Example project: "+
       JSON.stringify({afterImport,registeredCommands}).slice(0,3500));
   if(requireEditor&&(!defaultWebviewView?.procedureRoot||
       defaultWebviewView.graphNodes<1||
-      defaultWebviewView.procedureValue!=="establish-pdu-session"))
+      defaultWebviewView.procedureValue!=="establish-pdu-session-mas"))
     throw Error("Default v1alpha5 Procedure CustomEditor did not render: "+
       JSON.stringify({defaultWebviewView,webviewFrames}).slice(0,3000));
   if(requireEditor&&(!workbenchEvidence?.graphEditability?.readOnly||
@@ -1113,7 +1117,7 @@ try{
   if(requireEditor&&(!workbenchEvidence?.phaseEvidence?.visible||
       !workbenchEvidence.phaseEvidence.sourceOnly||
       !workbenchEvidence?.packageOverview?.skills||
-      workbenchEvidence.packageOverview.skills.length!==4))
+      workbenchEvidence.packageOverview.skills.length!==3))
     throw Error("v1alpha5 Inspector or Package Overview acceptance did not complete: "+
       JSON.stringify({phaseEvidence:workbenchEvidence?.phaseEvidence,
         packageOverview:workbenchEvidence?.packageOverview}).slice(0,3000));
@@ -1157,7 +1161,7 @@ try{
   if(!activationDiagnostics||activationDiagnostics.failures?.length||
      activationDiagnostics.components?.Workbench!=="READY"||
      activationDiagnostics.components?.["Package Explorer"]!=="READY"||
-     activationDiagnostics.packageInventory?.packageCount!==4||
+     activationDiagnostics.packageInventory?.packageCount!==3||
      activationDiagnostics.packageInventory?.state!=="ready"||
      !/^[0-9a-f]{40}$/.test(activationDiagnostics.buildId??"")||
      activationDiagnostics.welcomeCommandRegistered!==true||
@@ -1280,7 +1284,7 @@ try{
       return {inventory,activation,semantic};
     })()`);
     const inventory=persistedEvidence?.inventory??persistedEvidence?.activation?.packageInventory;
-    if(inventory?.state==="ready"&&inventory?.packages?.length===4&&
+    if(inventory?.state==="ready"&&inventory?.packages?.length===3&&
        persistedEvidence.activation?.workbenchReady===true&&
        persistedEvidence.semantic?.registered===true)break;
     await sleep(200);
@@ -1290,7 +1294,7 @@ try{
   if(!persistedEvidence?.inventory&&persistedEvidence?.activation?.packageInventory)
     persistedEvidence.inventory=persistedEvidence.activation.packageInventory;
   if(persistedEvidence.inventory?.state!=="ready"||
-     persistedEvidence.inventory?.packages?.length!==4||
+     persistedEvidence.inventory?.packages?.length!==3||
      persistedEvidence.activation?.failures?.length||
      persistedEvidence.activation?.workbenchReady!==true||
      persistedEvidence.semantic?.registered!==true)
@@ -1328,7 +1332,7 @@ try{
     try{
       legacyDiagnostics=await evalJS("(async()=>{const c=window.theia?.container;if(!c)return null;const k=[...(c._bindingDictionary?._map?.keys?.()??[])].find(x=>typeof x==='function'&&x.prototype?.executeCommand&&x.prototype?.registerCommand&&x.prototype?.getCommand);return k?await c.get(k).executeCommand('skillStudio.internal.semanticTokenDiagnostics'):null})()");
       legacyPackageStatus=(legacyDiagnostics?.packageStatuses??[]).find(item=>
-        String(item.rootUri??"").endsWith("/skill-studio-demo/skills/establish-pdu-session"));
+        String(item.rootUri??"").endsWith("/skill-studio-demo/skills/establish-pdu-session-mas"));
       legacyReadyOtherPackage=(legacyDiagnostics?.packageStatuses??[]).find(item=>
         item.rootUri!==legacyPackageStatus?.rootUri&&item.state==="READY");
       legacySourceDiagnostic=(legacyPackageStatus?.analysisDiagnostics??[]).find(item=>
@@ -1417,7 +1421,7 @@ try{
          upgradedIdentity?.procedureCurrentShape===true){
         upgradedEvidence=await evalJS("(()=>{const c=window.theia.container;const k=[...c._bindingDictionary._map.keys()].find(x=>typeof x==='function'&&x.prototype?.executeCommand&&x.prototype?.registerCommand&&x.prototype?.getCommand);return c.get(k).executeCommand('skillStudio.showActivationDiagnostics')})()");
         if(upgradedEvidence?.packageInventory?.state==="ready"&&
-           upgradedEvidence.packageInventory.packages?.length===4)break;
+           upgradedEvidence.packageInventory.packages?.length===3)break;
       }
     }catch{upgradedIdentity=null;}
     await sleep(250);
@@ -1426,7 +1430,7 @@ try{
      upgradedIdentity?.procedureCurrentShape!==true||
      upgradedIdentity?.libExists||upgradedIdentity?.outputExists||
      upgradedIdentity?.workspaceFolders?.length!==1||
-     upgradedEvidence?.packageInventory?.packages?.length!==4||
+     upgradedEvidence?.packageInventory?.packages?.length!==3||
      upgradedEvidence?.failures?.length)
     throw Error("Explicit Example replacement did not restore a clean current v1alpha5 project: "+
       JSON.stringify({identity:upgradedIdentity,activation:upgradedEvidence}).slice(0,3200));
@@ -1478,10 +1482,18 @@ try{
       throw Error("Unable to prepare native unsaved Source for mode acceptance");
     await switchWorkspaceMode('AI Workbench');
     await switchWorkspaceMode('Console');
-    const restored=await sourceState('read');
-    if(restored?.uri!==dirty.uri || restored.text!==dirty.text ||
-        (dirty.dirty===true && restored.dirty!==true))
-      throw Error("Console round trip lost selected file or unsaved Source");
+    const matchesDirtySource=state=>state?.uri===dirty.uri&&state.text===dirty.text&&
+      (dirty.dirty!==true||state.dirty===true);
+    let restored=null;
+    for(let attempt=0;attempt<50;attempt++){
+      restored=await sourceState('read');
+      if(matchesDirtySource(restored))break;
+      await sleep(100);
+    }
+    if(!matchesDirtySource(restored))
+      throw Error("Console round trip lost selected file or unsaved Source: "+
+        JSON.stringify({expectedUri:dirty.uri,actualUri:restored?.uri,
+          expectedDirty:dirty.dirty,actualDirty:restored?.dirty}));
     await sourceState('undo');
     for(let attempt=0;attempt<40;attempt++){
       if((await sourceState('read'))?.text===original.text)break;
@@ -1694,7 +1706,7 @@ try{
           await sleep(100);
         }
         throw Error("AI Authoring data-disclosure confirmation did not appear: "+
-          (await evalJS("document.body.innerText.slice(-1000)")));
+          JSON.stringify({workbench:await evalJS("document.body.innerText.slice(-1000)"),agent:(await readAiView())?.bodyText?.slice(-1000)}));
       };
       const sendPosition=await waitForDialogButton(["发送并生成提案"]);
       await command("Input.dispatchMouseEvent",{type:"mouseMoved",x:sendPosition.x,y:sendPosition.y});

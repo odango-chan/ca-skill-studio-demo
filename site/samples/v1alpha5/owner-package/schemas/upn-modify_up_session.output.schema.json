@@ -1,0 +1,22 @@
+{
+  "$id": "urn:openamsm:mas:v1alpha4:upn-modify_up_session-output",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "n3_synced": {
+      "const": "1",
+      "maxLength": 255,
+      "minLength": 1,
+      "type": "string"
+    },
+    "n4_seid": {
+      "maxLength": 255,
+      "minLength": 1,
+      "type": "string"
+    }
+  },
+  "required": [
+    "n3_synced"
+  ],
+  "type": "object"
+}

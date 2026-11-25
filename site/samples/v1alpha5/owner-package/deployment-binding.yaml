@@ -1,0 +1,33 @@
+kind: OwnerDeploymentBinding
+owner:
+  id: openamsm.smf.mas
+  product: OpenAMSM
+  version: 2.8.0
+  upstreamCommit: c27e1761ae09957a474cc2b0208d227cde64aabf
+  buildIdentity: sha256:ac834080f31ff0fa91b9eb846fa47c889a94837fc1f37ec2034190e4e83085c0
+  patches:
+  - 0001-mas-query-token-lowercase.patch
+  - 0006-owner-qos-delta.patch
+  - 0007-ssm-n1-modify-parse.patch
+  - 0008-nw-agent-scheme-c-modify.patch
+  - 0009-non-gbr-qos-delta.patch
+  - 0010-relay-fail-closed.patch
+  - 0011-ue-release-pure-mas.patch
+  - 0012-nw-agent-scheme-c-release.patch
+  - 0013-ue-release-pfcp-timeout.patch
+  - 0014-release-finalize-success-only.patch
+  - 0015-release-finalize-fail-closed.patch
+  - 0016-relay-transaction-correlation.patch
+  - 0017-pfcp-deletion-outcome.patch
+  - 0018-release-state-observability.patch
+  - 0019-agent-restart-fail-closed.patch
+  - 0020-upf-session-info.patch
+  - 0021-pfcp-unknown-reconcile.patch
+  - 0022-ssm-parse-release-readonly.patch
+  - 0023-mas-durable-receipt.patch
+package:
+  stableId: urn:openamsm:mas:tool-contracts
+  version: v1alpha4
+allowedDeployments:
+- urn:connectionagent:deployment:ac-lab
+ownerInstancePrefix: 'urn:openamsm:owner-instance:'

@@ -1,0 +1,35 @@
+{
+  "$id": "urn:openamsm:mas:v1alpha4:reconcile-decision",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "originalInvocationId": {
+      "type": "string"
+    },
+    "reDispatched": {
+      "const": false
+    },
+    "reason": {
+      "type": "string"
+    },
+    "receipt": {
+      "$ref": "urn:openamsm:mas:v1alpha4:mutation-receipt"
+    },
+    "resolved": {
+      "type": "boolean"
+    },
+    "state": {
+      "enum": [
+        "COMMITTED",
+        "NOT_COMMITTED",
+        "UNKNOWN"
+      ]
+    }
+  },
+  "required": [
+    "resolved",
+    "reDispatched"
+  ],
+  "title": "OpenAMSM exact-original reconcile decision",
+  "type": "object"
+}

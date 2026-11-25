@@ -23,7 +23,7 @@ try{
 }
 
 const rootUri="file:///workspace/establish-pdu-session";
-const sampleRoot="../site/samples/v1alpha5/establish-pdu-session/";
+const sampleRoot="./fixtures/v1alpha5-conventional/establish-pdu-session/";
 function read(path){return readFileSync(new URL(sampleRoot+path,import.meta.url),"utf8");}
 function document(relativePath,text){
   return {uri:rootUri+"/"+relativePath,relativePath,languageId:"yaml",

@@ -5,7 +5,7 @@ import {isSkillSchema,localSchemaReference,registerSchemaCommands,mountSchemaPre
   from '../experiments/ide-host/vscode/src/schema-editor.mjs';
 
 const source=readFileSync(new URL(
-  '../site/samples/v1alpha5/establish-pdu-session/schemas/establishment-request.schema.yaml',
+  './fixtures/v1alpha5-conventional/establish-pdu-session/schemas/establishment-request.schema.yaml',
   import.meta.url),'utf8');
 
 function mock() {

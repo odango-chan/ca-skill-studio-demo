@@ -4,7 +4,7 @@ import {readFileSync} from "node:fs";
 import {inspectionSnapshot} from "../vscode/src/inspection.mjs";
 import {isAllowedPackageRelativeLink} from "../vscode/src/markdown-link-policy.mjs";
 
-const sampleRoot=new URL("../../../site/samples/v1alpha5/",import.meta.url);
+const sampleRoot=new URL("../../../tests/fixtures/v1alpha5-conventional/",import.meta.url);
 const manifest=JSON.parse(readFileSync(new URL("files.json",sampleRoot),"utf8"));
 function currentPackage(name="establish-pdu-session"){
   const files=new Map();

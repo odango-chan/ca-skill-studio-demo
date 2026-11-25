@@ -1,16 +1,27 @@
-# CA-SL v1alpha5. MAS exports and Evidence Guarantees are unpublished candidates.
-goal: pdu_session.release_owner_plan_completed
+# CA-SL v1alpha5. The MAS dependency is the published OpenAMSM Owner contract
+# package (env-openamsm contracts/mas/v1alpha4).
+#
+# Goal scope: the Owner parsed the exact retained N1 (0xd1), built the N1/N2
+# release command for this Run's transaction, accepted the N1 Release Complete
+# and the N2 Release Response for that generation, and completed the release
+# cleanup (PCF termination, PFCP Session Deletion, event marker, SM Context
+# finalize). It does not prove that the AMF/UE observed the command, only that
+# the Owner built and settled it.
+goal: pdu_session.release_owner_transaction_completed
 precondition: validate-release-request.precondition
 requestSchema: schemas/release-request.schema.yaml
 contextSchema: ca-context::urn:connectionagent:ca:context:subject:v1
 dependencies:
   ca-context: urn:connectionagent:ca:host-context
-  mas: wtlab:packages:openamsm:mas-compiler-contract
+  mas: urn:openamsm:mas:tool-contracts
 capabilities:
-  - mas.upn.up.session.delete
-  - mas.ssm.ue.an.signal
+  - mas.ssm.n1.release.parse
+  - mas.ssm.n1.release.build
+  - mas.ssm.n1.release.confirm.n1
+  - mas.ssm.n1.release.confirm.n2
   - mas.pa.sm.policy.delete
-  - mas.sc.context.release
+  - mas.upn.up.session.delete
   - mas.se.events.emit
+  - mas.sc.context.release
 limits:
   maxActions: 20

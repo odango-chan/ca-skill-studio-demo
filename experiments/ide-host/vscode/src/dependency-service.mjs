@@ -13,6 +13,16 @@ const snapshotDirectory=(vscode,root,digest)=>{
 const missing=error=>error?.code==="FileNotFound";
 const metadataMatches=(a,b)=>canonicalJson(a)===canonicalJson(b);
 
+// A published package may itself own manifest.json. Keep its bytes in the
+// snapshot and select a separate store metadata path in that case.
+function snapshotManifestPath(files){
+  let name="manifest.json";
+  let suffix=0;
+  while(files.some(file=>file.path===name||file.path.startsWith(name+"/")))
+    name=".snapshot-store-"+(++suffix)+".json";
+  return name;
+}
+
 export async function writeImmutableSnapshot(vscode,workspaceRoot,files){
   const fs=vscode.workspace.fs;
   const snapshot=await calculateSnapshot(files);
@@ -42,7 +52,7 @@ export async function writeImmutableSnapshot(vscode,workspaceRoot,files){
         await fs.createDirectory(pathFor(vscode,staging,...pieces.slice(0,-1)));
       await fs.writeFile(pathFor(vscode,staging,...pieces),file.bytes);
     }
-    await fs.writeFile(pathFor(vscode,staging,"manifest.json"),
+    await fs.writeFile(pathFor(vscode,staging,snapshotManifestPath(snapshot.files)),
       enc.encode(JSON.stringify(manifest)));
     await fs.createDirectory(pathFor(vscode,base,"dependencies"));
     // No overwrite. A host without safe rename must block this operation,
@@ -65,7 +75,7 @@ export async function loadVerifiedSnapshot(vscode,workspaceRoot,lockEntry){
   const fs=vscode.workspace.fs;
   const root=snapshotDirectory(vscode,workspaceRoot,lockEntry.snapshotDigest);
   let manifest;
-  try{manifest=JSON.parse(dec.decode(await fs.readFile(pathFor(vscode,root,"manifest.json"))));}
+  try{manifest=JSON.parse(dec.decode(await fs.readFile(pathFor(vscode,root,snapshotManifestPath(lockEntry.files)))));}
   catch(error){
     // Preserve FileNotFound so writeImmutableSnapshot can distinguish a
     // stale positive stat result from an existing but corrupt immutable

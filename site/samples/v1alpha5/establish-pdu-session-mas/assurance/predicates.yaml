@@ -13,7 +13,7 @@ predicates:
 
   establishment.mas.subscription_validated:
     parameters:
-      - result: mas::wtlab:openamsm:mas:v0.2.0:sc-validate-subscription-result
+      - result: mas::urn:openamsm:mas:v1alpha4:sc-validate_subscription-output
     evidence:
       requires:
         result: [mas::sc.subscription-validated]
@@ -23,7 +23,7 @@ predicates:
 
   establishment.mas.secondary_auth_skipped:
     parameters:
-      - result: mas::wtlab:openamsm:mas:v0.2.0:saa-secondary-auth-result
+      - result: mas::urn:openamsm:mas:v1alpha4:saa-secondary_auth-output
     evidence:
       requires:
         result: [mas::saa.secondary-auth-disposition]
@@ -33,7 +33,7 @@ predicates:
 
   establishment.mas.context_created:
     parameters:
-      - result: mas::wtlab:openamsm:mas:v0.2.0:sc-create-sm-context-result
+      - result: mas::urn:openamsm:mas:v1alpha4:sc-create_sm_context-output
     evidence:
       requires:
         result: [mas::sc.context-created]
@@ -43,7 +43,7 @@ predicates:
 
   establishment.mas.uecm_registered:
     parameters:
-      - result: mas::wtlab:openamsm:mas:v0.2.0:sc-register-uecm-result
+      - result: mas::urn:openamsm:mas:v1alpha4:sc-register_uecm-output
     evidence:
       requires:
         result: [mas::sc.uecm-registered]
@@ -53,7 +53,7 @@ predicates:
 
   establishment.mas.policy_association_created:
     parameters:
-      - result: mas::wtlab:openamsm:mas:v0.2.0:pa-sm-policy-result
+      - result: mas::urn:openamsm:mas:v1alpha4:pa-create_sm_policy-output
     evidence:
       requires:
         result: [mas::pa.policy-association-created]
@@ -63,7 +63,7 @@ predicates:
 
   establishment.mas.anchor_selected:
     parameters:
-      - result: mas::wtlab:openamsm:mas:v0.2.0:ups-decide-anchor-result
+      - result: mas::urn:openamsm:mas:v1alpha4:ups-decide_anchor-output
     evidence:
       requires:
         result: [mas::ups.anchor-selected]
@@ -73,7 +73,7 @@ predicates:
 
   establishment.mas.address_allocated:
     parameters:
-      - result: mas::wtlab:openamsm:mas:v0.2.0:iam-allocate-address-result
+      - result: mas::urn:openamsm:mas:v1alpha4:iam-allocate_address-output
     evidence:
       requires:
         result: [mas::iam.address-allocated]
@@ -83,7 +83,7 @@ predicates:
 
   establishment.mas.policy_updated:
     parameters:
-      - result: mas::wtlab:openamsm:mas:v0.2.0:pa-sm-policy-result
+      - result: mas::urn:openamsm:mas:v1alpha4:pa-update_sm_policy-output
     evidence:
       requires:
         result: [mas::pa.policy-updated]
@@ -96,7 +96,7 @@ predicates:
   # completed under the current stub; it does not prove a charging reservation.
   establishment.mas.charging_step_completed:
     parameters:
-      - result: mas::wtlab:openamsm:mas:v0.2.0:ca-create-charging-result
+      - result: mas::urn:openamsm:mas:v1alpha4:ca-create_charging-output
     evidence:
       requires:
         result: [mas::ca.charging-step-skipped]
@@ -106,7 +106,7 @@ predicates:
 
   establishment.mas.n4_session_established:
     parameters:
-      - result: mas::wtlab:openamsm:mas:v0.2.0:upn-create-up-session-result
+      - result: mas::urn:openamsm:mas:v1alpha4:upn-create_up_session-output
     evidence:
       requires:
         result: [mas::upn.n4-session-established]
@@ -116,7 +116,7 @@ predicates:
 
   establishment.mas.access_network_ready:
     parameters:
-      - result: mas::wtlab:openamsm:mas:v0.2.0:ssm-signal-ue-an-result
+      - result: mas::urn:openamsm:mas:v1alpha4:ssm-signal_ue_an-output
     evidence:
       requires:
         result: [mas::ssm.access-network-ready]
@@ -126,7 +126,7 @@ predicates:
 
   establishment.mas.n3_synchronized:
     parameters:
-      - result: mas::wtlab:openamsm:mas:v0.2.0:upn-modify-up-session-result
+      - result: mas::urn:openamsm:mas:v1alpha4:upn-modify_up_session-output
     evidence:
       requires:
         result: [mas::upn.n3-synchronized]
@@ -136,7 +136,7 @@ predicates:
 
   establishment.mas.establishment_event_recorded:
     parameters:
-      - result: mas::wtlab:openamsm:mas:v0.2.0:se-emit-events-result
+      - result: mas::urn:openamsm:mas:v1alpha4:se-emit_events-output
     evidence:
       requires:
         result: [mas::se.establishment-event-recorded]

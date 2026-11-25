@@ -4,7 +4,7 @@ import {readFileSync} from 'node:fs';
 import {projectSkillContract} from '../site/contract-projection.mjs';
 
 const source = readFileSync(new URL(
-  '../site/samples/v1alpha5/establish-pdu-session/assurance/contract.yaml',
+  './fixtures/v1alpha5-conventional/establish-pdu-session/assurance/contract.yaml',
   import.meta.url), 'utf8');
 
 test('CA-SL v1alpha5 Contract projects its actual source fields and coordinates', () => {

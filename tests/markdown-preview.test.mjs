@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import {readFileSync} from "node:fs";
 import {renderMarkdown} from "../site/markdown-preview.mjs";
 const fixture=name=>readFileSync(
-  new URL("../site/samples/v1alpha5/"+name+"/SKILL.md",import.meta.url),"utf8");
+  new URL((name==="establish-pdu-session"?"./fixtures/v1alpha5-conventional/":"../site/samples/v1alpha5/")+name+"/SKILL.md",import.meta.url),"utf8");
 
 test("Markdown preview renders headings, emphasis, inline code, lists and blockquotes",()=>{
   const source="# Demo\n\nA **bold** and *italic* word with \x60code\x60.\n\n- First\n- Second\n\n> A quote\n";
@@ -84,7 +84,7 @@ test("all three current CreatedSession business References render safely in Mark
 
 test("current v1alpha5 Skill guides render safely and expose only explicit Package-local paths",()=>{
   for(const name of ["establish-pdu-session","establish-pdu-session-mas"]){
-    const source=readFileSync(new URL("../site/samples/v1alpha5/"+name+"/SKILL.md",import.meta.url),"utf8");
+    const source=readFileSync(new URL((name==="establish-pdu-session"?"./fixtures/v1alpha5-conventional/":"../site/samples/v1alpha5/")+name+"/SKILL.md",import.meta.url),"utf8");
     const preview=renderMarkdown(source);
     assert.equal(preview.available,true,name);
     assert.match(preview.html,/<details class="md-frontmatter" data-source-line="0">/,name);

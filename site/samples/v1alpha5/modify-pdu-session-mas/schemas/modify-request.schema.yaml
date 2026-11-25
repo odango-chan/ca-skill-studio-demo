@@ -1,10 +1,10 @@
 $schema: https://json-schema.org/draft/2020-12/schema
 $id: urn:connectionagent:example:mas:modify-request:v1alpha5
 title: ModifyRequest
-description: Host-normalized entry classification plus the exact QoS delta.
+description: Host-normalized entry classification. The raw N1 stays in the Host's private execution context and is never a Skill-authored request field; the Owner, not the Host, decodes the requested QoS target.
 type: object
 additionalProperties: false
-required: [pduSessionId, entryKind, qosFlowsDelta]
+required: [pduSessionId, entryKind]
 properties:
   pduSessionId:
     type: integer
@@ -13,39 +13,3 @@ properties:
   entryKind:
     type: string
     enum: [UE_INITIATED, AMF_INITIATED, NETWORK_TRIGGERED]
-  qosFlowsDelta:
-    type: object
-    additionalProperties: false
-    required: [qfi, fiveQi, gfbrUl, gfbrDl, mfbrUl, mfbrDl]
-    # Numeric QoS values are base-10 strings. The Owner contract owns the
-    # canonical lexical form (no sign, no leading zero, QFI 1-63, bitrate
-    # bounds). CA-SL v1alpha5 does not accept JSON Schema `pattern` in a
-    # Skill-owned request Schema, so the Skill does not redeclare that
-    # constraint here. The Postcondition compares the Owner result with the
-    # request by exact string equality: a non-canonical request can only fail
-    # closed, never create a false PASS.
-    properties:
-      qfi:
-        type: string
-        minLength: 1
-        maxLength: 13
-      fiveQi:
-        type: string
-        minLength: 1
-        maxLength: 3
-      gfbrUl:
-        type: string
-        minLength: 1
-        maxLength: 13
-      gfbrDl:
-        type: string
-        minLength: 1
-        maxLength: 13
-      mfbrUl:
-        type: string
-        minLength: 1
-        maxLength: 13
-      mfbrDl:
-        type: string
-        minLength: 1
-        maxLength: 13

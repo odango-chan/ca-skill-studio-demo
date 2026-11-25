@@ -1,0 +1,28 @@
+{
+  "$id": "urn:openamsm:mas:v1alpha4:pa-create_sm_policy-output",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "authorized_qos": {
+      "maxLength": 255,
+      "minLength": 1,
+      "type": "string"
+    },
+    "policy_assoc_id": {
+      "maxLength": 255,
+      "minLength": 1,
+      "type": "string"
+    },
+    "up_intent": {
+      "maxLength": 255,
+      "minLength": 1,
+      "type": "string"
+    }
+  },
+  "required": [
+    "up_intent",
+    "authorized_qos",
+    "policy_assoc_id"
+  ],
+  "type": "object"
+}

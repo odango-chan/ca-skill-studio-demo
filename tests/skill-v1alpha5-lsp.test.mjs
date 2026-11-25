@@ -97,10 +97,10 @@ const predicates=[
 ].join("\n");
 
 const sampleScriptRoot=new URL(
-  "../site/samples/v1alpha5/establish-pdu-session/scripts/",import.meta.url
+  "./fixtures/v1alpha5-conventional/establish-pdu-session/scripts/",import.meta.url
 );
 const sampleSchemaRoot=new URL(
-  "../site/samples/v1alpha5/establish-pdu-session/schemas/",import.meta.url
+  "./fixtures/v1alpha5-conventional/establish-pdu-session/schemas/",import.meta.url
 );
 function snapshot(source=procedure,contractSource=contract,predicatesSource=predicates) {
   const files={
@@ -127,13 +127,14 @@ function snapshot(source=procedure,contractSource=contract,predicatesSource=pred
 
 test("optional Studio examples mirror the pinned PDU/MAS v1alpha5 source shape",()=>{
   for(const [name,expectedNodes] of [["establish-pdu-session",10],["establish-pdu-session-mas",14]]) {
+    const fixtureRoot=name==="establish-pdu-session"?"./fixtures/v1alpha5-conventional/":"../site/samples/v1alpha5/";
     const sampleManifest=JSON.parse(readFileSync(new URL(
-      "../site/samples/v1alpha5/files.json",import.meta.url),"utf8"));
+      fixtureRoot+"files.json",import.meta.url),"utf8"));
     const docs=sampleManifest.files.filter(path=>path.startsWith(name+"/")).map(path=>{
       const relativePath=path.slice(name.length+1);
       return {
         relativePath,uri:"file:///workspace/"+name+"/"+relativePath,version:1,
-        text:readFileSync(new URL("../site/samples/v1alpha5/"+path,import.meta.url),"utf8")
+        text:readFileSync(new URL(fixtureRoot+path,import.meta.url),"utf8")
       };
     });
     const result=analyzePackageSnapshot({rootUri:"file:///workspace/"+name,
@@ -149,13 +150,13 @@ test("optional Studio examples mirror the pinned PDU/MAS v1alpha5 source shape",
 
 test("v1alpha5 5GC sample projects Node-entry Wait, wait.output and the Step 17 response boundary",()=>{
   const procedureText=readFileSync(new URL(
-    "../site/samples/v1alpha5/establish-pdu-session/assurance/procedure.yaml",import.meta.url
+    "./fixtures/v1alpha5-conventional/establish-pdu-session/assurance/procedure.yaml",import.meta.url
   ),"utf8");
   const contractText=readFileSync(new URL(
-    "../site/samples/v1alpha5/establish-pdu-session/assurance/contract.yaml",import.meta.url
+    "./fixtures/v1alpha5-conventional/establish-pdu-session/assurance/contract.yaml",import.meta.url
   ),"utf8");
   const predicateText=readFileSync(new URL(
-    "../site/samples/v1alpha5/establish-pdu-session/assurance/predicates.yaml",import.meta.url
+    "./fixtures/v1alpha5-conventional/establish-pdu-session/assurance/predicates.yaml",import.meta.url
   ),"utf8");
   const a=analyzePackageSnapshot(snapshot(procedureText,contractText,predicateText));
   assert.equal(a.procedure.state,"READY");
@@ -198,13 +199,13 @@ test("v1alpha5 5GC sample projects Node-entry Wait, wait.output and the Step 17 
 
 test("v1alpha5 Wait rejects invalid duration, timeout routes, response boundaries and Wait-only Nodes",()=>{
   const procedureText=readFileSync(new URL(
-    "../site/samples/v1alpha5/establish-pdu-session/assurance/procedure.yaml",import.meta.url
+    "./fixtures/v1alpha5-conventional/establish-pdu-session/assurance/procedure.yaml",import.meta.url
   ),"utf8");
   const contractText=readFileSync(new URL(
-    "../site/samples/v1alpha5/establish-pdu-session/assurance/contract.yaml",import.meta.url
+    "./fixtures/v1alpha5-conventional/establish-pdu-session/assurance/contract.yaml",import.meta.url
   ),"utf8");
   const predicateText=readFileSync(new URL(
-    "../site/samples/v1alpha5/establish-pdu-session/assurance/predicates.yaml",import.meta.url
+    "./fixtures/v1alpha5-conventional/establish-pdu-session/assurance/predicates.yaml",import.meta.url
   ),"utf8");
   const invalidDuration=analyzePackageSnapshot(snapshot(
     procedureText.replace("timeout: PT30S","timeout: PT0S"),contractText,predicateText));

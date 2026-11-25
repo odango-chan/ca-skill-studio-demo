@@ -1,0 +1,66 @@
+{
+  "$id": "urn:openamsm:mas:v1alpha4:upn-modify_qos_delta-output",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "five_qi": {
+      "maxLength": 255,
+      "minLength": 1,
+      "type": "string"
+    },
+    "gfbr_dl": {
+      "maxLength": 255,
+      "minLength": 1,
+      "type": "string"
+    },
+    "gfbr_ul": {
+      "maxLength": 255,
+      "minLength": 1,
+      "type": "string"
+    },
+    "mfbr_dl": {
+      "maxLength": 255,
+      "minLength": 1,
+      "type": "string"
+    },
+    "mfbr_ul": {
+      "maxLength": 255,
+      "minLength": 1,
+      "type": "string"
+    },
+    "n1n2_dispatched": {
+      "maxLength": 255,
+      "minLength": 1,
+      "type": "string"
+    },
+    "n4_seid": {
+      "maxLength": 255,
+      "minLength": 1,
+      "type": "string"
+    },
+    "qfi": {
+      "maxLength": 255,
+      "minLength": 1,
+      "type": "string"
+    },
+    "qos_delta_state": {
+      "enum": [
+        "APPLIED",
+        "ALREADY",
+        "PFCP_APPLIED_N1N2_FAILED"
+      ],
+      "maxLength": 255,
+      "minLength": 1,
+      "type": "string"
+    }
+  },
+  "required": [
+    "qos_delta_state",
+    "qfi",
+    "gfbr_ul",
+    "gfbr_dl",
+    "mfbr_ul",
+    "mfbr_dl"
+  ],
+  "type": "object"
+}

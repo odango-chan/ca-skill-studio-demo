@@ -1,0 +1,88 @@
+{
+  "$id": "urn:openamsm:mas:v1alpha4:deployment-binding",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "allowedDeployments": {
+      "items": {
+        "pattern": "^[A-Za-z][A-Za-z0-9+.-]*:",
+        "type": "string"
+      },
+      "minItems": 1,
+      "type": "array"
+    },
+    "kind": {
+      "const": "OwnerDeploymentBinding"
+    },
+    "owner": {
+      "additionalProperties": false,
+      "properties": {
+        "buildIdentity": {
+          "pattern": "^sha256:[a-f0-9]{64}$",
+          "type": "string"
+        },
+        "id": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "patches": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "product": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "upstreamCommit": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "version": {
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "product",
+        "version",
+        "upstreamCommit",
+        "buildIdentity",
+        "patches"
+      ],
+      "type": "object"
+    },
+    "ownerInstancePrefix": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "package": {
+      "additionalProperties": false,
+      "properties": {
+        "stableId": {
+          "pattern": "^[A-Za-z][A-Za-z0-9+.-]*:",
+          "type": "string"
+        },
+        "version": {
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "stableId",
+        "version"
+      ],
+      "type": "object"
+    }
+  },
+  "required": [
+    "kind",
+    "owner",
+    "package",
+    "allowedDeployments",
+    "ownerInstancePrefix"
+  ],
+  "type": "object"
+}

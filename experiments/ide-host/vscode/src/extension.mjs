@@ -14,7 +14,7 @@ function newNonce(){
   return [...bytes].map(n=>n.toString(16).padStart(2,"0")).join("");
 }
 import {EXAMPLE_PROJECT_NAME,seedExampleProject,
-  ensureOpenedExampleInterface} from "./sample-loader.mjs";
+  ensureOpenedExampleDependencies} from "./sample-loader.mjs";
 import {openProjectFolder,isSingleFolderWorkspace,restorePendingExampleProject,PENDING_EXAMPLE_OPEN_KEY} from "./project-navigation.mjs";
 import {registerProjectWelcome} from "./project-welcome.mjs";
 
@@ -30,6 +30,7 @@ import {registerPackageOverview} from "./package-overview.mjs";
 import {registerDependencyIntegration} from "./dependency-integration.mjs";
 import {resolveLockedDependencies} from "./dependency-service.mjs";
 import {projectLockedInterfaceCompletionHints} from "./interface-schema-completion.mjs";
+import {projectLockedToolCatalog} from "./dependency-catalog-projection.mjs";
 import {registerCompilerIntegration} from "./compiler-integration.mjs";
 import {registerPackageDiagnosticTesting} from "./package-diagnostic-testing.mjs";
 import {registerPackageRouteTesting} from "./package-route-testing.mjs";
@@ -490,9 +491,9 @@ export function activate(context){
       if(options?.seedLegacyExample===true){
         if(folders.length!==1||folders[0].uri.toString()!==exampleRoot.toString())
           throw Error("Refusing to seed a legacy fixture outside the built-in Example workspace");
-        const contract=vscode.Uri.joinPath(exampleRoot,"skills","establish-pdu-session",
+        const contract=vscode.Uri.joinPath(exampleRoot,"skills","establish-pdu-session-mas",
           "assurance","contract.yaml");
-        const procedure=vscode.Uri.joinPath(exampleRoot,"skills","establish-pdu-session",
+        const procedure=vscode.Uri.joinPath(exampleRoot,"skills","establish-pdu-session-mas",
           "assurance","procedure.yaml");
         await vscode.workspace.fs.createDirectory(vscode.Uri.joinPath(exampleRoot,"lib"));
         await vscode.workspace.fs.createDirectory(vscode.Uri.joinPath(exampleRoot,"output"));
@@ -508,11 +509,13 @@ export function activate(context){
       }
       const root=folders.length===1?folders[0].uri:null;
       const defaultProcedure=root?vscode.Uri.joinPath(root,
-        "skills","establish-pdu-session","assurance","procedure.yaml"):null;
-      const masProcedure=root?vscode.Uri.joinPath(root,
         "skills","establish-pdu-session-mas","assurance","procedure.yaml"):null;
+      const masProcedure=root?vscode.Uri.joinPath(root,
+        "skills","modify-pdu-session-mas","assurance","procedure.yaml"):null;
+      const releaseProcedure=root?vscode.Uri.joinPath(root,
+        "skills","release-pdu-session-mas","assurance","procedure.yaml"):null;
       const contract=root?vscode.Uri.joinPath(root,
-        "skills","establish-pdu-session","assurance","contract.yaml"):null;
+        "skills","establish-pdu-session-mas","assurance","contract.yaml"):null;
       const lib=root?vscode.Uri.joinPath(root,"lib"):null;
       const output=root?vscode.Uri.joinPath(root,"output"):null;
       const exists=async uri=>{
@@ -553,6 +556,10 @@ export function activate(context){
         item.id==="ca-client"&&item.kind==="interface-package");
       const interfaceHints=interfaceSnapshot
         ?projectLockedInterfaceCompletionHints(interfaceSnapshot):[];
+      const ownerSnapshot=dependencies?.snapshots?.find(item=>
+        item.id==="mas"&&item.kind==="tool-catalog");
+      const ownerCatalog=ownerSnapshot
+        ?projectLockedToolCatalog(ownerSnapshot):{available:false,operations:[]};
       return {
         workspaceName:vscode.workspace.name??null,
         workspaceFile:vscode.workspace.workspaceFile?.toString?.()??null,
@@ -562,6 +569,8 @@ export function activate(context){
         defaultProcedureExists:await exists(defaultProcedure),
         masProcedure:masProcedure?.toString?.()??null,
         masProcedureExists:await exists(masProcedure),
+        releaseProcedure:releaseProcedure?.toString?.()??null,
+        releaseProcedureExists:await exists(releaseProcedure),
         contractApiVersion,procedureApiVersion,
         contractCurrentShape,procedureCurrentShape,
         contractReadError:contractRead.error,procedureReadError:procedureRead.error,
@@ -575,6 +584,11 @@ export function activate(context){
           contextReadHint:interfaceHints.some(item=>
             item.id==="ca-client::openamsm.smf.mas.sc.query"&&
             item.argumentProperties?.some(p=>p.name==="supi")),
+          ownerToolCatalog:{
+            available:ownerCatalog.available,
+            operationCount:ownerCatalog.operations?.length??0,
+            operationIds:(ownerCatalog.operations??[]).map(item=>item.id)
+          },
           qualification:"AUTH_NOT_CHECKED",
           diagnostics:dependencies?.diagnostics?.map(item=>item.code)??[]
         }}:{}),
@@ -666,8 +680,8 @@ export function activate(context){
                 candidateFiles:result.candidateFiles,created:result.created,
                 skipped:result.skipped,readmeUpdated:result.readmeUpdated,
                 exampleDependencySeeded:result.exampleDependencySeeded,
-                exampleDependencyId:result.exampleDependencyId,
-                exampleDependencySnapshotDigest:result.exampleDependencySnapshotDigest
+                exampleDependencyIds:result.exampleDependencyIds,
+                exampleDependencySnapshotDigests:result.exampleDependencySnapshotDigests
               }));
               if(replaceExisting&&(!result.replacedExisting||
                  result.created!==result.candidateFiles||result.skipped!==0||
@@ -741,7 +755,7 @@ export function activate(context){
                 "示例项目已载入并打开工作区：skill-studio-demo/。默认已打开 CA-SL current Procedure（DRAFT / NOT_QUALIFIED）。"+
                 (result.replacedExisting?"已替换原有 Example 内容。":"")+
                 "导入当前 CA-SL Skill 文件 "+result.candidateFiles+" 个。"+
-                (viewOpened&&revealed?"已展开 Package Explorer（两个 current CA-SL Skills）。":
+                (viewOpened&&revealed?"已展开 Package Explorer（三个 Scheme C Skills）。":
                   "可在 Explorer → Package Explorer 查看当前 CA-SL Skills。"));
               return result;
             }catch(error){
@@ -821,8 +835,11 @@ export function activate(context){
     "skillStudio.internal.openPythonSyntaxAcceptance",async()=>{
       const folders=vscode.workspace.workspaceFolders??[];
       if(folders.length!==1)throw Error("Python syntax probe needs one Example workspace");
-      const uri=vscode.Uri.joinPath(folders[0].uri,"skills",
-        "establish-pdu-session","scripts","validate-subscription-request.py");
+      const fixtureRoot=vscode.Uri.joinPath(context.globalStorageUri,"browser-acceptance");
+      const uri=vscode.Uri.joinPath(fixtureRoot,"validate-subscription-request.py");
+      await vscode.workspace.fs.createDirectory(fixtureRoot);
+      await vscode.workspace.fs.writeFile(uri,new TextEncoder().encode(
+        "# Native Python syntax acceptance\ndef validate(value: int) -> bool:\n    return value == 1\n"));
       const doc=await openTextDocumentWithRetry(vscode,uri);
       const editor=await vscode.window.showTextDocument(doc,{
         viewColumn:vscode.ViewColumn.One,preserveFocus:false,preview:false
@@ -840,7 +857,7 @@ export function activate(context){
       // adaptation. Keep the editor-group baseline deterministic instead of
       // relying on filesystem enumeration order.
       const baseline=discoveredProcedures.find(uri=>
-        /\/skills\/establish-pdu-session\/assurance\/procedure\.yaml$/i.test(uri.path));
+        /\/skills\/establish-pdu-session-mas\/assurance\/procedure\.yaml$/i.test(uri.path));
       const procedures=baseline
         ? [baseline,...discoveredProcedures.filter(uri=>uri.toString()!==baseline.toString())
             .sort((a,b)=>a.path.localeCompare(b.path))]
@@ -867,13 +884,7 @@ export function activate(context){
       const firstRoot=procedureRoots[0].root;
       const firstPackageVisuals=visualUris.filter(uri=>uri.path.startsWith(firstRoot.path+"/"));
       for(const uri of firstPackageVisuals)await openNativeSource(vscode,uri,{viewColumn:vscode.ViewColumn.One,preserveFocus:false,preview:false});
-      const pythonFiles=await vscode.workspace.findFiles(
-        "**/scripts/validate-subscription-request.py","**/node_modules/**",5);
-      if(!pythonFiles.length)throw Error("CA-SL v1alpha5 Python acceptance fixture is missing");
-      const python=await openTextDocumentWithRetry(vscode,pythonFiles[0]);
-      await vscode.window.showTextDocument(python,{
-        viewColumn:vscode.ViewColumn.One,preserveFocus:false,preview:false
-      });
+      const python=await vscode.commands.executeCommand("skillStudio.internal.openPythonSyntaxAcceptance");
       const waitForPrimary=async uri=>{
         const started=Date.now();
         while(Date.now()-started<3000){
@@ -884,7 +895,7 @@ export function activate(context){
         }
         throw Error("Source-only editor did not open in the primary group: "+uri.toString());
       };
-      const pythonColumn=(await waitForPrimary(python.uri)).viewColumn;
+      const pythonColumn=(await waitForPrimary(vscode.Uri.parse(python.uri))).viewColumn;
       // Use a saved, temporary ordinary YAML file rather than an Untitled
       // buffer so the acceptance cleanup never opens an unsaved-changes dialog.
       const projectRoot=firstRoot.with({
@@ -923,7 +934,7 @@ export function activate(context){
   // One-time, non-destructive upgrade for an already-open Example from an
   // earlier Studio. Never mutate another workspace or existing user settings.
   // This runs after extension providers are registered, before navigation.
-  void ensureOpenedExampleInterface(vscode,context.extensionUri,
+  void ensureOpenedExampleDependencies(vscode,context.extensionUri,
     context.globalStorageUri).then(async result=>{
       if(result.status==="SEEDED"){
         console.log("STUDIO_EXAMPLE_INTERFACE_MIGRATED",JSON.stringify(result));

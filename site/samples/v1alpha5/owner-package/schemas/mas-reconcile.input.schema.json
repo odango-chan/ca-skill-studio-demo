@@ -1,0 +1,40 @@
+{
+  "$id": "urn:openamsm:mas:v1alpha4:mas-reconcile-input",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "deploymentId": {
+      "maxLength": 255,
+      "minLength": 1,
+      "type": "string"
+    },
+    "operator": {
+      "maxLength": 255,
+      "minLength": 1,
+      "type": "string"
+    },
+    "originalInvocationId": {
+      "maxLength": 255,
+      "minLength": 1,
+      "type": "string"
+    },
+    "ownerInstanceId": {
+      "maxLength": 255,
+      "minLength": 1,
+      "type": "string"
+    },
+    "reason": {
+      "maxLength": 255,
+      "minLength": 1,
+      "type": "string"
+    }
+  },
+  "required": [
+    "originalInvocationId",
+    "deploymentId",
+    "ownerInstanceId",
+    "operator",
+    "reason"
+  ],
+  "type": "object"
+}

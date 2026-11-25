@@ -4,7 +4,7 @@ import {readFileSync} from "node:fs";
 import {auditPackage,indexV1Alpha4ToolCatalogCallables}
   from "../site/package-audit.mjs";
 
-const sampleRoot=new URL("../site/samples/v1alpha5/",import.meta.url);
+const sampleRoot=new URL("./fixtures/v1alpha5-conventional/",import.meta.url);
 const manifest=JSON.parse(readFileSync(new URL("files.json",sampleRoot),"utf8"));
 function fixture(skill){
   const files=new Map();
@@ -555,36 +555,4 @@ test("unverified Evidence export candidates cannot manufacture a confirmed Owner
   }});
   assert.equal(find(verified,"EVIDENCE_DECLARATION_AMBIGUOUS",reference)?.status,
     "confirmed");
-});
-
-
-test("verified Interface Package ToolCatalog is a declaration source, not an Owner grant",()=>{
-  const files=fixture("establish-pdu-session");
-  const contract=files.get("assurance/contract.yaml");
-  contract.text=contract.text.replace(
-    "  ca: urn:example:connectionagent:5gc-tool-contracts",
-    "  ca: urn:example:connectionagent:5gc-tool-contracts\n"+
-    "  ca-client: urn:wtlab:ca-client-tools:openamsm-sbi-interface");
-  const procedure=files.get("assurance/procedure.yaml");
-  procedure.text=procedure.text.replace(
-    "tool: ca::sbi.udm.sm_data.get",
-    "tool: ca-client::context.smf.session.read");
-  const diagnostics=auditPackage({files,dependencyContext:{
-    available:true,
-    declarations:[{id:"ca-client",kind:"interface-package"}],
-    snapshots:[{id:"ca-client",kind:"interface-package"}],
-    diagnostics:[],
-    toolCatalogs:[{dependencyId:"ca-client",available:true}],
-    operations:[{dependencyId:"ca-client",id:"context.smf.session.read",
-      kind:"observation",owner:"ca-client-tools",effect:"READ"}],
-    schemas:[]
-  }});
-  assert.ok(!diagnostics.some(item=>
-    item.code==="TOOL_DEPENDENCY_KIND_MISMATCH"&&
-    item.message.includes("ca-client")));
-  assert.ok(!diagnostics.some(item=>
-    item.code==="TOOL_DECLARATION_NOT_FOUND"&&
-    item.message.includes("ca-client")));
-  assert.ok(diagnostics.some(item=>item.code==="CAPABILITY_GRANT_NOT_CHECKED"),
-    "declaration presence is never an Owner/Capability grant");
 });

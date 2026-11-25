@@ -1,0 +1,29 @@
+{
+  "$id": "urn:openamsm:mas:v1alpha4:sc-release_sm_context_c-output",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "lifecycle": {
+      "const": "RELEASING",
+      "maxLength": 255,
+      "minLength": 1,
+      "type": "string"
+    },
+    "sm_context_ref": {
+      "maxLength": 255,
+      "minLength": 1,
+      "type": "string"
+    },
+    "user_plane_ready": {
+      "const": "0",
+      "maxLength": 255,
+      "minLength": 1,
+      "type": "string"
+    }
+  },
+  "required": [
+    "lifecycle",
+    "user_plane_ready"
+  ],
+  "type": "object"
+}

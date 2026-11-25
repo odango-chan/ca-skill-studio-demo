@@ -8,7 +8,7 @@ import {
 
 const root=new URL("../site/samples/v1alpha5/",import.meta.url);
 const source=packageName=>new Map([["assurance/procedure.yaml",{
-  text:readFileSync(new URL(packageName+"/assurance/procedure.yaml",root),"utf8")
+  text:readFileSync(new URL(packageName+"/assurance/procedure.yaml",packageName==="establish-pdu-session"?new URL("./fixtures/v1alpha5-conventional/",import.meta.url):root),"utf8")
 }]]);
 const simple=id=>JSON.stringify({
   apiVersion:"skill-studio-route-scenario/v1",id,

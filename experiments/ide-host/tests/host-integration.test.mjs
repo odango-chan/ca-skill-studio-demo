@@ -11,7 +11,7 @@ import {proposeCanvasRouteConnection,previewCanvasRouteConnection}
   from "../../../site/route-connect.mjs";
 
 test("Bundled CustomTextEditor uses native document, guarded WorkspaceEdit and native Source",async()=>{
-  const source=readFileSync("site/samples/v1alpha5/establish-pdu-session/assurance/procedure.yaml","utf8");
+  const source=readFileSync("tests/fixtures/v1alpha5-conventional/establish-pdu-session/assurance/procedure.yaml","utf8");
   const makeUri=path=>({path,toString(){return "file://"+this.path;},with(change){return makeUri(change.path??this.path);}});
   const uri=makeUri("/workspace/assurance/procedure.yaml");
   const document={uri,text:source,version:21,
@@ -60,8 +60,8 @@ test("Bundled CustomTextEditor uses native document, guarded WorkspaceEdit and n
       },
       fs:{readFile:async uri=>new TextEncoder().encode(readFileSync(
         uri.path.endsWith("/assurance/contract.yaml")
-          ?"site/samples/v1alpha5/establish-pdu-session/assurance/contract.yaml"
-          :"site/samples/v1alpha5/establish-pdu-session/assurance/predicates.yaml","utf8"))},
+          ?"tests/fixtures/v1alpha5-conventional/establish-pdu-session/assurance/contract.yaml"
+          :"tests/fixtures/v1alpha5-conventional/establish-pdu-session/assurance/predicates.yaml","utf8"))},
       findFiles:async()=>[uri],
       asRelativePath:file=>file.path
     },

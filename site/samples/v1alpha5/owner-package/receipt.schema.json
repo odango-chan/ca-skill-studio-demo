@@ -1,0 +1,203 @@
+{
+  "$id": "urn:openamsm:mas:v1alpha4:mutation-receipt",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "commit": {
+      "$ref": "urn:openamsm:mas:v1alpha4:commit-proof"
+    },
+    "commitBasis": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "failureClass": {
+      "type": "string"
+    },
+    "operation": {
+      "additionalProperties": false,
+      "properties": {
+        "callable": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "effect": {
+          "enum": [
+            "READ",
+            "MUTATION"
+          ]
+        },
+        "mas": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "op": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "stepId": {
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "callable",
+        "mas",
+        "op",
+        "stepId",
+        "effect"
+      ],
+      "type": "object"
+    },
+    "originalInvocationId": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "owner": {
+      "additionalProperties": false,
+      "properties": {
+        "buildIdentity": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "deploymentId": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "id": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "instanceId": {
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "instanceId",
+        "buildIdentity",
+        "deploymentId"
+      ],
+      "type": "object"
+    },
+    "phase": {
+      "enum": [
+        "PREPARED",
+        "TERMINAL"
+      ]
+    },
+    "preparedAt": {
+      "type": "string"
+    },
+    "receiptId": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "resultDigest": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "schemaVersion": {
+      "const": "openamsm.mas-mutation-receipt/v1"
+    },
+    "scope": {
+      "additionalProperties": false,
+      "properties": {
+        "psi": {
+          "maximum": 15,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "sessionGeneration": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "sessionRef": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "smContextRef": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "supi": {
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "supi",
+        "psi",
+        "sessionRef",
+        "sessionGeneration"
+      ],
+      "type": "object"
+    },
+    "state": {
+      "enum": [
+        "COMMITTED",
+        "NOT_COMMITTED",
+        "UNKNOWN"
+      ]
+    },
+    "terminalAt": {
+      "type": "string"
+    },
+    "transaction": {
+      "additionalProperties": false,
+      "properties": {
+        "correlationId": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "frameEpoch": {
+          "type": "string"
+        },
+        "n4Seid": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "policyAssocId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "releaseGeneration": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "releaseTxn": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "correlationId"
+      ],
+      "type": "object"
+    }
+  },
+  "required": [
+    "schemaVersion",
+    "receiptId",
+    "phase",
+    "state",
+    "owner",
+    "originalInvocationId",
+    "operation",
+    "scope",
+    "transaction",
+    "resultDigest"
+  ],
+  "title": "OpenAMSM durable MAS mutation receipt",
+  "type": "object"
+}

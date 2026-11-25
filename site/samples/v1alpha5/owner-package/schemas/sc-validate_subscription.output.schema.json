@@ -1,0 +1,28 @@
+{
+  "$id": "urn:openamsm:mas:v1alpha4:sc-validate_subscription-output",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "secondary_auth_required": {
+      "maxLength": 255,
+      "minLength": 1,
+      "type": "string"
+    },
+    "sub_summary": {
+      "maxLength": 255,
+      "minLength": 1,
+      "type": "string"
+    },
+    "validated": {
+      "const": "1",
+      "maxLength": 255,
+      "minLength": 1,
+      "type": "string"
+    }
+  },
+  "required": [
+    "validated",
+    "sub_summary"
+  ],
+  "type": "object"
+}
