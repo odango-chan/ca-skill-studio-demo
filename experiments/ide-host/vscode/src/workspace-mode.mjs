@@ -42,7 +42,7 @@ export function registerWorkspaceMode(vscode, context, { authoring, showWelcome 
         // Do not recapture a Console document that was already tracked. Theia
         // can report a stale tab at the mode boundary; the saved editor is the
         // authoritative return target until Console navigation changes it.
-        if (mode !== "ai" && (!consoleEditor?.document || consoleEditor.document.isClosed)) {
+        if (startup || (mode !== "ai" && (!consoleEditor?.document || consoleEditor.document.isClosed))) {
           const editor = visibleSourceEditor(vscode);
           if (editor) consoleEditor = editor;
         }
