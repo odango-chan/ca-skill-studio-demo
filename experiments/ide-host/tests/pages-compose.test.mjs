@@ -88,7 +88,8 @@ test("Pages installs pinned browser LSP dependencies before bundling the Web ext
 test("Pages stages and smoke-tests the exact Compiler v2.1.0 Development Worker release",async()=>{
   const workflow=await readFile(new URL("../../../.github/workflows/pages.yml",import.meta.url),"utf8");
   const compilerCommit="b67fbb56c34d15b8d5a0903c8a7ca93d608f8f65";
-  assert.ok(workflow.includes("repository: odango-chan/ca-skill-compiler"));\n  assert.ok(workflow.includes("ref: "+compilerCommit));
+  assert.ok(workflow.includes("repository: odango-chan/ca-skill-compiler"));
+  assert.ok(workflow.includes("ref: "+compilerCommit));
   assert.ok(workflow.includes("Verify pinned CA Skill Compiler v2.1.0 source identity"));\n  assert.ok(workflow.includes("git rev-parse HEAD"));
   assert.ok(workflow.includes(compilerCommit));
   assert.ok(workflow.includes("Download and verify official Compiler v2.1.0 Worker bundle"));
