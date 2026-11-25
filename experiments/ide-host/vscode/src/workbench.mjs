@@ -1483,7 +1483,7 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
             throw Error("Pinned Interface Schema completion did not reach the actual Theia editor: "+
               JSON.stringify({queryToolCompletion,nativeQueryToolLabels,queryArgumentLabels,
                 nativeQueryArgumentLabels,requiredQueryArguments,
-                nativeRequiredQueryArguments}));
+                nativeRequiredQueryArguments,nativeCompletionDiagnostics,isTheiaHost}));
           if(!queryToolCompletion.includes(queryToolId))
             throw Error("Pinned Interface Tool completion omitted its exact exported callable: "+
               JSON.stringify(queryToolCompletion));
