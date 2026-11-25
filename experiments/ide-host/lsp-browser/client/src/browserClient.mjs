@@ -337,7 +337,7 @@ export function createSkillLanguageClient(vscode, context, handlers = {}) {
           provideCompletionItem(document,position,context,token,next){
             // The manual bridge owns YAML completion in Theia; preserve the
             // standard LanguageClient provider for Python and other documents.
-            if(/\.ya?ml$/i.test(document.uri.path))return [];
+            if(completionRegistration&&/\.ya?ml$/i.test(document.uri.path))return [];
             return next(document,position,context,token);
           }
         }
