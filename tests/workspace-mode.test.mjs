@@ -133,6 +133,7 @@ test("reopening AI while Theia reports another native tab active preserves the s
     ViewColumn: { One: 1 },
     window: {
       activeTextEditor: procedureEditor,
+      onDidChangeActiveTextEditor: () => ({ dispose() {} }),
       showWarningMessage: message => assert.fail(message),
       showTextDocument: async (...args) => opened.push(args),
     },
@@ -185,6 +186,7 @@ test("entering AI from Console preserves a selected non-Procedure source documen
     window: {
       activeTextEditor: procedureEditor,
       visibleTextEditors: [contractEditor],
+      onDidChangeActiveTextEditor: () => ({ dispose() {} }),
       showWarningMessage: message => assert.fail(message),
       showTextDocument: async (...args) => opened.push(args),
     },
@@ -237,6 +239,7 @@ test("entering AI from Console captures the visible Procedure when activeTextEdi
     window: {
       activeTextEditor: contractEditor,
       visibleTextEditors: [procedureEditor],
+      onDidChangeActiveTextEditor: () => ({ dispose() {} }),
       showWarningMessage: message => assert.fail(message),
       showTextDocument: async (...args) => opened.push(args),
     },
