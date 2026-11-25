@@ -1,38 +1,56 @@
-# CA-SL v1alpha5 PDU Session examples
+# CA-SL v1alpha5 Scheme C — Create / Modify / Release
 
-- **Language target** `connectionagent.io/v1alpha5`
-- **Normative source** [CA-SL v1alpha5 release record](https://github.com/odango-chan/ca-skills/blob/0abfd0e1ab99f481a4ae01f3f47efc54783dd5e5/docs/releases/ca-sl-v1alpha5.md)
-- **Status** Illustrative authoring examples. Product and Owner qualification remains `NOT_QUALIFIED`.
-- **Pinned 5GC Example source** `odango-chan/ca-skills@a1ed951b1e677f824c644541a26f08be4dc4847f` (`examples/skills/`), all four packages.
+This is the default Skill Studio Example. It contains the three real OpenAMSM
+Scheme C Skills from `odango-chan/ca-skills`, not a separate illustrative
+workflow:
 
-- [establish-pdu-session](establish-pdu-session/SKILL.md) models the conventional 5GC success path. The Step 11 transfer Operation triggers the Step 15 Node-entry Wait. The accepted request is available as `wait.output`, the authored timeout goes to `SAFE_STOPPED`, and Step 17 has its own typed response boundary after Step 16.
-- [establish-pdu-session-mas](establish-pdu-session-mas/SKILL.md) follows the OpenAMSM MAS source plan. The composite MAS Operation handles its own event correlation.
-- [modify-pdu-session-mas](modify-pdu-session-mas/SKILL.md) follows the OpenAMSM Modify PDU Session source plan with UE/AMF/network-requested trigger classification.
-- [release-pdu-session-mas](release-pdu-session-mas/SKILL.md) follows the OpenAMSM Release PDU Session source plan with explicit trigger mapping.
+1. **Create** — `establish-pdu-session-mas`
+2. **Modify** — `modify-pdu-session-mas`
+3. **Release** — `release-pdu-session-mas`
 
-## Bundled example-only Interface Package dependency
+The default Procedure is Create. All three source packages are pinned to
+`ca-skills` commit `83d9e0c7d523189a1ae03186f8913277f0829d72` (PR #86 head; PR #86 is the documentation
+correction following the merged Owner-linked Skill update in PR #85).
 
-On first creation, or after explicitly confirming **Replace Example**, Studio
-preinstalls and locks the exact public
-[`ca-client-tools v1.1.0` Interface Package](https://github.com/odango-chan/ca-client-tools/releases/tag/v1.1.0)
-under alias **`ca-client`**. It is shipped inside Studio and verified against
-`sha256:cbd8fad939844cda5474f33f18d3cdc015c69dd8c1dc3908e84bd5273ce6e71b`.
-No GitHub fetch, manual ZIP selection or runtime network access is required to
-open the Example. The immutable bytes live under `.skill-studio/dependencies/`;
-their declaration and lock live in `.vscode/settings.json`.
+## Locked dependencies
 
-In a Procedure `observation` you can type `ca-client::openamsm.smf.mas.sc.query`
-as the `tool`, then use native YAML completion under `arguments:` for
-`supi` and `pduSessionId`. The read-only Package Explorer also exposes the
-published `*.schema.json` bytes; Provider-authored `*.schema.yaml` remains
-the upstream source format, not an editable released dependency.
+- **`mas` — Owner ToolCatalog v1alpha4:** stable Package ID
+  `urn:openamsm:mas:tool-contracts`, Owner `openamsm.smf.mas`, exact
+  `ca-client-tools v1.2.0` source commit `fc44c3a745c68443fcfb12054c7eadf0ed7cc3f7`, and Owner build
+  identity `sha256:ac834080f31ff0fa91b9eb846fa47c889a94837fc1f37ec2034190e4e83085c0`. The bundled manifest verifies
+  all 58 published artifacts, including the ToolCatalog, callable Schemas,
+  Evidence Guarantees, receipt/proof/reconcile Schemas and CapabilityContracts.
+- **`ca-context` — Host subject-context Schema:** stable Package ID
+  `urn:connectionagent:ca:host-context`. Its single subject Schema is taken
+  from the exact `ca-agent-demo` Development fixture commit
+  `57e277ff9094dad93543df46910a12a1dbbaf560`; it is explicitly a Host-provided Development fixture, not a
+  production trust grant.
+- **`ca-client` — read-only Interface Package:** the existing published
+  `ca-client-tools v1.1.0` Interface Package remains available for read-only
+  SBI query completions. These three MAS mutation Skills do not use it as their
+  Owner contract and it does not export the MAS mutation callables.
 
-**Boundary:** This v1.1.0 package provides published READ/query interfaces,
-not the complete mutable 5GC/MAS Tool/Owner contracts or Compiler authorizations
-needed to execute the four illustrative Skill workflows. Completion is strictly
-`AUTH_NOT_CHECKED`, and the imported dependency is `Compiler NOT_LINKED`.
-It is not a production Admission or real-5GC qualification. The conventional
-Skill's `integration` placeholder and other `urn:example:` values remain
-illustrative. Changing/removing the pinned dependency in an existing Example
-is respected; non-replacing Example reload does not silently restore it.
+The **CA Client Tools v1.2.0 Runtime Provider is published**. It supplies the
+typed runtime bindings from the published Owner v1alpha4 contract. The runtime
+Provider, its read-only Interface Package, and the Owner ToolCatalog are
+separate artifacts; this Example keeps those boundaries explicit.
 
+## Verification and qualification
+
+- **Static Compiler:** PASS for the Owner-linked Skill source in
+  `ca-skills` PR #85 using released `skillc v2.0.2` and the published Owner
+  v1alpha4 contract. PR #86 only corrects the Skill adoption-status prose.
+- **Current-source Development E2E:** NOT RUN. The prior real
+  Create → Modify → Release Development E2E in
+  `ca-agent-demo/artifacts/reviews/20261123-scheme-c-final` used the earlier
+  `ca-skills` PR #84 source commit `494b05f` and a synthetic development
+  Owner closure. It must not be presented as E2E evidence for this newer
+  Owner-linked source.
+- **Production Qualification:** NOT QUALIFIED. A verified dependency snapshot
+  or static Compiler Build is not deployment admission, Owner authorization,
+  durable mutation receipt proof, or Production qualification.
+
+The project lock is a reproducible source snapshot. Skill Studio does not turn
+its presence into Owner authorization or deployment trust. The Compiler and
+Runtime must report missing trust explicitly rather than infer it from this
+Example.
