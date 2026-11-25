@@ -216,3 +216,55 @@ test("entering AI from Console preserves a selected non-Procedure source documen
     viewColumn: 1, preview: false, preserveFocus: false, selection: contractEditor.selection,
   });
 });
+
+
+test("entering AI from Console captures the visible Procedure when activeTextEditor is stale", async () => {
+  const commands = new Map();
+  const preferences = new Map([["skillStudio.workspaceMode", "console"]]);
+  const procedure = {
+    uri: { path: "/skills/demo/assurance/procedure.yaml" },
+    isClosed: false,
+  };
+  const contract = {
+    uri: { path: "/skills/demo/assurance/contract.yaml" },
+    isClosed: false,
+  };
+  const procedureEditor = { document: procedure, selection: { anchor: 4 }, viewColumn: 1 };
+  const contractEditor = { document: contract, selection: { anchor: 9 }, viewColumn: 1 };
+  const opened = [];
+  const vscode = {
+    ViewColumn: { One: 1 },
+    window: {
+      activeTextEditor: contractEditor,
+      visibleTextEditors: [procedureEditor],
+      showWarningMessage: message => assert.fail(message),
+      showTextDocument: async (...args) => opened.push(args),
+    },
+    commands: {
+      executeCommand: async (...args) => opened.push(args),
+      registerCommand(id, handler) {
+        commands.set(id, handler);
+        return { dispose() {} };
+      },
+    },
+  };
+  const context = {
+    globalState: {
+      get: key => preferences.get(key),
+      update: async (key, value) => preferences.set(key, value),
+    },
+    subscriptions: [],
+  };
+  const authoring = { open: async () => true, getDocument: () => procedure };
+  const mode = registerWorkspaceMode(vscode, context, {
+    authoring, showWelcome: () => false,
+  });
+
+  assert.equal(await mode.restore(), false);
+  assert.equal(await commands.get("skillStudio.openAiAuthoring")(), true);
+  assert.equal(await commands.get("skillStudio.openConsole")(), true);
+  assert.equal(opened.at(-1)[1], procedure.uri);
+  assert.deepEqual(opened.at(-1)[3], {
+    viewColumn: 1, preview: false, preserveFocus: false, selection: procedureEditor.selection,
+  });
+});
