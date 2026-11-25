@@ -1,13 +1,13 @@
 ---
 name: establish-pdu-session-mas
-description: CA-SL v1alpha5 illustrative OpenAMSM MAS policy-first initial PDU Session establishment source.
+description: CA-SL v1alpha5 OpenAMSM MAS policy-first initial PDU Session establishment Skill linked to the published Owner v1alpha4 contract.
 ---
 
 # Establish PDU Session — OpenAMSM MAS policy-first profile
 
 **Source language:** [CA-SL v1alpha5](https://github.com/odango-chan/ca-skills/blob/0abfd0e1ab99f481a4ae01f3f47efc54783dd5e5/docs/skill-language-spec.v1alpha5.zh-CN.md).
 
-**Adoption state: NOT_QUALIFIED / NOT_LINKABLE.** This is a source-aligned authoring example, not a linked, executable or Owner-approved Skill. The MAS ToolCatalog, operation Schemas, Evidence Guarantees and CapabilityContracts are not published. The `mas` dependency and all source-derived MAS IDs remain placeholders; Compiler linking must fail closed.
+**Adoption state: OWNER_LINKED / DEVELOPMENT_STATIC_BUILD_PASS / PRODUCTION_NOT_QUALIFIED.** The `mas` dependency resolves to the published Owner package `urn:openamsm:mas:tool-contracts` v1alpha4. Its ToolCatalog, callable input/output Schemas, mutation receipt and commit-proof Schemas, Evidence Guarantees, Owner identity and deployment CapabilityContracts are published. `ca-skills` PR #85 verified this Skill with released `skillc v2.0.2` in release mode against the Owner v1alpha4 publication, without a fixture Owner identity. This is static Compiler evidence only: it is not Production Admission, and the 2026-11-23 live Development E2E used the pre-PR #85 source revision. Re-run the live E2E against this exact Owner-linked revision before claiming current-source E2E.
 
 ## Scope
 

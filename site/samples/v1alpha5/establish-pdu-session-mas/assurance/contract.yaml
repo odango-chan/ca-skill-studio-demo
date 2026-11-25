@@ -1,4 +1,5 @@
-# CA-SL v1alpha5 author syntax. MAS ToolCatalog / CapabilityContracts are NOT published.
+# CA-SL v1alpha5 author syntax. The MAS dependency is the published OpenAMSM Owner
+# contract package (env-openamsm contracts/mas/v1alpha4).
 # Subject Context carries the 3GPP SUPI from the admitted CreateSMContext request; HostBusinessInstance and Runtime identities remain private.
 goal: pdu_session.initial_request_fulfilled
 precondition: validate-sm-subscription.precondition
@@ -6,7 +7,7 @@ requestSchema: schemas/establishment-request.schema.yaml
 contextSchema: ca-context::urn:connectionagent:ca:context:subject:v1
 dependencies:
   ca-context: urn:connectionagent:ca:host-context
-  mas: wtlab:packages:openamsm:mas-compiler-contract
+  mas: urn:openamsm:mas:tool-contracts
 capabilities:
   - mas.sc.subscription.validate
   - mas.saa.secondary.auth
