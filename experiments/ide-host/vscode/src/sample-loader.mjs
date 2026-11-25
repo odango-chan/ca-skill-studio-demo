@@ -1,6 +1,6 @@
 // Explicit Example project import for VS Code desktop/web or Theia browser-only OPFS.
 // Replacing an existing Example is a deliberate, user-confirmed operation that
-// deletes the Example root and recreates it from the single pinned v1alpha5 source.
+// refreshes authored files in the Example root from the single pinned v1alpha5 source.
 // Ordinary projects are never passed to this importer. It never creates lib/ or output/.
 import {writeImmutableSnapshot} from "./dependency-service.mjs";
 import {EXAMPLE_INTERFACE_ARCHIVE,prepareExampleInterfaceDependency,
@@ -24,32 +24,20 @@ const describeError=error=>({
   code:error?.code??null,
   message:String(error?.message??error)
 });
-async function clearDirectoryContents(vscode,fs,root,{preserveVscode=false}={}){
-  if(typeof fs.readDirectory!=="function")
-    fail("Host file system cannot enumerate the existing Example directory");
-  let entries;
-  try{entries=await fs.readDirectory(root);}
-  catch(error){
-    fail("Cannot enumerate the existing Example directory: "+
-      JSON.stringify(describeError(error)));
-  }
-  for(const [name] of entries){
+async function pruneExampleDirectory(vscode,fs,root,allowedPaths){
+  for(const [name,type] of await fs.readDirectory(root)){
     if(typeof name!=="string"||!name||name==="."||name===".."||
        name.includes("/")||name.includes("\\"))
       fail("Host file system returned an unsafe Example child name");
-    // .vscode/settings.json controls the active Theia workspace. Deleting
-    // it during an explicit Example replacement can restart the extension
-    // host and abort the import halfway through. Replace it at the very end.
-    if(preserveVscode&&name===".vscode")continue;
+    if(allowedPaths.includes(name))continue;
     const child=vscode.Uri.joinPath(root,name);
-    await fs.delete(child,{recursive:true,useTrash:false});
+    const prefix=name+"/";
+    const descendants=allowedPaths.filter(file=>file.startsWith(prefix))
+      .map(file=>file.slice(prefix.length));
+    if(descendants.length&&type===2)await pruneExampleDirectory(vscode,fs,child,descendants);
+    else if(!descendants.length)await fs.delete(child,{recursive:true,useTrash:false});
+    else fail("Confirmed Example directory is unavailable: "+name);
   }
-  const remaining=await fs.readDirectory(root);
-  if(remaining.some(([name])=>!preserveVscode||name!==".vscode")||
-     remaining.length>(preserveVscode?1:0))
-    fail("Existing Example contents remain after replacement cleanup: "+
-      remaining.map(([name])=>name).join(", "));
-  return entries.map(([name])=>name);
 }
 // Theia 1.76 browser-only currently supplies an HTTP(S) extensionUri in this
 // hosted-plugin worker. Fetch only same-origin extension assets in that case.
@@ -304,30 +292,27 @@ export async function seedExampleProject(vscode,extensionUri,storageUri,
     };
     const hadExisting=await exists(root);
     const replacedExisting=Boolean(replaceExisting&&hadExisting);
-    if(replacedExisting){
-      phase="replace-existing-example";
-      // The Example root is also the active workspace folder in Theia OPFS.
-      // Keep that directory handle/path stable and remove only its children;
-      // deleting the active workspace root itself is not a portable operation
-      // across VS Code and Theia filesystem providers.
-      await clearDirectoryContents(vscode,fs,root,{preserveVscode:true});
-    }else{
-      phase="create-project-layout";
-      await fs.createDirectory(root);
+    phase="verify-pinned-example-source";
+    const sourceRoot=vscode.Uri.joinPath(extensionUri,"samples","v1alpha5");
+    const readSource=file=>readBundledResource(vscode,
+      vscode.Uri.joinPath(sourceRoot,...file.split("/")));
+    const readme=await readSource(candidate.projectReadme);
+    const sources=new Map();
+    for(const file of candidate.files){
+      const bytes=await readSource(file);
+      if(!(bytes instanceof Uint8Array)||await gitBlobSha1(bytes)!==candidate.blobs[file])
+        fail("Bundled Skill source does not match pinned ca-skills blob: "+file);
+      sources.set(file,bytes);
     }
     phase="create-project-layout";
     await fs.createDirectory(skillsRoot);
 
-    const readmeSource=vscode.Uri.joinPath(extensionUri,"samples","v1alpha5",candidate.projectReadme);
     const readmeDestination=vscode.Uri.joinPath(root,"README.md");
     let readmeUpdated=false;
-    // After an explicit replacement, recursive deletion may leave a stale
-    // stat result in some hosted filesystem providers. The user has approved
-    // replacing this Example, so write the pinned README unconditionally.
+    // Confirmed replacement always restores the pinned README.
     if(replacedExisting||!(await exists(readmeDestination))){
       phase="write-v1alpha5-project-readme";
-      const bytes=await readBundledResource(vscode,readmeSource);
-      await fs.writeFile(readmeDestination,bytes);
+      await fs.writeFile(readmeDestination,readme);
       readmeUpdated=true;
     }
 
@@ -338,25 +323,16 @@ export async function seedExampleProject(vscode,extensionUri,storageUri,
       const parts=file.split("/");
       const destination=vscode.Uri.joinPath(skillsRoot,...parts);
       phase="stat-existing:"+file;
-      // Do not trust cached stat results after clearing the Example root.
-      // Explicit replacement writes every exact bundled file; writeFile is
-      // allowed to replace a stale provider entry.
+      // Confirmed replacement always restores the exact bundled bytes.
       if(!replacedExisting&&await exists(destination)){
         skipped++;
         report({phase:"files",completed:created+skipped,total});
         continue;
       }
-      phase="read-bundled-file:"+file;
-      const bytes=await readBundledResource(vscode,
-        vscode.Uri.joinPath(extensionUri,"samples","v1alpha5",...parts));
-      if(!(bytes instanceof Uint8Array))fail("Unrecognized v1alpha5 sample file");
-      if(await gitBlobSha1(bytes)!==candidate.blobs[file])
-        fail("Bundled Skill source does not match pinned ca-skills blob: "+file);
+      const bytes=sources.get(file);
       if(parts.length>1)
         await fs.createDirectory(vscode.Uri.joinPath(skillsRoot,...parts.slice(0,-1)));
-      // For a confirmed replacement, stale stat cache entries are expected
-      // after recursive deletion; this is an intentional overwrite of the
-      // exact pinned Example bytes, not an unconfirmed concurrent import.
+      // Protect against a concurrent write on an unconfirmed import.
       if(!replacedExisting){
         try{await fs.stat(destination);fail("v1alpha5 sample file changed during import");}
         catch(error){if(error?.code!=="FileNotFound")throw error;}
@@ -365,6 +341,14 @@ export async function seedExampleProject(vscode,extensionUri,storageUri,
       await fs.writeFile(destination,bytes);
       created++;
       report({phase:"files",completed:created+skipped,total});
+    }
+
+    if(replacedExisting){
+      phase="prune-retired-example-files";
+      // Keep active directory handles and immutable snapshots in place.
+      await pruneExampleDirectory(vscode,fs,root,[
+        ".vscode",".skill-studio","README.md",...candidate.files.map(file=>"skills/"+file)
+      ]);
     }
 
     // Only the built-in Example gets this dependency. A fresh or explicitly
