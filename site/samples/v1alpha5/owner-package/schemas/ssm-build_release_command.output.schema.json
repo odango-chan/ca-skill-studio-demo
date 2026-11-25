@@ -1,0 +1,48 @@
+{
+  "$id": "urn:openamsm:mas:v1alpha4:ssm-build_release_command-output",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "n1_sm_hex": {
+      "maxLength": 255,
+      "minLength": 1,
+      "type": "string"
+    },
+    "n2_sm_hex": {
+      "maxLength": 255,
+      "minLength": 1,
+      "type": "string"
+    },
+    "n2_sm_info_type": {
+      "const": "PDU_RES_REL_CMD",
+      "maxLength": 255,
+      "minLength": 1,
+      "type": "string"
+    },
+    "release_generation": {
+      "maxLength": 255,
+      "minLength": 1,
+      "type": "string"
+    },
+    "release_phase": {
+      "const": "command_built",
+      "maxLength": 255,
+      "minLength": 1,
+      "type": "string"
+    },
+    "release_txn": {
+      "maxLength": 255,
+      "minLength": 1,
+      "type": "string"
+    }
+  },
+  "required": [
+    "n1_sm_hex",
+    "n2_sm_hex",
+    "n2_sm_info_type",
+    "release_generation",
+    "release_txn",
+    "release_phase"
+  ],
+  "type": "object"
+}

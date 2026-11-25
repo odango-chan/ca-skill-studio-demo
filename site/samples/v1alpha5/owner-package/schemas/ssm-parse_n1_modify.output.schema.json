@@ -1,0 +1,53 @@
+{
+  "$id": "urn:openamsm:mas:v1alpha4:ssm-parse_n1_modify-output",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "five_qi": {
+      "maxLength": 255,
+      "minLength": 1,
+      "type": "string"
+    },
+    "gfbr_dl": {
+      "maxLength": 255,
+      "minLength": 1,
+      "type": "string"
+    },
+    "gfbr_ul": {
+      "maxLength": 255,
+      "minLength": 1,
+      "type": "string"
+    },
+    "mfbr_dl": {
+      "maxLength": 255,
+      "minLength": 1,
+      "type": "string"
+    },
+    "mfbr_ul": {
+      "maxLength": 255,
+      "minLength": 1,
+      "type": "string"
+    },
+    "qfi": {
+      "maxLength": 255,
+      "minLength": 1,
+      "type": "string"
+    },
+    "requested_kind": {
+      "const": "qos_flow_descriptions",
+      "maxLength": 255,
+      "minLength": 1,
+      "type": "string"
+    }
+  },
+  "required": [
+    "qfi",
+    "five_qi",
+    "gfbr_ul",
+    "gfbr_dl",
+    "mfbr_ul",
+    "mfbr_dl",
+    "requested_kind"
+  ],
+  "type": "object"
+}

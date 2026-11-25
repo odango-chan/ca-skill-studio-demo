@@ -1,0 +1,17 @@
+{
+  "$id": "urn:openamsm:mas:v1alpha4:se-emit_release_event_c-output",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "last_event": {
+      "const": "1",
+      "maxLength": 255,
+      "minLength": 1,
+      "type": "string"
+    }
+  },
+  "required": [
+    "last_event"
+  ],
+  "type": "object"
+}

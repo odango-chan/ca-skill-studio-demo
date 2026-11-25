@@ -1,0 +1,29 @@
+{
+  "$id": "urn:openamsm:mas:v1alpha4:ssm-parse_n1_release-input",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "parse_n1": {
+      "const": "1",
+      "maxLength": 255,
+      "minLength": 1,
+      "type": "string"
+    },
+    "psi": {
+      "maximum": 15,
+      "minimum": 1,
+      "type": "integer"
+    },
+    "ue_identity": {
+      "maxLength": 32,
+      "minLength": 1,
+      "type": "string"
+    }
+  },
+  "required": [
+    "ue_identity",
+    "psi",
+    "parse_n1"
+  ],
+  "type": "object"
+}
