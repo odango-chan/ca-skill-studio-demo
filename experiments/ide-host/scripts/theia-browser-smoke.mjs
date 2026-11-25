@@ -1161,7 +1161,7 @@ try{
   if(!activationDiagnostics||activationDiagnostics.failures?.length||
      activationDiagnostics.components?.Workbench!=="READY"||
      activationDiagnostics.components?.["Package Explorer"]!=="READY"||
-     activationDiagnostics.packageInventory?.packageCount!==4||
+     activationDiagnostics.packageInventory?.packageCount!==3||
      activationDiagnostics.packageInventory?.state!=="ready"||
      !/^[0-9a-f]{40}$/.test(activationDiagnostics.buildId??"")||
      activationDiagnostics.welcomeCommandRegistered!==true||
