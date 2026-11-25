@@ -23,6 +23,13 @@ export function registerWorkspaceMode(vscode, context, { authoring, showWelcome 
   let switching = false;
   let waitForProcedure;
 
+  // Track source navigation only while Console is the visible workspace mode.
+  // Theia may keep a different native tab in activeTextEditor while AI is open.
+  const sourceEditorListener = vscode.window.onDidChangeActiveTextEditor(editor => {
+    if (mode === "console" && editor?.document) consoleEditor = editor;
+  });
+  context.subscriptions.push(sourceEditorListener);
+
   async function select(next, { startup = false } = {}) {
     if (switching) return false;
     waitForProcedure?.dispose();
@@ -30,10 +37,10 @@ export function registerWorkspaceMode(vscode, context, { authoring, showWelcome 
     switching = true;
     try {
       if (next === "ai") {
-        // Capture the actually visible Console Source. Theia can leave
-        // activeTextEditor pointing at another native tab while the fixed
-        // Source editor remains visible in group one.
-        if (startup || mode !== "ai") {
+        // Do not recapture a Console document that was already tracked. Theia
+        // can report a stale tab at the mode boundary; the saved editor is the
+        // authoritative return target until Console navigation changes it.
+        if (mode !== "ai" && (!consoleEditor?.document || consoleEditor.document.isClosed)) {
           const editor = visibleSourceEditor(vscode);
           if (editor) consoleEditor = editor;
         }
@@ -44,15 +51,21 @@ export function registerWorkspaceMode(vscode, context, { authoring, showWelcome 
         const document = mode === "ai" && savedDocument && !savedDocument.isClosed
           ? savedDocument : activeDocument ?? authoring.getDocument();
         if (document) {
+          const previousEditor = consoleEditor;
           const options = {
             viewColumn: vscode.ViewColumn.One, preview: false, preserveFocus: false,
-            ...(consoleEditor?.document === document && !document.isClosed
-              && consoleEditor.selection ? { selection: consoleEditor.selection } : {}),
+            ...(previousEditor?.document === document && !document.isClosed
+              && previousEditor.selection ? { selection: previousEditor.selection } : {}),
           };
           // Theia's native source opener preserves the editor contribution
           // used by Preview and the semantic-token decoration renderer.
           if (document.isUntitled) await vscode.window.showTextDocument(document, options);
           else await openNativeSource(vscode, document.uri, options);
+          // Record the document we explicitly restored. Active-editor events
+          // emitted during the transition are ignored until Console is active.
+          if (previousEditor?.document !== document || document.isClosed) {
+            consoleEditor = { document };
+          }
         } else if (await showWelcome() !== true) {
           return false;
         }
@@ -76,7 +89,11 @@ export function registerWorkspaceMode(vscode, context, { authoring, showWelcome 
   return {
     restore() {
       // Let the existing Welcome/Example flow establish a project and source.
-      if (mode !== "ai") return Promise.resolve(false);
+      if (mode !== "ai") {
+        const editor = visibleSourceEditor(vscode);
+        if (editor) consoleEditor = editor;
+        return Promise.resolve(false);
+      }
       if (isProcedurePath(visibleSourceEditor(vscode)?.document.uri.path)) {
         return select("ai", { startup: true });
       }
