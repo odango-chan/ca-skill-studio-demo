@@ -186,6 +186,7 @@ export function createSemanticTokenDecorationRenderer(vscode, tokenTypes, semant
   function clearDocument(uri) {
     if (!uri) return;
     documents.delete(uri);
+    tokenDiagnosticsByUri.delete(uri);
     applyVisible(uri, null);
   }
 
