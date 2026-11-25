@@ -85,23 +85,26 @@ test("Pages installs pinned browser LSP dependencies before bundling the Web ext
   assert.ok(client>=0&&server>client&&bundle>server);
 });
 
-test("Pages builds and smoke-tests the exact Compiler v2.0.2 Go/WASM release",async()=>{
+test("Pages stages and smoke-tests the exact Compiler v2.1.0 Development Worker release",async()=>{
   const workflow=await readFile(new URL("../../../.github/workflows/pages.yml",import.meta.url),"utf8");
-  const compilerCommit="e98a7b26acabfa2a5e1587974ab9be5742e70bf7";
-  assert.match(workflow,/repository: odango-chan\/ca-skill-compiler[\s\S]*?ref: e98a7b26acabfa2a5e1587974ab9be5742e70bf7/);
-  assert.match(workflow,/Verify pinned CA Skill Compiler v2\.0\.2 source identity[\s\S]*?git rev-parse HEAD/);
+  const compilerCommit="b67fbb56c34d15b8d5a0903c8a7ca93d608f8f65";
+  assert.ok(workflow.includes("repository: odango-chan/ca-skill-compiler"));
+  assert.ok(workflow.includes("ref: "+compilerCommit));
+  assert.ok(workflow.includes("Verify pinned CA Skill Compiler v2.1.0 source identity"));
+  assert.ok(workflow.includes("git rev-parse HEAD"));
   assert.ok(workflow.includes(compilerCommit));
-  assert.match(workflow,/go-version: "1\.26\.6"/);
+  assert.ok(workflow.includes("Download and verify official Compiler v2.1.0 Worker bundle"));
+  assert.ok(workflow.includes("skillc-v2.1.0-web-worker.tar.gz"));
+  assert.match(workflow,/SHA256SUMS/);
   const extensionBuild=workflow.indexOf("node experiments/ide-host/scripts/build-ide-spike.mjs");
-  const compilerBuild=workflow.indexOf("Build pinned Compiler v2.0.2 Go/WASM Core");
   const stage=workflow.indexOf("node experiments/ide-host/scripts/prepare-theia-online.mjs");
-  assert.ok(extensionBuild>=0&&compilerBuild>extensionBuild&&stage>compilerBuild,
-    "WASM must be built after dist cleanup and before Theia plugin staging");
+  assert.ok(extensionBuild>=0&&stage>extensionBuild,
+    "verified Compiler Worker assets must be staged after the extension build");
   assert.match(workflow,/THEIA_REQUIRE_COMPILER_WORKER: "1"/);
 });
 
-test("all Compiler host workflows pin the same released v2.0.2 source commit",async()=>{
-  const compilerCommit="e98a7b26acabfa2a5e1587974ab9be5742e70bf7";
+test("all Compiler host workflows pin the same released v2.1.0 source commit",async()=>{
+  const compilerCommit="b67fbb56c34d15b8d5a0903c8a7ca93d608f8f65";
   const workflows=[
     "pages.yml",
     "theia-browser-host-spike.yml",
@@ -111,9 +114,9 @@ test("all Compiler host workflows pin the same released v2.0.2 source commit",as
   ];
   for(const name of workflows){
     const workflow=await readFile(new URL("../../../.github/workflows/"+name,import.meta.url),"utf8");
-    assert.match(workflow,/repository: odango-chan\/ca-skill-compiler[\s\S]*?ref: e98a7b26acabfa2a5e1587974ab9be5742e70bf7/,
-      name+" must check out the exact v2.0.2 commit");
-    assert.match(workflow,/Verify pinned CA Skill Compiler v2\.0\.2 source identity[\s\S]*?git rev-parse HEAD/,
+    assert.ok(workflow.includes("repository: odango-chan/ca-skill-compiler") && workflow.includes("ref: "+compilerCommit),
+      name+" must check out the exact v2.1.0 commit");
+    assert.ok(workflow.includes("Verify pinned CA Skill Compiler v2.1.0 source identity") && workflow.includes("git rev-parse HEAD"),
       name+" must verify the staged Compiler source identity");
     assert.ok(workflow.includes(compilerCommit),name+" must retain the exact immutable source SHA");
   }

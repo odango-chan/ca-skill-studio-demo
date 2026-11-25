@@ -1,8 +1,8 @@
-// Theia / VS Code host adapter for released CA Skill Compiler v2.0.2.
+// Theia / VS Code host adapter for released CA Skill Compiler v2.1.0.
 // The Compiler is the sole authority for Check, Build, linking and Artifact output.
 // This adapter owns workspace snapshots, diagnostics and read-only presentation.
 import {collectPackageSnapshot,packageRootForProcedure} from "./package-snapshot.mjs";
-import {createCompilerWorkerClient} from "./compiler-client.mjs";
+import {createCompilerWorkerClient,workerResourceUrl} from "./compiler-client.mjs";
 import {normalizeCompilerDiagnostics} from "./compiler-diagnostics.mjs";
 import {createCompilerResultGate} from "./compiler-result-gate.mjs";
 import {
@@ -17,6 +17,11 @@ import {
   isCompilerBuildResult,
   isCompilerInspection
 } from "./compiler-request.mjs";
+import {
+  COMPILER_DEVELOPMENT_BUILD_REQUEST_API_VERSION,
+  createCompilerDevelopmentBuildRequest,
+  isCompilerDevelopmentBuildResult
+} from "./compiler-development-request.mjs";
 
 const SOURCE_SUFFIX="/assurance/procedure.yaml";
 const utf8=new TextDecoder("utf-8",{fatal:true});
@@ -639,12 +644,59 @@ export function registerCompilerIntegration(vscode,context,{
         if(!isCompilerInspection(inspect)){
           throw new Error("Compiler Worker did not return DependencyInspection v1alpha5");
         }
+        const developmentFixtureUri=vscode.Uri.joinPath(context.extensionUri,"dist",
+          "authoring-development-build-request.json");
+        // The browser-only Theia PluginWorker can execute extension commands but
+        // its workspace.fs provider may cancel reads against the hosted extension
+        // filesystem (Canceled FileSystemError). The asset is already served as
+        // part of the immutable extension package, so fetch that exact packaged
+        // URL in browser hosts. Keep workspace.fs for native Node extension hosts.
+        let developmentFixtureBytes;
+        if(localBrowserHost){
+          const fixtureUrl=workerResourceUrl(developmentFixtureUri);
+          const response=await fetch(fixtureUrl,{cache:"no-store"});
+          if(!response.ok)
+            throw new Error("Cannot load packaged Compiler Development fixture: HTTP "+
+              response.status+" "+fixtureUrl);
+          developmentFixtureBytes=new Uint8Array(await response.arrayBuffer());
+        }else{
+          developmentFixtureBytes=await vscode.workspace.fs.readFile(developmentFixtureUri);
+        }
+        const developmentRequest=JSON.parse(utf8.decode(developmentFixtureBytes));
+        if(developmentRequest.apiVersion!==COMPILER_DEVELOPMENT_BUILD_REQUEST_API_VERSION)
+          throw new Error("Staged Compiler v2.1.0 Development Build fixture has the wrong API version");
+        const development=await client.request("buildDevelopment",developmentRequest);
+        if(!isCompilerDevelopmentBuildResult(development)||!development.success||
+           development.sourceStatus!=="VALIDATED"||
+           development.interfaceLinkStatus!=="LINKED"||
+           development.artifactStatus!=="BUILT"||
+           development.executionStatus!=="NOT_ADMITTED"||
+           typeof development.artifactDigest!=="string"||!development.artifactDigest)
+          throw new Error("Compiler v2.1.0 BuildDevelopment did not produce the expected development-only result");
+        const verified=await client.request("verifyDevelopment",{
+          request:developmentRequest,result:development
+        });
+        if(verified!=="")
+          throw new Error("Compiler v2.1.0 VerifyDevelopment rejected its own result: "+String(verified));
+        const tampered={...development,artifactDigest:"sha256:"+"0".repeat(64)};
+        const tamperCheck=await client.request("verifyDevelopment",{
+          request:developmentRequest,result:tampered
+        });
+        if(typeof tamperCheck!=="string"||!tamperCheck.length)
+          throw new Error("Compiler v2.1.0 VerifyDevelopment accepted a tampered artifact digest");
         return {
           compilerVersion:COMPILER_VERSION,languageTarget:COMPILER_LANGUAGE_TARGET,
           checkDiagnostics:check.length,buildSuccess:build.success,
           buildOutputFiles:build.outputFiles.length,
           inspectCallables:inspect.callables.length,inspectSchemas:inspect.schemas.length,
-          workerTransport:"PASS",artifactFailureAtomicity:"PASS"
+          workerTransport:"PASS",artifactFailureAtomicity:"PASS",
+          developmentBuild:"PASS",developmentVerify:"PASS",
+          developmentSourceStatus:development.sourceStatus,
+          developmentLinkStatus:development.interfaceLinkStatus,
+          developmentArtifactStatus:development.artifactStatus,
+          developmentExecutionStatus:development.executionStatus,
+          developmentArtifactDigest:development.artifactDigest,
+          tamperedArtifactRejected:true
         };
       }
     ));
@@ -655,6 +707,28 @@ export function registerCompilerIntegration(vscode,context,{
     problems:problemsProvider,
     getArtifactProvider:()=>artifacts,
     compilerVersion:COMPILER_VERSION,
+    async buildDevelopmentRequest(request){
+      if(request?.apiVersion!==COMPILER_DEVELOPMENT_BUILD_REQUEST_API_VERSION||
+         request?.languageTarget!==COMPILER_LANGUAGE_TARGET)
+        throw new Error("Compiler Development Build requires "+COMPILER_DEVELOPMENT_BUILD_REQUEST_API_VERSION+
+          " for "+COMPILER_LANGUAGE_TARGET);
+      const result=await client.request("buildDevelopment",request);
+      if(!isCompilerDevelopmentBuildResult(result))
+        throw new Error("Compiler BuildDevelopment returned an invalid result envelope");
+      return result;
+    },
+    async verifyDevelopmentRequest(request,result){
+      if(request?.apiVersion!==COMPILER_DEVELOPMENT_BUILD_REQUEST_API_VERSION||
+         !isCompilerDevelopmentBuildResult(result))
+        throw new Error("Compiler VerifyDevelopment requires the exact request and BuildDevelopment result");
+      const error=await client.request("verifyDevelopment",{request,result});
+      if(typeof error!=="string")
+        throw new Error("Compiler VerifyDevelopment returned an invalid response");
+      return {success:error.length===0,error};
+    },
+    async createDevelopmentRequest({packageName,documents,resolvedDependencies}={}){
+      return createCompilerDevelopmentBuildRequest({packageName,documents,resolvedDependencies});
+    },
     async checkRequest(request){
       if(request?.languageTarget!==COMPILER_LANGUAGE_TARGET){
         throw new Error("AI Authoring Compiler Check requires "+COMPILER_LANGUAGE_TARGET);

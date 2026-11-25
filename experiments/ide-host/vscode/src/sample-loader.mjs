@@ -1,6 +1,7 @@
 // Explicit Example project import for VS Code desktop/web or Theia browser-only OPFS.
 // Replacing an existing Example is a deliberate, user-confirmed operation that
-// deletes the Example root and recreates it from the single pinned v1alpha5 source.
+// replaces all authored project contents from the pinned v1alpha5 source while
+// preserving host-owned workspace settings and immutable dependency snapshots.
 // Ordinary projects are never passed to this importer. It never creates lib/ or output/.
 import {writeImmutableSnapshot} from "./dependency-service.mjs";
 import {EXAMPLE_INTERFACE_ARCHIVE,prepareExampleInterfaceDependency,
@@ -21,7 +22,7 @@ const describeError=error=>({
   code:error?.code??null,
   message:String(error?.message??error)
 });
-async function clearDirectoryContents(vscode,fs,root,{preserveVscode=false}={}){
+async function clearDirectoryContents(vscode,fs,root,{preserveWorkspaceMetadata=false}={}){
   if(typeof fs.readDirectory!=="function")
     fail("Host file system cannot enumerate the existing Example directory");
   let entries;
@@ -30,20 +31,24 @@ async function clearDirectoryContents(vscode,fs,root,{preserveVscode=false}={}){
     fail("Cannot enumerate the existing Example directory: "+
       JSON.stringify(describeError(error)));
   }
+  const workspaceMetadata=new Set([".vscode",".skill-studio"]);
   for(const [name] of entries){
     if(typeof name!=="string"||!name||name==="."||name===".."||
        name.includes("/")||name.includes("\\"))
       fail("Host file system returned an unsafe Example child name");
-    // .vscode/settings.json controls the active Theia workspace. Deleting
-    // it during an explicit Example replacement can restart the extension
-    // host and abort the import halfway through. Replace it at the very end.
-    if(preserveVscode&&name===".vscode")continue;
+    // These are host/workspace metadata, not authored Example content.
+    // .vscode/settings.json controls the active Theia workspace and replacing
+    // it mid-import can restart the extension host. .skill-studio stores
+    // content-addressed immutable dependency snapshots; deleting it would
+    // discard locked dependency bytes and may fail while OPFS has them open.
+    // Reset .vscode only after all Skill files and the new snapshot are ready;
+    // retain .skill-studio so existing immutable snapshots remain reusable.
+    if(preserveWorkspaceMetadata&&workspaceMetadata.has(name))continue;
     const child=vscode.Uri.joinPath(root,name);
     await fs.delete(child,{recursive:true,useTrash:false});
   }
   const remaining=await fs.readDirectory(root);
-  if(remaining.some(([name])=>!preserveVscode||name!==".vscode")||
-     remaining.length>(preserveVscode?1:0))
+  if(remaining.some(([name])=>!preserveWorkspaceMetadata||!workspaceMetadata.has(name)))
     fail("Existing Example contents remain after replacement cleanup: "+
       remaining.map(([name])=>name).join(", "));
   return entries.map(([name])=>name);
@@ -248,7 +253,7 @@ export async function seedExampleProject(vscode,extensionUri,storageUri,
       // Keep that directory handle/path stable and remove only its children;
       // deleting the active workspace root itself is not a portable operation
       // across VS Code and Theia filesystem providers.
-      await clearDirectoryContents(vscode,fs,root,{preserveVscode:true});
+      await clearDirectoryContents(vscode,fs,root,{preserveWorkspaceMetadata:true});
     }else{
       phase="create-project-layout";
       await fs.createDirectory(root);

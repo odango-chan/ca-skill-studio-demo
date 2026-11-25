@@ -206,7 +206,7 @@ test("Compiler Check result is bound to exact document, Package generation and c
   const candidateDigest = "sha256:" + "b".repeat(64);
   let request;
   const compilerIntegration = {
-    compilerVersion: "v2.0.2",
+    compilerVersion: "2.1.0",
     async checkRequest(value) { request = value; return []; },
   };
   const result = await createAuthoringCompilerCheck({
@@ -214,7 +214,7 @@ test("Compiler Check result is bound to exact document, Package generation and c
     candidateSource: "start: candidate\\nnodes: {}\\n",candidateDigest,
   });
   assert.equal(request.languageTarget, "connectionagent.io/v1alpha5");
-  assert.equal(result.compilerVersion, "v2.0.2");
+  assert.equal(result.compilerVersion, "2.1.0");
   assert.equal(result.state, "PASS");
   assert.equal(result.complete, true);
   assert.equal(result.documentUri, changeSet.base.documentUri);
@@ -225,7 +225,7 @@ test("Compiler Check result is bound to exact document, Package generation and c
   assert.equal(result.trustedIngressBinding, false);
   const failed = await createAuthoringCompilerCheck({
     compilerIntegration: {
-      compilerVersion: "v2.0.2",
+      compilerVersion: "2.1.0",
       async checkRequest() { return [{code:"E_TEST",severity:"error",message:"invalid"}]; },
     },
     state,document,changeSet,
@@ -245,7 +245,7 @@ test("AI proposals require a complete pinned v1alpha5 Compiler PASS for the exac
   } };
   const patchPlan = { candidateDigest: "sha256:" + "b".repeat(64) };
   const compilerCheck = {
-    compilerVersion: "v2.0.2",
+    compilerVersion: "2.1.0",
     languageTarget: "connectionagent.io/v1alpha5",
     state: "PASS",
     complete: true,

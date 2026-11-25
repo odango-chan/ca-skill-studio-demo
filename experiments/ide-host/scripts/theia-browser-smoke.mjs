@@ -1409,9 +1409,10 @@ try{
   await command("Input.dispatchMouseEvent",{type:"mouseMoved",x:replacePosition.x,y:replacePosition.y});
   await command("Input.dispatchMouseEvent",{type:"mousePressed",x:replacePosition.x,y:replacePosition.y,button:"left",clickCount:1});
   await command("Input.dispatchMouseEvent",{type:"mouseReleased",x:replacePosition.x,y:replacePosition.y,button:"left",clickCount:1});
-  let upgradedIdentity=null,upgradedEvidence=null;
+  let upgradedIdentity=null,upgradedEvidence=null,exampleImport=null;
   for(let attempt=0;attempt<120;attempt++){
     try{
+      exampleImport=await evalJS("(()=>{const c=window.theia?.container;if(!c)return null;const k=[...(c._bindingDictionary?._map?.keys?.()??[])].find(x=>typeof x==='function'&&x.prototype?.executeCommand&&x.prototype?.registerCommand&&x.prototype?.getCommand);return k?c.get(k).executeCommand('skillStudio.internal.exampleLoadAcceptance'):null})()");
       upgradedIdentity=await evalJS("(()=>{const c=window.theia?.container;if(!c)return null;const k=[...(c._bindingDictionary?._map?.keys?.()??[])].find(x=>typeof x==='function'&&x.prototype?.executeCommand&&x.prototype?.registerCommand&&x.prototype?.getCommand);return k?c.get(k).executeCommand('skillStudio.internal.workspaceIdentityAcceptance'):null})()");
       if(upgradedIdentity?.contractCurrentShape===true&&
          upgradedIdentity?.procedureCurrentShape===true){
@@ -1429,7 +1430,8 @@ try{
      upgradedEvidence?.packageInventory?.packages?.length!==4||
      upgradedEvidence?.failures?.length)
     throw Error("Explicit Example replacement did not restore a clean current v1alpha5 project: "+
-      JSON.stringify({identity:upgradedIdentity,activation:upgradedEvidence}).slice(0,3200));
+      JSON.stringify({identity:upgradedIdentity,activation:upgradedEvidence,
+        exampleImport}).slice(0,4200));
   console.log("STUDIO_LEGACY_EXAMPLE_REPLACEMENT_CHROMIUM_PASS",JSON.stringify({
     menu:recoveryMenu,legacyVersion:legacyIdentity.contractApiVersion,
     cancelPreserved:afterCancel.contractApiVersion,
@@ -1481,7 +1483,8 @@ try{
     const restored=await sourceState('read');
     if(restored?.uri!==dirty.uri || restored.text!==dirty.text ||
         (dirty.dirty===true && restored.dirty!==true))
-      throw Error("Console round trip lost selected file or unsaved Source");
+      throw Error("Console round trip lost selected file or unsaved Source: "+
+        JSON.stringify({original,dirty,restored,mode:await readWorkspaceMode()}));
     await sourceState('undo');
     for(let attempt=0;attempt<40;attempt++){
       if((await sourceState('read'))?.text===original.text)break;
@@ -1921,7 +1924,7 @@ try{
       });
       if(!tabNavigation.result?.value?.opened||!tabNavigation.result?.value?.keyboard||!tabNavigation.result?.value?.restored)
         throw Error("AI Workbench keyboard-accessible review tabs failed in Chromium");
-      if(!proposalView.compilerStatus.includes("Compiler v2.0.2 Check: FAIL")||
+      if(!proposalView.compilerStatus.includes("Compiler 2.1.0 Check: FAIL")||
          !proposalView.patchState.includes("Compiler Check failed")||
          !proposalView.applyDisabled)
         throw Error("Compiler failure did not keep the candidate PREVIEW ONLY: "+JSON.stringify({
@@ -2170,11 +2173,24 @@ try{
       }catch{/* The acceptance profile is ephemeral; never hide the primary failure. */}
       await new Promise(resolve=>mockGateway.close(resolve));
     }
+    if(requireCompilerWorker){
+      // Exercise the actual browser Worker against the official v2.1.0
+      // Development Build fixture, including VerifyDevelopment and tamper rejection.
+      const compilerWorker=await nativeCommand("skillStudio.internal.compilerWorkerAcceptance");
+      if(compilerWorker?.compilerVersion!=="2.1.0"||
+         compilerWorker?.developmentBuild!=="PASS"||
+         compilerWorker?.developmentVerify!=="PASS"||
+         compilerWorker?.developmentExecutionStatus!=="NOT_ADMITTED"||
+         compilerWorker?.tamperedArtifactRejected!==true){
+        throw Error("Compiler v2.1.0 browser Worker acceptance failed: "+JSON.stringify(compilerWorker));
+      }
+      console.log("STUDIO_COMPILER_V2_1_BROWSER_WORKER_ACCEPTANCE_PASS",JSON.stringify(compilerWorker));
+    }
     // The backend CI host enables this fixture-only command explicitly.
     // Unlike the unqualified 5GC mock proposal above, this verifies an exact
     // Compiler-qualified candidate in the native VS Code/Theia editor.
     const synthetic=await nativeCommand("skillStudio.internal.syntheticAuthoringApplyAcceptance");
-    if(synthetic?.compilerVersion!=="v2.0.2"||
+    if(synthetic?.compilerVersion!=="2.1.0"||
        synthetic?.qualification!=="SYNTHETIC_TEST_ONLY"||
        synthetic?.compilerBaseline?.errors!==0||
        synthetic?.compilerCandidate?.errors!==0||
@@ -2208,7 +2224,7 @@ try{
 
     // This additional PASS must be produced from the actual standalone
     // AI Editor Tab, not from the independent native-edit acceptance command.
-    // The Node test host stages the official pinned Compiler v2.0.2 fixture
+    // The Node test host stages a trusted v1alpha5 fixture produced by artifact generator 2.0.2
     // under an isolated temporary directory, never a real 5GC Package.
     const prepared=await nativeCommand("skillStudio.internal.prepareSyntheticEditorTabAcceptance");
     if(prepared?.ready!==true||prepared?.syntheticOnly!==true)
@@ -2306,7 +2322,8 @@ try{
       while(Date.now()<qualifiedDeadline&&!readyView){
         const view=await readAiView();
         if(view?.candidateSource.includes("FAIL: FAILED")&&
-           view.compilerStatus.includes("Compiler v2.0.2 Check: PASS")&&
+           view.compilerStatus.includes("Compiler 2.1.0 Check: PASS")&&
+           view.patchState.includes("Compiler 2.1.0 PASS")&&
            view.applyDisabled===false)readyView=view;
         if(!readyView)await sleep(100);
       }
@@ -2358,7 +2375,7 @@ try{
         JSON.stringify({
           qualification:"SYNTHETIC_TEST_ONLY",modelSource:"MOCK_GATEWAY",
           modelProposalSchema:"PASS",selectedPatch:"PASS",
-          compilerVersion:"v2.0.2",compilerCheck:"PASS",
+          compilerVersion:"2.1.0",artifactGeneratorVersion:"2.0.2",compilerCheck:"PASS",
           nativeWorkspaceEdit:"PASS",frontendUndo:"PASS",
           unsavedDiskUnchanged:true,autoSaved:false,
           undoCommand:undoCommandForTab,

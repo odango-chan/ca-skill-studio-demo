@@ -8,6 +8,20 @@ export const COMPILER_DEVELOPMENT_BUILD_REQUEST_API_VERSION=
   "connectionagent.io/compiler-development-build-request/v1alpha1";
 export const INTERFACE_DEPENDENCY_LOCK_API_VERSION=
   "connectionagent.io/interface-dependency-lock/v1alpha1";
+export const COMPILER_DEVELOPMENT_BUILD_RESULT_API_VERSION=
+  "connectionagent.io/compiler-development-build-result/v1alpha1";
+
+export function isCompilerDevelopmentBuildResult(value){
+  return Boolean(value&&typeof value==="object"&&
+    value.apiVersion===COMPILER_DEVELOPMENT_BUILD_RESULT_API_VERSION&&
+    typeof value.success==="boolean"&&
+    typeof value.sourceStatus==="string"&&
+    typeof value.interfaceLinkStatus==="string"&&
+    typeof value.artifactStatus==="string"&&
+    typeof value.executionStatus==="string"&&
+    Array.isArray(value.diagnostics)&&Array.isArray(value.outputFiles));
+}
+
 export const INTERFACE_PACKAGE_API_VERSION=
   "connectionagent.io/interface-package/v1alpha1";
 

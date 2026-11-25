@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import {createCompilerWorkerClient} from "../vscode/src/compiler-client.mjs";
+import {createCompilerWorkerClient,workerResourceUrl} from "../vscode/src/compiler-client.mjs";
 
 class FakeWorker{
   constructor(url,options){
@@ -40,6 +40,22 @@ function host(WorkerCtor=FakeWorker){
   return {client:createCompilerWorkerClient(vscode,context,{WorkerCtor,timeoutMs:1000})};
 }
 
+test("browser extension assets resolve through the hosted PluginWorker base path",()=>{
+  const previous=Object.getOwnPropertyDescriptor(globalThis,"location");
+  Object.defineProperty(globalThis,"location",{
+    configurable:true,
+    value:{pathname:"/studio/ide-preview/plugin-worker.js",origin:"https://studio.example.test"}
+  });
+  try{
+    const uri={scheme:"https",toString(){return "https://studio.example.test/hostedPlugin/odango-chan.ca-skill-studio-ide-spike/dist/authoring-development-build-request.json";}};
+    assert.equal(workerResourceUrl(uri),
+      "/studio/ide-preview/hostedPlugin/odango-chan.ca-skill-studio-ide-spike/dist/authoring-development-build-request.json");
+  }finally{
+    if(previous)Object.defineProperty(globalThis,"location",previous);
+    else delete globalThis.location;
+  }
+});
+
 test("Compiler Worker client serializes requests and preserves response correlation",async()=>{
   FakeWorker.instances.length=0;
   const {client}=host();
@@ -52,7 +68,7 @@ test("Compiler Worker client serializes requests and preserves response correlat
     const worker=FakeWorker.instances[0];
     assert.equal(worker.messages.length,2);
     assert.deepEqual(worker.messages.map(item=>item.command),["check","inspect"]);
-    assert.equal(worker.options.name,"skill-studio-compiler-v1alpha5");
+    assert.equal(worker.options.name,"skill-studio-compiler-v2.1.0");
   }finally{client.dispose();}
 });
 
@@ -138,7 +154,7 @@ test("Node extension hosts run the same pinned Go/WASM Compiler through worker_t
     const worker=FakeNodeWorker.instances[0];
     assert.equal(worker.path,"/extension/dist/compiler-node-worker.mjs");
     assert.equal(worker.options.workerData.wasmPath,"/extension/dist/skillc.wasm");
-    assert.equal(worker.options.name,"skill-studio-compiler-v1alpha5");
+    assert.equal(worker.options.name,"skill-studio-compiler-v2.1.0");
     assert.deepEqual(worker.messages.map(item=>item.command),["check","inspect"]);
   }finally{client.dispose();}
 });

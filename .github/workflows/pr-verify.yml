@@ -61,30 +61,37 @@ jobs:
           npm ci --prefix experiments/ide-host/lsp-browser/server --no-audit --no-fund
       - name: Build IDE host extensions
         run: node experiments/ide-host/scripts/build-ide-spike.mjs
-      - name: Checkout pinned CA Skill Compiler v2.0.2 source
+      - name: Checkout pinned CA Skill Compiler v2.1.0 source
         uses: actions/checkout@v4
         with:
           repository: odango-chan/ca-skill-compiler
-          ref: e98a7b26acabfa2a5e1587974ab9be5742e70bf7
+          ref: b67fbb56c34d15b8d5a0903c8a7ca93d608f8f65
           path: compiler-source
           token: ${{ secrets.CA_SKILL_COMPILER_READ_TOKEN }}
           persist-credentials: false
-      - name: Verify pinned CA Skill Compiler v2.0.2 source identity
-        working-directory: compiler-source
-        run: test "$(git rev-parse HEAD)" = "e98a7b26acabfa2a5e1587974ab9be5742e70bf7"
-      - name: Go 1.26.6 for the pinned Compiler WASM build
-        uses: actions/setup-go@v5
-        with:
-          go-version: "1.26.6"
-      - name: Build pinned Compiler v2.0.2 Go/WASM Core
+      - name: Verify pinned CA Skill Compiler v2.1.0 source identity
         working-directory: compiler-source
         run: |
-          mkdir -p dist
-          GOWORK=off CGO_ENABLED=0 GOOS=js GOARCH=wasm go build -o dist/skillc.wasm ./cmd/skillc-wasm
-          cp "$(go env GOROOT)/lib/wasm/wasm_exec.js" dist/wasm_exec.js
+          test "$(git rev-parse HEAD)" = "b67fbb56c34d15b8d5a0903c8a7ca93d608f8f65"
+          grep -F 'const CompilerVersion = "v2.1.0"' internal/compiler/version.go
+      - name: Download and verify official Compiler v2.1.0 Worker bundle
+        working-directory: compiler-source
+        run: |
+          set -euo pipefail
+          mkdir -p dist ../experiments/ide-host/vscode/dist
+          release="https://github.com/odango-chan/ca-skill-compiler/releases/download/v2.1.0"
+          curl -fsSL "$release/SHA256SUMS" -o dist/SHA256SUMS
+          curl -fsSL "$release/skillc-v2.1.0-web-worker.tar.gz" -o dist/skillc-v2.1.0-web-worker.tar.gz
+          (cd dist && grep -F "skillc-v2.1.0-web-worker.tar.gz" SHA256SUMS | sha256sum --check)
+          tar -xzf dist/skillc-v2.1.0-web-worker.tar.gz -C dist
+          test -s dist/skillc.wasm
+          test -s dist/wasm_exec.js
           cp dist/skillc.wasm ../experiments/ide-host/vscode/dist/skillc.wasm
           cp dist/wasm_exec.js ../experiments/ide-host/vscode/dist/wasm_exec.js
-      - name: Verify synthetic AI proposal and exact Compiler v2.0.2 candidate PASS
+          cp docs/design/fixtures/registration-development-request.json ../experiments/ide-host/vscode/dist/authoring-development-build-request.json
+      - name: Verify Compiler v2.1.0 Development Build and Verify through Node Worker
+        run: node experiments/ide-host/scripts/compiler-development-acceptance.mjs compiler-source
+      - name: Verify frozen v1alpha5 artifact generator regression
         run: node experiments/ide-host/scripts/ai-authoring-compiler-acceptance.mjs compiler-source
 
   portable-windows-smoke:

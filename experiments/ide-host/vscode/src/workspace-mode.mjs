@@ -16,12 +16,23 @@ export function registerWorkspaceMode(vscode, context, { authoring, showWelcome 
     switching = true;
     try {
       if (next === "ai") {
-        const editor = vscode.window.activeTextEditor;
+        // Theia's native editor opener does not consistently populate
+        // activeTextEditor even when a Source editor is visibly selected.
+        // Capture the one visible text editor first so AI Workbench cannot
+        // replace the user's Console selection with its own Procedure.
+        const visible=(vscode.window.visibleTextEditors??[])
+          .filter(item=>item?.document&&!item.document.isClosed);
+        const editor=visible.find(item=>item.viewColumn===vscode.ViewColumn.One) ??
+          visible[0] ?? vscode.window.activeTextEditor;
         if (editor) consoleEditor = editor;
         if (!await authoring.open({ pick: !startup })) return false;
       } else {
-        const document = vscode.window.activeTextEditor?.document ??
-          consoleEditor?.document ?? authoring.getDocument();
+        // Once captured, the Console document outranks the AI editor's last
+        // Procedure. This restores the exact selected file and its dirty model.
+        const consoleDocument=consoleEditor?.document&&!consoleEditor.document.isClosed
+          ?consoleEditor.document:null;
+        const document = consoleDocument ??
+          vscode.window.activeTextEditor?.document ?? authoring.getDocument();
         if (document) {
           const options = {
             viewColumn: vscode.ViewColumn.One, preview: false, preserveFocus: false,
