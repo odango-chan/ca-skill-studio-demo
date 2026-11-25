@@ -41,7 +41,7 @@ async function fixtureInput(){
 }
 
 test("v2.1.0 Development Build request exactly reproduces the official Compiler fixture",async()=>{
-  const request=await createCompilerDevelopmentBuildRequest(fixtureInput());
+  const request=await createCompilerDevelopmentBuildRequest(await fixtureInput());
   assert.equal(request.apiVersion,COMPILER_DEVELOPMENT_BUILD_REQUEST_API_VERSION);
   assert.equal(request.languageTarget,"connectionagent.io/v1alpha5");
   assert.equal(request.profile,"DEVELOPMENT");
