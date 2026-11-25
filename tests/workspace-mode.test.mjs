@@ -126,8 +126,8 @@ test("reopening AI while Theia reports another native tab active preserves the s
     uri: { path: "/skills/demo/assurance/contract.yaml" },
     isClosed: false,
   };
-  const procedureEditor = { document: procedure, selection: { anchor: 2 } };
-  const contractEditor = { document: contract, selection: { anchor: 8 } };
+  const procedureEditor = { document: procedure, selection: { anchor: 2 }, viewColumn: 1 };
+  const contractEditor = { document: contract, selection: { anchor: 8 }, viewColumn: 1 };
   const opened = [];
   const vscode = {
     ViewColumn: { One: 1 },
@@ -177,12 +177,14 @@ test("entering AI from Console preserves a selected non-Procedure source documen
     uri: { path: "/skills/demo/assurance/contract.yaml" },
     isClosed: false,
   };
-  const contractEditor = { document: contract, selection: { anchor: 11 } };
+  const contractEditor = { document: contract, selection: { anchor: 11 }, viewColumn: 1 };
+  const procedureEditor = { document: procedure, selection: { anchor: 2 }, viewColumn: 1 };
   const opened = [];
   const vscode = {
     ViewColumn: { One: 1 },
     window: {
       activeTextEditor: contractEditor,
+      visibleTextEditors: [procedureEditor],
       showWarningMessage: message => assert.fail(message),
       showTextDocument: async (...args) => opened.push(args),
     },
