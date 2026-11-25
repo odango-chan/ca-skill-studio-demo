@@ -592,7 +592,7 @@ export function activate(context){
   const progressZh=String(vscode.env?.language??"en").toLowerCase().startsWith("zh");
   const exampleText=progressZh?{
     title:"加载示例项目",
-    replacePrompt:"检测到已有 Example 项目。是否替换为最新 当前 CA-SL 示例？替换将删除整个 Example 目录中的现有内容，包括本地修改和旧版样例。",
+    replacePrompt:"检测到已有 Example 项目。是否替换为最新当前 CA-SL 示例？替换将覆盖全部 Skill 源文件、README 和旧版样例，包括本地修改；工作区设置与不可变依赖快照会保留。",
     replaceAction:"替换 Example",
     cancelAction:"取消",
     starting:"正在准备 current CA-SL Skills…",
@@ -605,7 +605,7 @@ export function activate(context){
     failure:"示例项目载入失败"
   }:{
     title:"Loading example project",
-    replacePrompt:"An Example project already exists. Replace the entire Example folder with the latest current CA-SL sample? This deletes all existing Example contents, including local edits and retired samples.",
+    replacePrompt:"An Example project already exists. Replace its authored Skill files, README and retired samples with the latest current CA-SL sample, including local edits? Host workspace settings and immutable dependency snapshots are preserved.",
     replaceAction:"Replace Example",
     cancelAction:"Cancel",
     starting:"Preparing current CA-SL Skills…",
