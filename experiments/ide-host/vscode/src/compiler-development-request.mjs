@@ -1,7 +1,7 @@
 import {parseDocument} from "yaml";
 import {createCompilerSourceFiles,COMPILER_LANGUAGE_TARGET}
   from "./compiler-request.mjs";
-import {calculateCompilerDependencySnapshotDigest,decodeBase64,base64Bytes}
+import {calculateSnapshot,calculateCompilerDependencySnapshotDigest,decodeBase64,base64Bytes}
   from "./dependency-snapshot.mjs";
 
 export const COMPILER_DEVELOPMENT_BUILD_REQUEST_API_VERSION=
@@ -103,6 +103,14 @@ async function readInterfaceSnapshot(snapshot){
         "Interface Package dependencies require unique aliases and exact Package ID/version pairs");
     edgeAliases.add(dependency.alias);
   }
+  // Re-check the resolver's existing Studio lock digest at this boundary.
+  // The Compiler v2.1 digest below is a distinct framing over the same exact
+  // bytes; neither digest may silently substitute for the other.
+  const studioSnapshot=await calculateSnapshot(files);
+  if(typeof snapshot.snapshotDigest!=="string"||
+     studioSnapshot.snapshotDigest!==snapshot.snapshotDigest)
+    fail("DEVELOPMENT_BUILD_SNAPSHOT_DIGEST_MISMATCH",
+      "Resolved Interface Package bytes no longer match the current immutable Studio lock");
   const snapshotDigest=await calculateCompilerDependencySnapshotDigest(files);
   const key={packageId:manifest.packageId,version:manifest.version,snapshotDigest};
   return {
