@@ -66,7 +66,10 @@ test("defaults to AI and restores the same dirty native buffer and AI view", asy
   assert.equal(host.panels[0].column, 1);
   assert.equal(host.panels[0].options.retainContextWhenHidden, true);
 
-  host.vscode.window.activeTextEditor = undefined;
+  // Theia can report another native tab as active while the AI panel is visible.
+  host.vscode.window.activeTextEditor = {
+    document: { uri: { path: "/skills/demo/assurance/contract.yaml" } },
+  };
   assert.equal(await host.commands.get("skillStudio.openConsole")(), true);
   assert.deepEqual(host.opened[0], ["vscode.openWith", host.document.uri, "default", {
     viewColumn: 1, preview: false, preserveFocus: false, selection: host.editor.selection,

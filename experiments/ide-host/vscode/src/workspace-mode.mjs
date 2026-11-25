@@ -20,8 +20,10 @@ export function registerWorkspaceMode(vscode, context, { authoring, showWelcome 
         if (editor) consoleEditor = editor;
         if (!await authoring.open({ pick: !startup })) return false;
       } else {
-        const document = vscode.window.activeTextEditor?.document ??
-          consoleEditor?.document ?? authoring.getDocument();
+        const savedDocument = consoleEditor?.document;
+        const activeDocument = vscode.window.activeTextEditor?.document;
+        const document = mode === "ai" && savedDocument && !savedDocument.isClosed
+          ? savedDocument : activeDocument ?? authoring.getDocument();
         if (document) {
           const options = {
             viewColumn: vscode.ViewColumn.One, preview: false, preserveFocus: false,
