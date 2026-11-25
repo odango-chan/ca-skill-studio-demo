@@ -938,12 +938,17 @@ export async function runWorkbenchAcceptance({
       JSON.stringify({branchInitial,branchCollapsed,anchorCollapsedDelta}));
 
   await evalWebviewJS("(()=>{const s=document.querySelector('#rootPathMode');s.value='all';s.dispatchEvent(new Event('change',{bubbles:true}));return true;})()");
-  await sleep(350);
-  const allPaths=await evalWebviewJS("(()=>({layout:document.querySelector('#layoutDirection')?.value??null,"+
+  const readAllPaths=()=>evalWebviewJS("(()=>({layout:document.querySelector('#layoutDirection')?.value??null,"+
     "rootMode:document.querySelector('#rootPathMode')?.value??null,"+
     "rootToolbarVisible:document.querySelector('#rootPathToolbar')?.hidden===false,"+
     "nodes:document.querySelectorAll('#reactFlowRoot .react-flow__node').length,"+
     "edges:document.querySelectorAll('#reactFlowRoot .react-flow__edge').length}))()");
+  let allPaths;
+  for(let attempt=0;attempt<50;attempt++){
+    allPaths=await readAllPaths();
+    if(allPaths.nodes>branchCollapsed.nodes&&allPaths.edges>branchCollapsed.edges)break;
+    await sleep(100);
+  }
   if(allPaths.layout!=="DOWN"||allPaths.rootMode!=="all"||!allPaths.rootToolbarVisible||
      !(allPaths.nodes>branchCollapsed.nodes)||!(allPaths.edges>branchCollapsed.edges))
     throw Error("v1alpha5 All Paths mode did not reveal the full graph: "+
