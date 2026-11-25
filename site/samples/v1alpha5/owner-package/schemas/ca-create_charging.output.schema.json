@@ -1,0 +1,17 @@
+{
+  "$id": "urn:openamsm:mas:v1alpha4:ca-create_charging-output",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "charging_ref": {
+      "const": "1",
+      "maxLength": 255,
+      "minLength": 1,
+      "type": "string"
+    }
+  },
+  "required": [
+    "charging_ref"
+  ],
+  "type": "object"
+}

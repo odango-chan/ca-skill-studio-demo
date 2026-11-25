@@ -1,0 +1,41 @@
+{
+  "$id": "urn:openamsm:mas:v1alpha4:iam-allocate_address-input",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "allocator": {
+      "const": "LOCAL_POOL",
+      "maxLength": 255,
+      "minLength": 1,
+      "type": "string"
+    },
+    "dnn": {
+      "maxLength": 255,
+      "minLength": 1,
+      "type": "string"
+    },
+    "psi": {
+      "maximum": 15,
+      "minimum": 1,
+      "type": "integer"
+    },
+    "ue_identity": {
+      "maxLength": 32,
+      "minLength": 1,
+      "type": "string"
+    },
+    "upAnchorReady": {
+      "maxLength": 255,
+      "minLength": 1,
+      "type": "string"
+    }
+  },
+  "required": [
+    "ue_identity",
+    "psi",
+    "dnn",
+    "allocator",
+    "upAnchorReady"
+  ],
+  "type": "object"
+}

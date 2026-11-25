@@ -1,0 +1,14 @@
+{
+  "$id": "urn:openamsm:mas:v1alpha4:mas-receipt_query-output",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "receipt": {
+      "$ref": "urn:openamsm:mas:v1alpha4:mutation-receipt"
+    }
+  },
+  "required": [
+    "receipt"
+  ],
+  "type": "object"
+}
