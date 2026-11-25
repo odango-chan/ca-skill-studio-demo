@@ -313,8 +313,10 @@ export async function seedExampleProject(vscode,extensionUri,storageUri,
       if(!(bytes instanceof Uint8Array))fail("Unrecognized v1alpha5 sample file");
       if(parts.length>1)
         await fs.createDirectory(vscode.Uri.joinPath(skillsRoot,...parts.slice(0,-1)));
-      try{await fs.stat(destination);fail("v1alpha5 sample file changed during import");}
-      catch(error){if(error?.code!=="FileNotFound")throw error;}
+      if(!replacedExisting){
+        try{await fs.stat(destination);fail("v1alpha5 sample file changed during import");}
+        catch(error){if(error?.code!=="FileNotFound")throw error;}
+      }
       phase="write-v1alpha5-file:"+file;
       await fs.writeFile(destination,bytes);
       created++;
