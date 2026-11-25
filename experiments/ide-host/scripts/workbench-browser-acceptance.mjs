@@ -1083,6 +1083,11 @@ export async function runWorkbenchAcceptance({
        !currentLanguageFeatures.interfaceArgumentCompletion?.includes("pduSessionId")||
        !currentLanguageFeatures.interfaceNativeArgumentCompletion?.includes("supi")||
        !currentLanguageFeatures.interfaceNativeArgumentCompletion?.includes("pduSessionId")||
+       currentLanguageFeatures.interfaceNativeProviderDiagnostics?.registered!==true||
+       currentLanguageFeatures.interfaceNativeProviderDiagnostics?.requests<2||
+       currentLanguageFeatures.interfaceNativeProviderDiagnostics?.lastCount!==2||
+       !currentLanguageFeatures.interfaceNativeProviderDiagnostics?.lastLabels?.includes("supi")||
+       !currentLanguageFeatures.interfaceNativeProviderDiagnostics?.lastLabels?.includes("pduSessionId")||
        currentLanguageFeatures.interfaceArgumentCompletionDetails?.length!==2||
        currentLanguageFeatures.interfaceNativeArgumentCompletionDetails?.length!==2||
        currentLanguageFeatures.interfaceArgumentCompletionDetails?.some(item=>
@@ -1092,6 +1097,7 @@ export async function runWorkbenchAcceptance({
       throw Error("Native current language-provider acceptance failed: "+
         JSON.stringify(currentLanguageFeatures));
     console.log("STUDIO_EXAMPLE_INTERFACE_SCHEMA_COMPLETION_CHROMIUM",JSON.stringify({
+      nativeProvider:currentLanguageFeatures.interfaceNativeProviderDiagnostics,
       tool:currentLanguageFeatures.interfaceToolCompletion,
       nativeTool:currentLanguageFeatures.interfaceNativeToolCompletion,
       arguments:currentLanguageFeatures.interfaceArgumentCompletion,
