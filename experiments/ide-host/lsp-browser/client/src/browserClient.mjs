@@ -325,6 +325,15 @@ export function createSkillLanguageClient(vscode, context, handlers = {}) {
         { language: "python" }
       ],
       synchronize: {},
+      // Theia uses the native CompletionItemProvider below as the canonical
+      // editor bridge. Its LanguageClient adapter would register a second
+      // provider for the same Worker and duplicate every Schema candidate.
+      // Keep the standard LSP completion provider on VS Code only.
+      ...(handlers.manualCompletionProvider===true?{
+        middleware:{
+          provideCompletionItem(){return [];}
+        }
+      }:{}),
       initializationOptions: handlers.localSemanticTokens === true
         ? {disableSemanticTokens:true} : {},
       outputChannel: output,
