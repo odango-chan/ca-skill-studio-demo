@@ -1332,7 +1332,7 @@ try{
     try{
       legacyDiagnostics=await evalJS("(async()=>{const c=window.theia?.container;if(!c)return null;const k=[...(c._bindingDictionary?._map?.keys?.()??[])].find(x=>typeof x==='function'&&x.prototype?.executeCommand&&x.prototype?.registerCommand&&x.prototype?.getCommand);return k?await c.get(k).executeCommand('skillStudio.internal.semanticTokenDiagnostics'):null})()");
       legacyPackageStatus=(legacyDiagnostics?.packageStatuses??[]).find(item=>
-        String(item.rootUri??"").endsWith("/skill-studio-demo/skills/establish-pdu-session"));
+        String(item.rootUri??"").endsWith("/skill-studio-demo/skills/establish-pdu-session-mas"));
       legacyReadyOtherPackage=(legacyDiagnostics?.packageStatuses??[]).find(item=>
         item.rootUri!==legacyPackageStatus?.rootUri&&item.state==="READY");
       legacySourceDiagnostic=(legacyPackageStatus?.analysisDiagnostics??[]).find(item=>

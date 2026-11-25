@@ -491,11 +491,10 @@ export function activate(context){
       if(options?.seedLegacyExample===true){
         if(folders.length!==1||folders[0].uri.toString()!==exampleRoot.toString())
           throw Error("Refusing to seed a legacy fixture outside the built-in Example workspace");
-        const contract=vscode.Uri.joinPath(exampleRoot,"skills","establish-pdu-session",
+        const contract=vscode.Uri.joinPath(exampleRoot,"skills","establish-pdu-session-mas",
           "assurance","contract.yaml");
-        const procedure=vscode.Uri.joinPath(exampleRoot,"skills","establish-pdu-session",
+        const procedure=vscode.Uri.joinPath(exampleRoot,"skills","establish-pdu-session-mas",
           "assurance","procedure.yaml");
-        await vscode.workspace.fs.createDirectory(vscode.Uri.joinPath(exampleRoot,"skills","establish-pdu-session","assurance"));
         await vscode.workspace.fs.createDirectory(vscode.Uri.joinPath(exampleRoot,"lib"));
         await vscode.workspace.fs.createDirectory(vscode.Uri.joinPath(exampleRoot,"output"));
         await vscode.workspace.fs.writeFile(contract,new TextEncoder().encode(

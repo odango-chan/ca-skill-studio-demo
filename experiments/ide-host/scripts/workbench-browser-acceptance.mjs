@@ -1113,7 +1113,7 @@ export async function runWorkbenchAcceptance({
         });
       const lines=[...(editor?.querySelectorAll('.view-lines .view-line')??[])];
       const line=lines.find(node=>node.textContent.replace(/\\u00a0/g,' ')
-        .includes('PASS: subscribe-sm-data'));
+        .includes('PASS: skip-secondary-authentication'));
       const span=[...(line?.querySelectorAll('span')??[])].find(node=>
         node.textContent.replace(/\\u00a0/g,' ').trim()==='PASS');
       return {visible:!!editor&&editor.getBoundingClientRect().width>150,
