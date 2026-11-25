@@ -583,6 +583,11 @@ export function activate(context){
     }
   ));
   let exampleLoadPromise=null;
+  let exampleLoadAcceptance={state:"idle",stage:null,choice:null,error:null,
+    candidateFiles:null,created:null,skipped:null,replacedExisting:null};
+  context.subscriptions.push(vscode.commands.registerCommand(
+    "skillStudio.internal.exampleLoadAcceptance",()=>({...exampleLoadAcceptance})
+  ));
   let projectWelcome=null;
   const progressZh=String(vscode.env?.language??"en").toLowerCase().startsWith("zh");
   const exampleText=progressZh?{
@@ -617,6 +622,8 @@ export function activate(context){
       // All entry points (Welcome, menu and Command Palette) share this task.
       // Repeated clicks must never start concurrent file imports.
       if(exampleLoadPromise)return exampleLoadPromise;
+      exampleLoadAcceptance={state:"checking",stage:"check-existing",choice:null,error:null,
+        candidateFiles:null,created:null,skipped:null,replacedExisting:null};
       exampleLoadPromise=(async()=>{
         // Also show the native status bar for hosts where notifications are
         // delayed or don't render until the extension's first awaited I/O.
@@ -637,7 +644,13 @@ export function activate(context){
               replaceAction:exampleText.replaceAction,
               replaceExisting:choice===exampleText.replaceAction
             }));
-            if(choice!==exampleText.replaceAction)return null;
+            exampleLoadAcceptance={...exampleLoadAcceptance,state:"confirmation",
+              stage:"replacement-decision",choice:choice??null};
+            if(choice!==exampleText.replaceAction){
+              exampleLoadAcceptance={...exampleLoadAcceptance,state:"cancelled",
+                stage:"replacement-cancelled"};
+              return null;
+            }
             replaceExisting=true;
           }
           statusBar=typeof vscode.window.setStatusBarMessage==="function"
@@ -648,18 +661,25 @@ export function activate(context){
               projectWelcome?.setImportStatus({state:"loading",message,...details});
             };
             let stage="seed-example";
+            exampleLoadAcceptance={...exampleLoadAcceptance,state:"running",stage};
             try{
               report(exampleText.starting);
               const result=await seedExampleProject(
                 vscode,context.extensionUri,context.globalStorageUri,{
                   replaceExisting,
                   onProgress:({phase,completed,total})=>{
+                    exampleLoadAcceptance={...exampleLoadAcceptance,state:"running",
+                      stage:phase,completed:completed??null,total:total??null};
                     if(phase==="manifest")report(exampleText.manifest);
                     else if(phase==="files")report(
                       exampleText.files(completed,total),{completed,total});
                     else if(phase==="project-ready")report(exampleText.workspace);
                   }
                 });
+              exampleLoadAcceptance={...exampleLoadAcceptance,state:"seeded",
+                stage:"seed-complete",candidateFiles:result.candidateFiles,
+                created:result.created,skipped:result.skipped,
+                replacedExisting:result.replacedExisting};
               console.log("STUDIO_EXAMPLE_IMPORT_RESULT",JSON.stringify({
                 root:result.root.toString(),replaceRequested:replaceExisting,
                 replacedExisting:result.replacedExisting,
@@ -680,6 +700,7 @@ export function activate(context){
               // extension host is reactivated in the newly opened folder.
               if(!isSingleFolderWorkspace(vscode,result.root)){
                 stage="open-project";
+                exampleLoadAcceptance={...exampleLoadAcceptance,state:"opening-project",stage};
                 report(exampleText.workspace);
                 const pending={
                   root:result.root.toString(),
@@ -698,6 +719,7 @@ export function activate(context){
                 return result;
               }
               stage="show-packages";
+              exampleLoadAcceptance={...exampleLoadAcceptance,state:"running",stage};
               report(exampleText.packages);
               // End in the real Package Explorer, not a custom duplicate view.
               let viewOpened=false;
@@ -715,6 +737,7 @@ export function activate(context){
                 await packageOverview.refresh();
               }
               stage="open-procedure";
+              exampleLoadAcceptance={...exampleLoadAcceptance,state:"running",stage};
               report(exampleText.procedure);
               // Open the authoritative native Source; the shared right Preview follows it.
               const confirmedFolders=(vscode.workspace.workspaceFolders??[])
@@ -732,6 +755,8 @@ export function activate(context){
                 defaultProcedure:result.procedure.toString(),
                 editor:"native-source",preview:"skillStudio.preview"
               }));
+              exampleLoadAcceptance={...exampleLoadAcceptance,state:"success",
+                stage:"complete",error:null};
               projectWelcome?.setImportStatus({
                 state:"success",message:exampleText.success
               });
@@ -745,6 +770,8 @@ export function activate(context){
                   "可在 Explorer → Package Explorer 查看当前 CA-SL Skills。"));
               return result;
             }catch(error){
+              exampleLoadAcceptance={...exampleLoadAcceptance,state:"error",stage,
+                error:String(error?.message??error)};
               const message=exampleText.failure+" ["+stage+"]："+String(error?.message??error);
               projectWelcome?.setImportStatus({state:"error",message});
               void vscode.window.showErrorMessage(
@@ -763,6 +790,8 @@ export function activate(context){
           }
           return await run({report(){}});
         }catch(error){
+          exampleLoadAcceptance={...exampleLoadAcceptance,state:"error",stage:"outer",
+            error:String(error?.message??error)};
           void vscode.window.showErrorMessage(
             "SKILL Example replacement check failed: "+String(error?.message??error));
           return null;
