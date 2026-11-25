@@ -61,6 +61,10 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
     server:null,transport:null,packageAttachAttempts:0,lastPackageRoot:null,
     lastPackageAttachReason:null
   };
+  const nativeCompletionDiagnostics={
+    registered:false,transport:null,requests:0,lastUri:null,lastLabels:[],
+    lastCount:0,lastError:null
+  };
   function encodeNativeSemanticTokens(document,spans){
     const segments=[];
     const text=document.getText();
@@ -338,8 +342,22 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
             // Keep the LSP Worker responsible for diagnostics and navigation.
             localSemanticTokens:(typeof STUDIO_THEIA_HOST!=="undefined"&&STUDIO_THEIA_HOST)||
               /theia/i.test(String(vscode.env?.appName??"")),
-            manualCompletionProvider:(typeof STUDIO_THEIA_HOST!=="undefined"&&STUDIO_THEIA_HOST)||
-              /theia/i.test(String(vscode.env?.appName??"")),
+            manualCompletionProvider:isTheiaHost,
+            onCompletionProviderRegistered:status=>{
+              nativeCompletionDiagnostics.registered=status?.registered===true;
+              nativeCompletionDiagnostics.transport=status?.transport??null;
+            },
+            onCompletionProviderRequest:request=>{
+              nativeCompletionDiagnostics.requests++;
+              nativeCompletionDiagnostics.lastUri=request?.uri??null;
+            },
+            onCompletionProviderResult:result=>{
+              nativeCompletionDiagnostics.lastLabels=result?.labels??[];
+              nativeCompletionDiagnostics.lastCount=result?.count??0;
+            },
+            onCompletionProviderError:error=>{
+              nativeCompletionDiagnostics.lastError=error?.message??String(error);
+            },
             onStatus:status=>{
               if(epoch!==languageClientEpoch)return;
               const state=languagePackages.get(status?.rootUri);
@@ -1596,6 +1614,7 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
               insertText:typeof item.insertText==="string"?item.insertText:
                 item.insertText?.value??item.textEdit?.newText??null
             })),
+            interfaceNativeProviderDiagnostics:{...nativeCompletionDiagnostics},
             outcomeUnknownTargets:unknownTarget,
             contractDefinition:gateDefinition.length,
             predicateDefinition:predicateDefinition.length,
