@@ -1,0 +1,203 @@
+apiVersion: connectionagent.io/capability-contracts/v1alpha4
+kind: CapabilityContracts
+metadata:
+  name: openamsm-mas-requirements
+spec:
+  capabilities:
+  - id: mas.ca.charging.create
+    owner: openamsm.smf.mas
+    callables:
+    - owner: openamsm.smf.mas
+      id: CA.CREATE_CHARGING
+      kind: operation
+      effect: MUTATION
+      scopePolicyRef: urn:connectionagent:scope:mas-owner-exact
+  - id: mas.iam.address.allocate
+    owner: openamsm.smf.mas
+    callables:
+    - owner: openamsm.smf.mas
+      id: IAM.ALLOCATE_ADDRESS
+      kind: operation
+      effect: MUTATION
+      scopePolicyRef: urn:connectionagent:scope:mas-owner-exact
+  - id: mas.pa.sm.policy.create
+    owner: openamsm.smf.mas
+    callables:
+    - owner: openamsm.smf.mas
+      id: PA.CREATE_SM_POLICY
+      kind: operation
+      effect: MUTATION
+      scopePolicyRef: urn:connectionagent:scope:mas-owner-exact
+  - id: mas.pa.sm.policy.delete
+    owner: openamsm.smf.mas
+    callables:
+    - owner: openamsm.smf.mas
+      id: PA.DELETE_SM_POLICY_C
+      kind: operation
+      effect: MUTATION
+      scopePolicyRef: urn:connectionagent:scope:mas-owner-exact
+  - id: mas.pa.sm.policy.update
+    owner: openamsm.smf.mas
+    callables:
+    - owner: openamsm.smf.mas
+      id: PA.UPDATE_SM_POLICY
+      kind: operation
+      effect: MUTATION
+      scopePolicyRef: urn:connectionagent:scope:mas-owner-exact
+  - id: mas.receipt.query
+    owner: openamsm.smf.mas
+    callables:
+    - owner: openamsm.smf.mas
+      id: MAS.RECEIPT_QUERY
+      kind: operation
+      effect: READ
+      scopePolicyRef: urn:connectionagent:scope:mas-owner-exact
+  - id: mas.reconcile.exact_original
+    owner: openamsm.smf.mas
+    callables:
+    - owner: openamsm.smf.mas
+      id: MAS.RECONCILE
+      kind: operation
+      effect: READ
+      scopePolicyRef: urn:connectionagent:scope:mas-owner-exact
+  - id: mas.saa.secondary.auth
+    owner: openamsm.smf.mas
+    callables:
+    - owner: openamsm.smf.mas
+      id: SAA.SECONDARY_AUTH
+      kind: operation
+      effect: MUTATION
+      scopePolicyRef: urn:connectionagent:scope:mas-owner-exact
+  - id: mas.sc.context.create
+    owner: openamsm.smf.mas
+    callables:
+    - owner: openamsm.smf.mas
+      id: SC.CREATE_SM_CONTEXT
+      kind: operation
+      effect: MUTATION
+      scopePolicyRef: urn:connectionagent:scope:mas-owner-exact
+  - id: mas.sc.context.release
+    owner: openamsm.smf.mas
+    callables:
+    - owner: openamsm.smf.mas
+      id: SC.RELEASE_SM_CONTEXT_C
+      kind: operation
+      effect: MUTATION
+      scopePolicyRef: urn:connectionagent:scope:mas-owner-exact
+  - id: mas.sc.subscription.validate
+    owner: openamsm.smf.mas
+    callables:
+    - owner: openamsm.smf.mas
+      id: SC.VALIDATE_SUBSCRIPTION
+      kind: operation
+      effect: MUTATION
+      scopePolicyRef: urn:connectionagent:scope:mas-owner-exact
+  - id: mas.sc.uecm.register
+    owner: openamsm.smf.mas
+    callables:
+    - owner: openamsm.smf.mas
+      id: SC.REGISTER_UECM
+      kind: operation
+      effect: MUTATION
+      scopePolicyRef: urn:connectionagent:scope:mas-owner-exact
+  - id: mas.se.events.emit
+    owner: openamsm.smf.mas
+    callables:
+    - owner: openamsm.smf.mas
+      id: SE.EMIT_EVENTS
+      kind: operation
+      effect: MUTATION
+      scopePolicyRef: urn:connectionagent:scope:mas-owner-exact
+    - owner: openamsm.smf.mas
+      id: SE.EMIT_RELEASE_EVENT_C
+      kind: operation
+      effect: MUTATION
+      scopePolicyRef: urn:connectionagent:scope:mas-owner-exact
+  - id: mas.ssm.n1.modify.parse
+    owner: openamsm.smf.mas
+    callables:
+    - owner: openamsm.smf.mas
+      id: SSM.PARSE_N1_MODIFY
+      kind: operation
+      effect: READ
+      scopePolicyRef: urn:connectionagent:scope:mas-owner-exact
+  - id: mas.ssm.n1.release.build
+    owner: openamsm.smf.mas
+    callables:
+    - owner: openamsm.smf.mas
+      id: SSM.BUILD_RELEASE_COMMAND
+      kind: operation
+      effect: MUTATION
+      scopePolicyRef: urn:connectionagent:scope:mas-owner-exact
+  - id: mas.ssm.n1.release.confirm.n1
+    owner: openamsm.smf.mas
+    callables:
+    - owner: openamsm.smf.mas
+      id: SSM.RELEASE_CONFIRM_N1
+      kind: operation
+      effect: MUTATION
+      scopePolicyRef: urn:connectionagent:scope:mas-owner-exact
+  - id: mas.ssm.n1.release.confirm.n2
+    owner: openamsm.smf.mas
+    callables:
+    - owner: openamsm.smf.mas
+      id: SSM.RELEASE_CONFIRM_N2
+      kind: operation
+      effect: MUTATION
+      scopePolicyRef: urn:connectionagent:scope:mas-owner-exact
+  - id: mas.ssm.n1.release.parse
+    owner: openamsm.smf.mas
+    callables:
+    - owner: openamsm.smf.mas
+      id: SSM.PARSE_N1_RELEASE
+      kind: operation
+      effect: READ
+      scopePolicyRef: urn:connectionagent:scope:mas-owner-exact
+  - id: mas.ssm.ue.an.signal
+    owner: openamsm.smf.mas
+    callables:
+    - owner: openamsm.smf.mas
+      id: SSM.SIGNAL_UE_AN
+      kind: operation
+      effect: MUTATION
+      scopePolicyRef: urn:connectionagent:scope:mas-owner-exact
+  - id: mas.upn.up.qos.delta
+    owner: openamsm.smf.mas
+    callables:
+    - owner: openamsm.smf.mas
+      id: UPN.MODIFY_QOS_DELTA
+      kind: operation
+      effect: MUTATION
+      scopePolicyRef: urn:connectionagent:scope:mas-owner-exact
+  - id: mas.upn.up.session.create
+    owner: openamsm.smf.mas
+    callables:
+    - owner: openamsm.smf.mas
+      id: UPN.CREATE_UP_SESSION
+      kind: operation
+      effect: MUTATION
+      scopePolicyRef: urn:connectionagent:scope:mas-owner-exact
+  - id: mas.upn.up.session.delete
+    owner: openamsm.smf.mas
+    callables:
+    - owner: openamsm.smf.mas
+      id: UPN.DELETE_UP_SESSION
+      kind: operation
+      effect: MUTATION
+      scopePolicyRef: urn:connectionagent:scope:mas-owner-exact
+  - id: mas.upn.up.session.modify
+    owner: openamsm.smf.mas
+    callables:
+    - owner: openamsm.smf.mas
+      id: UPN.MODIFY_UP_SESSION
+      kind: operation
+      effect: MUTATION
+      scopePolicyRef: urn:connectionagent:scope:mas-owner-exact
+  - id: mas.ups.anchor.decide
+    owner: openamsm.smf.mas
+    callables:
+    - owner: openamsm.smf.mas
+      id: UPS.DECIDE_ANCHOR
+      kind: operation
+      effect: MUTATION
+      scopePolicyRef: urn:connectionagent:scope:mas-owner-exact
