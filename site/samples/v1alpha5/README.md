@@ -9,8 +9,9 @@ workflow:
 3. **Release** — `release-pdu-session-mas`
 
 The default Procedure is Create. All three source packages are pinned to
-`ca-skills` commit `83d9e0c7d523189a1ae03186f8913277f0829d72` (PR #86 head; PR #86 is the documentation
-correction following the merged Owner-linked Skill update in PR #85).
+`ca-skills` commit `b06f72baae3eb3d578c489f950a325e2d63d556f` on `main`, which includes the Owner-linked
+Skill source and its corrected adoption-status documentation (PR #86,
+stacked on the merged update in PR #85).
 
 ## Locked dependencies
 
