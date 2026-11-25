@@ -14,7 +14,7 @@ function newNonce(){
   return [...bytes].map(n=>n.toString(16).padStart(2,"0")).join("");
 }
 import {EXAMPLE_PROJECT_NAME,seedExampleProject,
-  ensureOpenedExampleInterface} from "./sample-loader.mjs";
+  ensureOpenedExampleDependencies} from "./sample-loader.mjs";
 import {openProjectFolder,isSingleFolderWorkspace,restorePendingExampleProject,PENDING_EXAMPLE_OPEN_KEY} from "./project-navigation.mjs";
 import {registerProjectWelcome} from "./project-welcome.mjs";
 
@@ -508,11 +508,13 @@ export function activate(context){
       }
       const root=folders.length===1?folders[0].uri:null;
       const defaultProcedure=root?vscode.Uri.joinPath(root,
-        "skills","establish-pdu-session","assurance","procedure.yaml"):null;
-      const masProcedure=root?vscode.Uri.joinPath(root,
         "skills","establish-pdu-session-mas","assurance","procedure.yaml"):null;
+      const masProcedure=root?vscode.Uri.joinPath(root,
+        "skills","modify-pdu-session-mas","assurance","procedure.yaml"):null;
+      const releaseProcedure=root?vscode.Uri.joinPath(root,
+        "skills","release-pdu-session-mas","assurance","procedure.yaml"):null;
       const contract=root?vscode.Uri.joinPath(root,
-        "skills","establish-pdu-session","assurance","contract.yaml"):null;
+        "skills","establish-pdu-session-mas","assurance","contract.yaml"):null;
       const lib=root?vscode.Uri.joinPath(root,"lib"):null;
       const output=root?vscode.Uri.joinPath(root,"output"):null;
       const exists=async uri=>{
@@ -562,6 +564,8 @@ export function activate(context){
         defaultProcedureExists:await exists(defaultProcedure),
         masProcedure:masProcedure?.toString?.()??null,
         masProcedureExists:await exists(masProcedure),
+        releaseProcedure:releaseProcedure?.toString?.()??null,
+        releaseProcedureExists:await exists(releaseProcedure),
         contractApiVersion,procedureApiVersion,
         contractCurrentShape,procedureCurrentShape,
         contractReadError:contractRead.error,procedureReadError:procedureRead.error,
@@ -666,8 +670,8 @@ export function activate(context){
                 candidateFiles:result.candidateFiles,created:result.created,
                 skipped:result.skipped,readmeUpdated:result.readmeUpdated,
                 exampleDependencySeeded:result.exampleDependencySeeded,
-                exampleDependencyId:result.exampleDependencyId,
-                exampleDependencySnapshotDigest:result.exampleDependencySnapshotDigest
+                exampleDependencyIds:result.exampleDependencyIds,
+                exampleDependencySnapshotDigests:result.exampleDependencySnapshotDigests
               }));
               if(replaceExisting&&(!result.replacedExisting||
                  result.created!==result.candidateFiles||result.skipped!==0||
@@ -923,7 +927,7 @@ export function activate(context){
   // One-time, non-destructive upgrade for an already-open Example from an
   // earlier Studio. Never mutate another workspace or existing user settings.
   // This runs after extension providers are registered, before navigation.
-  void ensureOpenedExampleInterface(vscode,context.extensionUri,
+  void ensureOpenedExampleDependencies(vscode,context.extensionUri,
     context.globalStorageUri).then(async result=>{
       if(result.status==="SEEDED"){
         console.log("STUDIO_EXAMPLE_INTERFACE_MIGRATED",JSON.stringify(result));
