@@ -129,8 +129,8 @@ const total=candidate.files.length;
 test("Example imports the three real Owner-linked Scheme C Skills and their exact dependency snapshots",async()=>{
   const h=host(),result=await seedExampleProject(
     h.vscode,uri("/extension"),uri("/global-storage"));
-  assert.equal(candidate.sourceSha,"83d9e0c7d523189a1ae03186f8913277f0829d72");
-  assert.equal(candidate.sourceRef,"refs/pull/86/head");
+  assert.equal(candidate.sourceSha,"b06f72baae3eb3d578c489f950a325e2d63d556f");
+  assert.equal(candidate.sourceRef,"refs/heads/main");
   assert.equal(candidate.sourceStatus,"OWNER_LINKED_STATIC_BUILD_PASS_E2E_NOT_RERUN");
   assert.equal(candidate.languageVersion,"connectionagent.io/v1alpha5");
   assert.deepEqual(candidate.skills,[
