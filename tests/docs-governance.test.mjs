@@ -85,6 +85,18 @@ test("WORK is a compact current snapshot and preserves dated history separately"
   assert.match(governance,/WORK-history\.md/);
 });
 
+test("TRACEABILITY stays current and archives dated evidence",()=>{
+  const trace=content("docs/TRACEABILITY.md"),history=content("docs/WORK-history.md");
+  const lines=trace.trim().split(/\r?\n/).length;
+  assert.ok(lines<=60,"TRACEABILITY should remain a compact current matrix; got "+lines);
+  assert.match(trace,/Current checkpoint/);
+  assert.match(trace,/Issue #280/);
+  assert.match(trace,/Issue #288/);
+  assert.doesNotMatch(trace,/Historical evidence matrix/);
+  assert.match(history,/Historical evidence matrix/);
+  assert.match(history,/Refreshed establish-pdu-session optional references/);
+});
+
 test("documentation governance identifies the current dependency architecture and WORK compaction follow-up",()=>{
   const governance=content("docs/DOCUMENTATION.md");
   assert.match(governance,/Updated: 2026-11-26/);
@@ -147,7 +159,7 @@ test("historical conventional CreatedSession fixture is separate from the defaul
   const docs=content("docs/design/authoring-workbench.md");
   assert.match(work,/The conventional `establish-pdu-session` 5GC Skill is a separate NOT_QUALIFIED fixture, not the default Example/);
   assert.match(history,/eaadf9488ec3b5d6d6f60eb7090a2dee715d440b/);
-  assert.match(trace,/Refreshed establish-pdu-session optional references/);
+  assert.match(history,/Refreshed establish-pdu-session optional references/);
   for(const name of ["3gpp-procedure.md","session-selection.md","failure-handling.md"])
     assert.ok(history.includes("references/"+name),name);
   assert.match(docs,/Historical UI and Editing Design/);
