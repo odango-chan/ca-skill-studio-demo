@@ -70,6 +70,10 @@ test("a delayed stale editor event cannot replace the Console source restored fr
   const host = harness(undefined, {useAuthoringStub:true});
   assert.equal(await host.mode.restore(), true);
   assert.equal(await host.commands.get("skillStudio.openConsole")(), true);
+  const restoredState=host.commands.get("skillStudio.internal.workspaceModeDiagnostics")();
+  assert.equal(restoredState.mode,"console");
+  assert.equal(restoredState.pendingConsoleRestore.uri,host.document.uri.toString());
+  assert.equal(restoredState.consoleEditor.uri,host.document.uri.toString());
 
   // The previous implementation stopped suppressing editor events after 300 ms.
   // A delayed event for another tab could then replace the saved Console URI.
