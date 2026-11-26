@@ -6,6 +6,11 @@ const MAX_FILE=2097152,MAX_FILES=512,MAX_TOTAL=16777216;
 const hex=bytes=>[...bytes].map(x=>x.toString(16).padStart(2,"0")).join("");
 const digest=async bytes=>new Uint8Array(await crypto.subtle.digest("SHA-256",bytes));
 export const sha256=async bytes=>"sha256:"+hex(await digest(bytes));
+export async function gitBlobSha1(bytes){
+  if(!(bytes instanceof Uint8Array))throw Error("Expected Git blob bytes");
+  const header=enc.encode("blob "+bytes.length+"\\0");
+  return hex(new Uint8Array(await crypto.subtle.digest("SHA-1",concat([header,bytes]))));
+}
 export function validateSnapshotPath(path){
   if(typeof path!=="string"||path.length>240||path!==path.normalize("NFC")||
     path.startsWith("/")||path.includes("\\")||path.includes(":")||
