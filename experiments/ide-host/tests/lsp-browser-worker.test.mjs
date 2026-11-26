@@ -4,6 +4,7 @@ import { Worker } from "node:worker_threads";
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { readFileSync } from "node:fs";
+import { indexV1Alpha4ToolCatalogCallables } from "../../../site/package-audit.mjs";
 
 const workerEntry = new URL("./lsp-server-worker-thread.mjs", import.meta.url);
 const serverBundle = pathToFileURL(resolve(
@@ -387,7 +388,7 @@ test("browser LSP provides current CA-SL Definition, References, Hover, Python s
 });
 
 
-test("browser LSP preserves Dependency Alias in external Tool Operation identity",async()=>{
+test("browser LSP preserves Dependency Alias across the published MAS ToolCatalog",async()=>{
   const worker=new Worker(workerEntry,{workerData:{serverUrl:serverBundle}});
   try{
     worker.postMessage({jsonrpc:"2.0",id:71,method:"initialize",
@@ -403,15 +404,26 @@ test("browser LSP preserves Dependency Alias in external Tool Operation identity
       .replace("tool: ca::sbi.udm.sm_data.get",
         "tool: mas::SC.VALIDATE_SUBSCRIPTION")
       .replace("tool: ca::sbi.udm.sdm_subscription.create",
-        "tool: ca-context::SC.VALIDATE_SUBSCRIPTION");
+        "tool: mas-shadow::SC.VALIDATE_SUBSCRIPTION");
     assert.ok(procedure.text.includes("tool: mas::SC.VALIDATE_SUBSCRIPTION"));
-    assert.ok(procedure.text.includes("tool: ca-context::SC.VALIDATE_SUBSCRIPTION"));
+    assert.ok(procedure.text.includes("tool: mas-shadow::SC.VALIDATE_SUBSCRIPTION"));
 
-    // Same Callable ID in two dependencies is two distinct qualified refs.
+    // Use the actual published MAS ToolCatalog and its production projection
+    // shape; a second dependency exports the same package-local Callable ID.
+    const catalogText=readFileSync(
+      "site/samples/v1alpha5/owner-package/tool-catalog.yaml","utf8");
+    const masCatalog=indexV1Alpha4ToolCatalogCallables("mas",[
+      {path:"tool-catalog.yaml",text:catalogText}
+    ]);
+    assert.equal(masCatalog.available,true);
+    assert.ok(masCatalog.operations.some(item=>item.id==="SC.VALIDATE_SUBSCRIPTION"));
+    const duplicate=masCatalog.operations.find(item=>item.id==="SC.CREATE_SM_CONTEXT");
+    assert.ok(duplicate);
     snapshot.dependencyOperations=[
-      {dependencyId:"mas",id:"SC.VALIDATE_SUBSCRIPTION"},
-      {dependencyId:"ca-context",id:"SC.VALIDATE_SUBSCRIPTION"},
-      {dependencyId:"mas",id:"SC.CREATE_SM_CONTEXT"}
+      ...masCatalog.operations,
+      {...masCatalog.operations.find(item=>item.id==="SC.VALIDATE_SUBSCRIPTION"),
+        dependencyId:"mas-shadow"},
+      {...duplicate}
     ];
     const ready=waitForMessage(worker,message=>
       message?.method==="skillStudio/analysisStatus"&&
@@ -429,26 +441,28 @@ test("browser LSP preserves Dependency Alias in external Tool Operation identity
     assert.match(masHover.contents.value,/mas::SC\.VALIDATE_SUBSCRIPTION/);
     assert.match(masHover.contents.value,/Declared in project dependency `mas`/);
 
-    const contextHover=await lspRequest(worker,73,"textDocument/hover",{
+    const shadowHover=await lspRequest(worker,73,"textDocument/hover",{
       textDocument:{uri:procedure.uri},
-      position:positionOf(procedure.text,"ca-context::SC.VALIDATE_SUBSCRIPTION")
+      position:positionOf(procedure.text,"mas-shadow::SC.VALIDATE_SUBSCRIPTION")
     });
-    assert.match(contextHover.contents.value,/ca-context::SC\.VALIDATE_SUBSCRIPTION/);
-    assert.match(contextHover.contents.value,/Declared in project dependency `ca-context`/);
+    assert.match(shadowHover.contents.value,/mas-shadow::SC\.VALIDATE_SUBSCRIPTION/);
+    assert.match(shadowHover.contents.value,/Declared in project dependency `mas-shadow`/);
 
     const allAliasCompletions=await lspRequest(worker,74,"textDocument/completion",{
       textDocument:{uri:procedure.uri},
       position:positionOf(procedure.text,"tool: mas::SC.VALIDATE_SUBSCRIPTION","tool: ".length)
     });
     assert.ok(allAliasCompletions.some(item=>item.label==="mas::SC.VALIDATE_SUBSCRIPTION"));
-    assert.ok(allAliasCompletions.some(item=>item.label==="ca-context::SC.VALIDATE_SUBSCRIPTION"));
+    assert.ok(allAliasCompletions.some(item=>item.label==="mas-shadow::SC.VALIDATE_SUBSCRIPTION"));
+    assert.ok(!allAliasCompletions.some(item=>item.label==="mas::SC.CREATE_SM_CONTEXT"),
+      "duplicate declarations under the same alias must fail closed");
 
     const narrowedCompletions=await lspRequest(worker,75,"textDocument/completion",{
       textDocument:{uri:procedure.uri},
       position:positionOf(procedure.text,"mas::SC.VALIDATE_SUBSCRIPTION","mas::SC.".length)
     });
     assert.ok(narrowedCompletions.some(item=>item.label==="mas::SC.VALIDATE_SUBSCRIPTION"));
-    assert.ok(!narrowedCompletions.some(item=>item.label==="ca-context::SC.VALIDATE_SUBSCRIPTION"),
+    assert.ok(!narrowedCompletions.some(item=>item.label==="mas-shadow::SC.VALIDATE_SUBSCRIPTION"),
       "a typed Dependency Alias must narrow completion to that exact package");
   }finally{
     await worker.terminate();
