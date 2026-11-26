@@ -3,6 +3,8 @@ import { CompletionRequest, SemanticTokensRequest } from "vscode-languageserver-
 import { SKILL_SEMANTIC_TOKEN_TYPES, SKILL_SEMANTIC_TOKEN_MODIFIERS } from "../../../../../language/semantic-tokens.mjs";
 import studioLightTheme from "../../../../../extensions/skill-studio-theme/themes/skill-studio-light-color-theme.json";
 import { createSemanticTokenDecorationRenderer } from "./semantic-token-decorations.mjs";
+import { toNativeCompletionItems } from "./native-completion-items.mjs";
+import { toLspCompletionContext } from "./completion-context.mjs";
 
 export const PACKAGE_SNAPSHOT_NOTIFICATION = "skillStudio/packageSnapshot";
 export const PACKAGE_SNAPSHOT_ACCEPTED_NOTIFICATION = "skillStudio/packageSnapshotAccepted";
@@ -47,6 +49,7 @@ export function createSkillLanguageClient(vscode, context, handlers = {}) {
   let clientStopPromise = null;
   let client = null;
   let semanticTokenRegistration = null;
+  let completionRegistration = null;
   let semanticTokenChangeEmitter = null;
   let semanticTokenRenderer = null;
   let semanticTokenRefreshQueued = false;
@@ -204,6 +207,69 @@ export function createSkillLanguageClient(vscode, context, handlers = {}) {
     output.appendLine("Registered Theia semantic-token adapter from the canonical Skill Language catalog");
   }
 
+  // Theia 1.76's native LanguageClient adapter does not consistently expose
+  // LSP CompletionItems through the public editor provider API. Keep the Worker
+  // as the single completion engine and bridge its exact CompletionRequest into
+  // Theia's native CompletionItemProvider. VS Code uses its normal LSP adapter.
+  function registerTheiaCompletionProvider(){
+    if(!handlers.manualCompletionProvider||completionRegistration)return;
+    if(typeof vscode.languages?.registerCompletionItemProvider!=="function"){
+      output.appendLine("Native CompletionItemProvider API unavailable in this host");
+      return;
+    }
+    const provider={
+      async provideCompletionItems(document,position,cancellationToken,context){
+        const lspContext=toLspCompletionContext(context);
+        const lineText=document.lineAt(position.line).text;
+        handlers.onCompletionProviderRequest?.({
+          uri:document.uri.toString(),
+          languageId:document.languageId,
+          version:document.version,
+          position:{line:position.line,character:position.character},
+          lineText,
+          prefix:lineText.slice(0,position.character),
+          editorTriggerKind:context?.triggerKind??null,
+          lspTriggerKind:lspContext.triggerKind,
+          triggerCharacter:context?.triggerCharacter??null
+        });
+        if(stopped||terminalFailure||!started||cancellationToken?.isCancellationRequested)
+          return [];
+        try{
+          const result=await client.sendRequest(CompletionRequest.type,{
+            textDocument:{uri:document.uri.toString()},
+            position:{line:position.line,character:position.character},
+            context:lspContext
+          },cancellationToken);
+          if(cancellationToken?.isCancellationRequested)return [];
+          const nativeItems=toNativeCompletionItems(result,vscode);
+          handlers.onCompletionProviderResult?.({
+            uri:document.uri.toString(),
+            labels:nativeItems.map(item=>item.label),
+            count:nativeItems.length
+          });
+          return nativeItems;
+        }catch(error){
+          handlers.onCompletionProviderError?.({
+            uri:document.uri.toString(),message:String(error?.message??error)
+          });
+          if(!stopped&&!terminalFailure)
+            output.appendLine("Theia Schema completion request failed: "+
+              String(error?.message??error));
+          return [];
+        }
+      }
+    };
+    completionRegistration=vscode.languages.registerCompletionItemProvider(
+      [
+        {scheme:"file",pattern:"**/*.yaml"},
+        {scheme:"file",pattern:"**/*.yml"}
+      ],
+      provider,":","/",".",
+    );
+    handlers.onCompletionProviderRegistered?.({registered:true,transport:"browser-lsp-worker"});
+    output.appendLine("Registered Theia native YAML CompletionItemProvider over the shared Skill Language Worker");
+  }
+
   // Register the cross-language Definition adapter before LanguageClient
   // installs its generic providers. For a Python Skill entrypoint, the
   // Package index knows the authoritative YAML caller range; return that
@@ -262,6 +328,20 @@ export function createSkillLanguageClient(vscode, context, handlers = {}) {
         { language: "python" }
       ],
       synchronize: {},
+      // Theia uses the native CompletionItemProvider below as the canonical
+      // editor bridge. Its LanguageClient adapter would register a second
+      // provider for the same Worker and duplicate every Schema candidate.
+      // Keep the standard LSP completion provider on VS Code only.
+      ...(handlers.manualCompletionProvider===true?{
+        middleware:{
+          provideCompletionItem(document,position,context,token,next){
+            // The manual bridge owns YAML completion in Theia; preserve the
+            // standard LanguageClient provider for Python and other documents.
+            if(completionRegistration&&/\.ya?ml$/i.test(document.uri.path))return [];
+            return next(document,position,context,token);
+          }
+        }
+      }:{}),
       initializationOptions: handlers.localSemanticTokens === true
         ? {disableSemanticTokens:true} : {},
       outputChannel: output,
@@ -331,6 +411,7 @@ export function createSkillLanguageClient(vscode, context, handlers = {}) {
         startPromise = client.start().then(() => {
           started = true;
           registerTheiaSemanticTokenProvider();
+          registerTheiaCompletionProvider();
           scheduleHeartbeat();
         });
       }
@@ -402,6 +483,8 @@ export function createSkillLanguageClient(vscode, context, handlers = {}) {
       } finally {
         crossLanguageDefinitionRegistration?.dispose?.();
         crossLanguageDefinitionRegistration=null;
+        completionRegistration?.dispose?.();
+        completionRegistration=null;
         semanticTokenRegistration?.dispose?.();
         semanticTokenRegistration=null;
         semanticTokenRenderer?.dispose?.();

@@ -1065,14 +1065,45 @@ export async function runWorkbenchAcceptance({
        !currentLanguageFeatures.procedureOutline?.includes("run-script")||
        !currentLanguageFeatures.procedureOutline?.includes("await-event")||
        !currentLanguageFeatures.procedureOutline?.includes("timeout-handler")||
+       !currentLanguageFeatures.interfaceToolCompletion?.includes(
+         "ca-client::openamsm.smf.mas.sc.query")||
+       !currentLanguageFeatures.interfaceNativeToolCompletion?.includes(
+         "ca-client::openamsm.smf.mas.sc.query")||
+       !currentLanguageFeatures.interfaceArgumentCompletion?.includes("supi")||
+       !currentLanguageFeatures.interfaceArgumentCompletion?.includes("pduSessionId")||
+       !currentLanguageFeatures.interfaceNativeArgumentCompletion?.includes("supi")||
+       !currentLanguageFeatures.interfaceNativeArgumentCompletion?.includes("pduSessionId")||
+       currentLanguageFeatures.interfaceNativeProviderDiagnostics?.registered!==true||
+       currentLanguageFeatures.interfaceNativeProviderDiagnostics?.requests<2||
+       currentLanguageFeatures.interfaceNativeProviderDiagnostics?.lastCount!==2||
+       !currentLanguageFeatures.interfaceNativeProviderDiagnostics?.lastLabels?.includes("supi")||
+       !currentLanguageFeatures.interfaceNativeProviderDiagnostics?.lastLabels?.includes("pduSessionId")||
+       currentLanguageFeatures.interfaceArgumentCompletionDetails?.length!==2||
+       currentLanguageFeatures.interfaceNativeArgumentCompletionDetails?.length!==2||
+       currentLanguageFeatures.interfaceArgumentCompletionDetails?.some(item=>
+         !String(item.detail??"").includes("AUTH_NOT_CHECKED")||
+         !String(item.insertText??"").endsWith(": "))||
        currentLanguageFeatures.ownerQualification!=="NOT_QUALIFIED")
       throw Error("Native current language-provider acceptance failed: "+
         JSON.stringify(currentLanguageFeatures));
+    console.log("STUDIO_EXAMPLE_INTERFACE_SCHEMA_COMPLETION_CHROMIUM",JSON.stringify({
+      nativeProvider:currentLanguageFeatures.interfaceNativeProviderDiagnostics,
+      tool:currentLanguageFeatures.interfaceToolCompletion,
+      nativeTool:currentLanguageFeatures.interfaceNativeToolCompletion,
+      arguments:currentLanguageFeatures.interfaceArgumentCompletion,
+      nativeArguments:currentLanguageFeatures.interfaceNativeArgumentCompletion,
+      details:currentLanguageFeatures.interfaceArgumentCompletionDetails,
+      nativeDetails:currentLanguageFeatures.interfaceNativeArgumentCompletionDetails
+    }));
     // Provider fixture cleanup and Webview focus changes can update Theia's
     // visible editor list asynchronously. Focus the exact native Source
     // before checking its real editor decorations and rendered colors.
-    await nativeCommand(
+    const highlightSourceFocus=await nativeCommand(
       "skillStudio.internal.openProcedureSourceForHighlightDiagnostics",defaultProcedureUri);
+    console.log("STUDIO_HIGHLIGHT_SOURCE_FOCUS_CHROMIUM",JSON.stringify(highlightSourceFocus));
+    const highlightSourcePair=await assertSourceVisualPair(evalJS,sleep,
+      "procedure.yaml","CA-SL current Procedure after Schema completion");
+    console.log("STUDIO_HIGHLIGHT_SOURCE_PAIR_CHROMIUM",JSON.stringify(highlightSourcePair));
     for(let attempt=0;attempt<40;attempt++){
       semanticTokenEvidence=await nativeCommand("skillStudio.internal.semanticTokenDiagnostics");
       const renderer=semanticTokenEvidence?.rendererDiagnostics;
@@ -1094,7 +1125,7 @@ export async function runWorkbenchAcceptance({
       throw Error("Native v1alpha5 semantic token ranges were not applied to the visible editor: "+
         JSON.stringify({semanticTokenEvidence,rendererState}));
     const predicateColorEvidence=await evalJS(`(()=>{
-      const widget=document.getElementById(${JSON.stringify(procedurePair.source.id)});
+      const widget=document.getElementById(${JSON.stringify(highlightSourcePair.source.id)});
       const editor=widget?.querySelector('.monaco-editor')??
         [...document.querySelectorAll('.monaco-editor')].find(node=>{
           const r=node.getBoundingClientRect();return r.width>150&&r.height>100;
@@ -1111,7 +1142,7 @@ export async function runWorkbenchAcceptance({
     const outcomeMarker=await nativeCommand("skillStudio.internal.revealSemanticColorAcceptance");
     await sleep(180);
     const outcomeColorEvidence=await evalJS(`(()=>{
-      const widget=document.getElementById(${JSON.stringify(procedurePair.source.id)});
+      const widget=document.getElementById(${JSON.stringify(highlightSourcePair.source.id)});
       const editor=widget?.querySelector('.monaco-editor')??
         [...document.querySelectorAll('.monaco-editor')].find(node=>{
           const r=node.getBoundingClientRect();return r.width>150&&r.height>100;

@@ -62,6 +62,8 @@ export function createSemanticTokenDecorationRenderer(vscode, tokenTypes, semant
   }
 
   const documents = new Map();
+  const tokenDiagnosticsByUri = new Map();
+  const applicationDiagnosticsByUri = new Map();
   const appliedByEditor = new WeakMap();
   const subscriptions = [];
   const diagnostics = {
@@ -111,15 +113,19 @@ export function createSemanticTokenDecorationRenderer(vscode, tokenTypes, semant
   }
 
   function recordApplication(uri,summary) {
-    diagnostics.lastUri=uri;
-    diagnostics.lastVisibleEditorCount=summary.visibleEditorCount;
-    diagnostics.lastCandidateEditorCount=summary.candidateEditorCount;
-    diagnostics.lastMatchingEditorCount=summary.matchingEditorCount;
-    diagnostics.lastVersionMatchedEditorCount=summary.versionMatchedEditorCount;
-    diagnostics.lastAppliedEditorCount=summary.appliedEditorCount;
-    diagnostics.lastAppliedDecorationCount=summary.appliedDecorationCount;
-    diagnostics.lastAppliedRangeCount=summary.appliedRangeCount;
-    diagnostics.lastVersionMismatches=summary.versionMismatches;
+    const snapshot={
+      lastUri:uri,
+      lastVisibleEditorCount:summary.visibleEditorCount,
+      lastCandidateEditorCount:summary.candidateEditorCount,
+      lastMatchingEditorCount:summary.matchingEditorCount,
+      lastVersionMatchedEditorCount:summary.versionMatchedEditorCount,
+      lastAppliedEditorCount:summary.appliedEditorCount,
+      lastAppliedDecorationCount:summary.appliedDecorationCount,
+      lastAppliedRangeCount:summary.appliedRangeCount,
+      lastVersionMismatches:summary.versionMismatches
+    };
+    applicationDiagnosticsByUri.set(uri,snapshot);
+    Object.assign(diagnostics,snapshot);
   }
 
   function applyVisible(uri, entry) {
@@ -180,6 +186,7 @@ export function createSemanticTokenDecorationRenderer(vscode, tokenTypes, semant
   function clearDocument(uri) {
     if (!uri) return;
     documents.delete(uri);
+    tokenDiagnosticsByUri.delete(uri);
     applyVisible(uri, null);
   }
 
@@ -236,9 +243,14 @@ export function createSemanticTokenDecorationRenderer(vscode, tokenTypes, semant
 
     let tokenCount = 0;
     for (const tokenRanges of ranges.values()) tokenCount += tokenRanges.length;
-    diagnostics.lastDocumentVersion=document.version;
-    diagnostics.lastTokenCount=tokenCount;
-    diagnostics.lastTokenTypeCount=ranges.size;
+    const tokenSnapshot={
+      lastUri:uri,
+      lastDocumentVersion:document.version,
+      lastTokenCount:tokenCount,
+      lastTokenTypeCount:ranges.size
+    };
+    tokenDiagnosticsByUri.set(uri,tokenSnapshot);
+    Object.assign(diagnostics,tokenSnapshot);
     applyVisible(uri, entry);
     return { tokenCount, tokenTypeCount: ranges.size };
   }
@@ -280,9 +292,15 @@ export function createSemanticTokenDecorationRenderer(vscode, tokenTypes, semant
 
   return {
     render,
-    diagnostics() {
+    diagnostics(uri) {
+      const key=typeof uri==="string"?uri:uriKey(uri);
+      const tokenSnapshot=key?tokenDiagnosticsByUri.get(key):null;
+      const applicationSnapshot=key?applicationDiagnosticsByUri.get(key):null;
       return {
         ...diagnostics,
+        ...(tokenSnapshot??{}),
+        ...(applicationSnapshot??{}),
+        queriedUri:key??null,
         decorationTypeCount:decorationTypes.size,
         decorationStyles:Object.fromEntries(decorationStyles)
       };
