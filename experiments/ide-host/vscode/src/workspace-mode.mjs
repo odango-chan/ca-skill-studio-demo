@@ -21,13 +21,35 @@ export function registerWorkspaceMode(vscode, context, { authoring, showWelcome 
   let mode = context.globalState.get(preferenceKey) === "console" ? "console" : "ai";
   let consoleEditor;
   let switching = false;
-  let suppressEditorEvents = false;
+  let pendingConsoleRestoreDocument;
+  let nativeShellBridgeSeen = false;
+  let nativeShellSourceUri = null;
   let waitForProcedure;
 
-  // Track user navigation while Console is active. Ignore the delayed native
-  // editor event caused by restoring Console itself; it may refer to a stale tab.
+  // A native editor event may arrive after the command that restored Console has
+  // completed. Keep the intended document as the restore target: events for that
+  // document confirm the restore; events for another document are accepted only
+  // when they agree with the host's current activeTextEditor.
   const sourceEditorListener = vscode.window.onDidChangeActiveTextEditor(editor => {
-    if (mode !== "console" || switching || suppressEditorEvents || !editor?.document) return;
+    if (!editor?.document) return;
+    if (nativeShellBridgeSeen) {
+      const editorUri = editor.document.uri?.toString?.();
+      if (editorUri && editorUri === nativeShellSourceUri) consoleEditor = editor;
+      return;
+    }
+    if (pendingConsoleRestoreDocument) {
+      if (editor.document === pendingConsoleRestoreDocument) {
+        consoleEditor = editor;
+        return;
+      }
+      const activeDocument = vscode.window.activeTextEditor?.document;
+      if (activeDocument === editor.document) {
+        consoleEditor = editor;
+        pendingConsoleRestoreDocument = undefined;
+      }
+      return;
+    }
+    if (mode !== "console" || switching) return;
     if (editor.document !== consoleEditor?.document) consoleEditor = editor;
   });
   context.subscriptions.push(sourceEditorListener);
@@ -37,6 +59,7 @@ export function registerWorkspaceMode(vscode, context, { authoring, showWelcome 
     waitForProcedure?.dispose();
     waitForProcedure = undefined;
     switching = true;
+    pendingConsoleRestoreDocument = undefined;
     try {
       if (next === "ai") {
         // Keep the last Console editor object (including selection/undo state).
@@ -47,12 +70,13 @@ export function registerWorkspaceMode(vscode, context, { authoring, showWelcome 
         }
         if (!await authoring.open({ pick: !startup })) return false;
       } else {
-        suppressEditorEvents = true;
         const savedDocument = consoleEditor?.document;
         const activeDocument = visibleSourceEditor(vscode)?.document;
         const document = mode === "ai" && savedDocument && !savedDocument.isClosed
           ? savedDocument : activeDocument ?? authoring.getDocument();
         if (document) {
+          pendingConsoleRestoreDocument = document;
+          nativeShellSourceUri = document.uri?.toString?.() ?? null;
           const previousEditor = consoleEditor;
           const options = {
             viewColumn: vscode.ViewColumn.One, preview: false, preserveFocus: false,
@@ -72,22 +96,64 @@ export function registerWorkspaceMode(vscode, context, { authoring, showWelcome 
       }
       mode = next;
       if (!startup) await context.globalState.update(preferenceKey, mode);
-      if (next === "console") {
-        // Allow Theia's restore-related active-editor event to settle before
-        // accepting subsequent user navigation as a new Console source.
-        setTimeout(() => { suppressEditorEvents = false; }, 300);
-      } else {
-        suppressEditorEvents = false;
-      }
       return true;
     } catch (error) {
-      suppressEditorEvents = false;
+      if (next === "console") pendingConsoleRestoreDocument = undefined;
       void vscode.window.showWarningMessage("SKILL Studio mode: " + String(error?.message ?? error));
       return false;
     } finally {
       switching = false;
     }
   }
+
+  const nativeSourceActivated = vscode.commands.registerCommand(
+    "skillStudio.internal.nativeSourceActivated", async uriValue => {
+      const uri = typeof uriValue === "string"
+        ? vscode.Uri.parse(uriValue) : uriValue;
+      const uriKey = uri?.toString?.();
+      if (!uriKey) return false;
+      // Never reopen from disk as a fallback: that could discard a dirty
+      // document if the extension-host projection has not registered it yet.
+      const document = (vscode.workspace.textDocuments ?? []).find(item =>
+        item.uri?.toString?.() === uriKey);
+      if (!document) return false;
+      nativeShellBridgeSeen = true;
+      nativeShellSourceUri = uriKey;
+      const editor = (vscode.window.visibleTextEditors ?? []).find(item =>
+        item.document === document || item.document?.uri?.toString?.() === uriKey);
+      if (editor) consoleEditor = editor;
+      else if (consoleEditor?.document?.uri?.toString?.() !== uriKey) {
+        consoleEditor = {document};
+      }
+      pendingConsoleRestoreDocument = undefined;
+      return true;
+    }
+  );
+  context.subscriptions.push(nativeSourceActivated);
+
+  const workspaceModeDiagnostics = vscode.commands.registerCommand(
+    "skillStudio.internal.workspaceModeDiagnostics", () => {
+      const documentState = document => document ? {
+        uri:document.uri?.toString?.()??null,
+        version:document.version??null,
+        dirty:document.isDirty??null,
+        closed:document.isClosed??false
+      } : null;
+      const editorState = editor => editor?.document ? {
+        ...documentState(editor.document),
+        viewColumn:editor.viewColumn??null,
+        selection:editor.selection ? String(editor.selection) : null
+      } : null;
+      return {
+        mode,switching,nativeShellBridgeSeen,nativeShellSourceUri,
+        pendingConsoleRestore:documentState(pendingConsoleRestoreDocument),
+        consoleEditor:editorState(consoleEditor),
+        activeTextEditor:editorState(vscode.window.activeTextEditor),
+        visibleTextEditors:(vscode.window.visibleTextEditors??[]).map(editorState)
+      };
+    }
+  );
+  context.subscriptions.push(workspaceModeDiagnostics);
 
   context.subscriptions.push(
     vscode.commands.registerCommand("skillStudio.openAiAuthoring", () => select("ai")),
