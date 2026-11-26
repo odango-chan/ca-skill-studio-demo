@@ -1,6 +1,8 @@
-# E · Source Editor Workstream（与 D Visual Designer 并行）
+# E · Source Editor Workstream（历史 standalone Source 编辑器设计）
 
-**Status: Accepted (development boundary) · Date: 2026-11-04**  
+**Status: Historical workstream record · Original date: 2026-11-04**
+
+> 本文件记录早期独立浏览器应用中 Monaco Source Editor 与 D Visual Designer 并行的 E1–E4 工作流。当前在线产品是 Theia browser-only，用户编辑使用宿主原生 Source Editor；固定 Source + Preview 布局见 [ADR-0005](../decisions/0005-fixed-source-preview-workbench.md)。本文件中的旧 `site/app.mjs`、Monaco adapter、历史 main SHA 与 E 线阶段状态不得作为当前 Theia 实现指令。Source authority、native WorkspaceEdit、revision / Patch 安全原则仍由当前实现和 [Studio Ownership](../architecture/studio-boundaries.md) 约束。  
 **Implementation: E1/E2/E3-A1/A2/E4-A1/A2 ACCEPTED and MERGED. E4-A2 main@ef8eae87 via PR #50; 365/365 + real Chromium OPFS + Windows filesystem fixture + resulting-main Pages PASS. The interactive native Windows Chrome OS folder picker/write remains NOT_RUN; Runtime NOT_RUN.**  
 **Current accepted main baseline:** `main@3433e991006d8be9b41ae455d499ce7f59380b55`; [PR #40](https://github.com/odango-chan/ca-skill-studio-demo/pull/40) ports the E1-A1/A2 integration from historical [PR #33](https://github.com/odango-chan/ca-skill-studio-demo/pull/33) onto current D4-A4b1. [Final PR CI #41796985366](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41796985366) **322/322 + real Chromium PASS** and [resulting-main Pages #41797402343](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41797402343) **PASS** at `main@a5db46ee`. 本文件为 E 线的唯一 canonical 设计正文；追踪在 E1 #23、E2 #24、E3 #25 和 E4 #26。
 
