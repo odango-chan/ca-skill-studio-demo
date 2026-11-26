@@ -141,12 +141,12 @@ test("AGENTS safety and evidence rules are paired with repository ignore",()=>{
 test("Studio ownership document defines the current product and authority boundary",()=>{
   const doc=content("docs/architecture/studio-boundaries.md");
   assert.match(doc,/Status: Current product architecture baseline/);
-  assert.match(doc,/Theia 1\\.76 browser-only/);
+  assert.ok(doc.includes("Theia 1.76 browser-only"));
   assert.match(doc,/Preview is a projection/);
   assert.match(doc,/ca-client/);
   assert.match(doc,/#280/);
   assert.match(doc,/#225/);
-  assert.match(doc,/Compiler v2\\.1\\.0/);
+  assert.ok(doc.includes("Compiler v2.1.0"));
   assert.doesNotMatch(doc,/superseded as a target design/);
 });
 
