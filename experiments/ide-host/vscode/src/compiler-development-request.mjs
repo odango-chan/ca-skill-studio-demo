@@ -107,6 +107,18 @@ async function readInterfaceSnapshot(snapshot){
   };
 }
 
+function manifestIdentityCandidate(snapshot){
+  if(!Array.isArray(snapshot?.files))return null;
+  const file=snapshot.files.find(item=>item?.path==="package.json");
+  if(typeof file?.bytes!=="string")return null;
+  try{
+    const manifest=JSON.parse(decoder.decode(decodeBase64(file.bytes)));
+    if(typeof manifest.packageId!=="string"||!manifest.packageId.trim()||
+       typeof manifest.version!=="string"||!manifest.version.trim())return null;
+    return {packageId:manifest.packageId,version:manifest.version};
+  }catch{return null;}
+}
+
 /**
  * Assemble the released Compiler v2.1.0 Development BuildRequest from the
  * exact project-locked snapshots. Contract.dependencies owns root aliases;
@@ -122,39 +134,91 @@ export async function createCompilerDevelopmentBuildRequest({
     fail("DEVELOPMENT_BUILD_DEPENDENCIES_NOT_READY",
       "Exact locked Interface Package snapshots are not READY; Compiler Development Build is blocked");
   const rootsFromContract=contractDependencies(documents);
-  const parsedSnapshots=await Promise.all(resolvedDependencies.snapshots.map(readInterfaceSnapshot));
-  const byAlias=new Map();
-  const byIdentity=new Map();
-  for(const snapshot of parsedSnapshots){
-    if(byAlias.has(snapshot.alias))
-      fail("DEVELOPMENT_BUILD_DEPENDENCY_ALIAS_DUPLICATE",
-        "More than one locked snapshot uses dependency alias "+snapshot.alias);
-    byAlias.set(snapshot.alias,snapshot);
-    const key=identity(snapshot.key);
-    const previous=byIdentity.get(key);
-    if(previous&&previous.key.snapshotDigest!==snapshot.key.snapshotDigest)
-      fail("DEVELOPMENT_BUILD_PACKAGE_IDENTITY_AMBIGUOUS",
-        "One Package ID/version resolves to multiple immutable snapshot digests: "+
-        snapshot.key.packageId+"@"+snapshot.key.version);
-    if(!previous)byIdentity.set(key,snapshot);
+
+  // Index the resolver's already-verified snapshots without validating every
+  // project dependency as an Interface Package. Only Contract roots and the
+  // transitive closure selected from their manifests are Compiler inputs.
+  const rawByAlias=new Map();
+  for(const raw of resolvedDependencies.snapshots){
+    if(typeof raw?.id!=="string"||!raw.id.trim())continue;
+    const list=rawByAlias.get(raw.id)??[];
+    list.push(raw);
+    rawByAlias.set(raw.id,list);
   }
+  const identityCandidates=new Map();
+  for(const raw of resolvedDependencies.snapshots){
+    if(raw?.kind!=="interface-package")continue;
+    const candidate=manifestIdentityCandidate(raw);
+    if(!candidate)continue; // An unrelated package must not block this Skill.
+    const key=identity(candidate);
+    const list=identityCandidates.get(key)??[];
+    list.push(raw);
+    identityCandidates.set(key,list);
+  }
+  const parsedByRaw=new Map();
+  const readSelected=async raw=>{
+    if(!parsedByRaw.has(raw))parsedByRaw.set(raw,readInterfaceSnapshot(raw));
+    return parsedByRaw.get(raw);
+  };
+  const unsupportedKind=(alias,kind)=>fail("DEVELOPMENT_BUILD_DEPENDENCY_KIND_UNSUPPORTED",
+    "Contract or transitive dependency "+alias+" resolves to "+String(kind)+
+    "; Compiler v2.1.0 requires a formal Interface Package");
 
   const roots=[];
+  const rootSnapshots=new Map();
   for(const [alias,packageId] of rootsFromContract){
-    const snapshot=byAlias.get(alias);
-    if(!snapshot)
+    const candidates=rawByAlias.get(alias)??[];
+    if(!candidates.length)
       fail("DEVELOPMENT_BUILD_ROOT_NOT_LOCKED",
         "Contract dependency alias "+alias+" has no exact locked Interface Package snapshot");
+    if(candidates.length!==1)
+      fail("DEVELOPMENT_BUILD_DEPENDENCY_ALIAS_DUPLICATE",
+        "More than one locked snapshot uses Contract dependency alias "+alias);
+    const raw=candidates[0];
+    if(raw.kind!=="interface-package")unsupportedKind(alias,raw.kind);
+    const snapshot=await readSelected(raw);
     if(snapshot.key.packageId!==packageId)
       fail("DEVELOPMENT_BUILD_ROOT_PACKAGE_ID_MISMATCH",
         "Contract dependency "+alias+" declares "+packageId+
         " but the locked snapshot is "+snapshot.key.packageId);
     roots.push({alias,key:snapshot.key});
+    rootSnapshots.set(alias,snapshot);
   }
+
+  const resolveTransitive=async dependency=>{
+    const keyId=identity(dependency);
+    const candidates=identityCandidates.get(keyId)??[];
+    if(candidates.length){
+      const digests=new Set(candidates.map(item=>item.snapshotDigest));
+      if(digests.size>1)
+        fail("DEVELOPMENT_BUILD_PACKAGE_IDENTITY_AMBIGUOUS",
+          "One Package ID/version resolves to multiple immutable snapshot digests: "+
+          dependency.packageId+"@"+dependency.version);
+      return readSelected(candidates[0]);
+    }
+    const aliasCandidates=rawByAlias.get(dependency.alias)??[];
+    if(aliasCandidates.length>1)
+      fail("DEVELOPMENT_BUILD_DEPENDENCY_ALIAS_DUPLICATE",
+        "More than one locked snapshot uses transitive dependency alias "+dependency.alias);
+    if(aliasCandidates.length===1){
+      const raw=aliasCandidates[0];
+      if(raw.kind!=="interface-package")unsupportedKind(dependency.alias,raw.kind);
+      const snapshot=await readSelected(raw);
+      if(identity(snapshot.key)!==keyId)
+        fail("DEVELOPMENT_BUILD_TRANSITIVE_PACKAGE_IDENTITY_MISMATCH",
+          "Transitive dependency "+dependency.alias+" requires "+
+          dependency.packageId+"@"+dependency.version+" but the locked alias resolves to "+
+          snapshot.key.packageId+"@"+snapshot.key.version);
+      return snapshot;
+    }
+    fail("DEVELOPMENT_BUILD_TRANSITIVE_SNAPSHOT_MISSING",
+      "Package dependency "+dependency.alias+" = "+dependency.packageId+"@"+
+      dependency.version+" has no exact locked Interface Package snapshot");
+  };
 
   const visited=new Set(),visiting=new Set(),packages=[],snapshots=[];
   const versionByPackageId=new Map();
-  const visit=snapshot=>{
+  const visit=async snapshot=>{
     const previousVersion=versionByPackageId.get(snapshot.key.packageId);
     if(previousVersion&&previousVersion!==snapshot.key.version)
       fail("DEVELOPMENT_BUILD_PACKAGE_VERSION_CONFLICT",
@@ -169,14 +233,9 @@ export async function createCompilerDevelopmentBuildRequest({
     visiting.add(keyId);
     const edges=[];
     for(const dependency of snapshot.manifest.dependencies){
-      const target=byIdentity.get(identity(dependency));
-      if(!target)
-        fail("DEVELOPMENT_BUILD_TRANSITIVE_SNAPSHOT_MISSING",
-          "Package "+snapshot.key.packageId+" requires exact transitive dependency "+
-          dependency.alias+" = "+dependency.packageId+"@"+dependency.version+
-          ", but that immutable snapshot is not locked");
+      const target=await resolveTransitive(dependency);
       edges.push({alias:dependency.alias,key:target.key});
-      visit(target);
+      await visit(target);
     }
     edges.sort((a,b)=>compareText(a.alias,b.alias));
     packages.push({key:snapshot.key,dependencies:edges});
@@ -185,8 +244,8 @@ export async function createCompilerDevelopmentBuildRequest({
     visited.add(keyId);
   };
   for(const root of roots){
-    const snapshot=byAlias.get(root.alias);
-    visit(snapshot);
+    const snapshot=rootSnapshots.get(root.alias);
+    await visit(snapshot);
   }
   packages.sort((a,b)=>compareText(a.key.packageId,b.key.packageId)||
     compareText(a.key.version,b.key.version));
