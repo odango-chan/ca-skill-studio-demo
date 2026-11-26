@@ -42,7 +42,7 @@
 - Every code / document change must link an Issue; every updated canonical document records changed sections, reason and author/model.
 - Current Theia Preview remains read-only. Do not restore D1–D4 visual mutation or introduce a third pane.
 - Demo scope does not require production admission, signatures, Trust Registry, Runtime qualification or real 5GC E2E. Do not claim them as PASS.
-- Current canonical sources: [docs map](README.md), [traceability](TRACEABILITY.md), [documentation governance](DOCUMENTATION.md), [history](WORK-history.md).
+- Current canonical sources: [docs map](README.md), [ownership / Source authority](architecture/studio-boundaries.md), [traceability](TRACEABILITY.md), [documentation governance](DOCUMENTATION.md), [history](WORK-history.md).
 
 ## Revision record
 
@@ -51,3 +51,5 @@
 - **2026-11-26 — Preview lifecycle candidate exact-head acceptance updated.** Sections: Preview lifecycle blocker and open PRs. Reason: record PR #293's 5/5 PASS on the #291 base without claiming merge or main qualification. Author: ChatGPT (GPT-6.2).
 
 - **2026-11-26 — Documentation PR build acceptance advanced.** Sections: open PRs. Reason: record PR Verify and Pages Build / real Chromium PASS on the latest tested #291-based head while distinguishing PR artifact validation from main deployment. Author: ChatGPT (GPT-6.2).
+
+- **2026-11-26 — Added the current Studio ownership / Source authority document to canonical links.** Sections: current canonical sources. Reason: make the active ownership boundary directly discoverable from WORK. Author: ChatGPT (GPT-6.2).
