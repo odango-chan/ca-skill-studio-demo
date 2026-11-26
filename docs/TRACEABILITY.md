@@ -1,5 +1,39 @@
 # Skill Studio 实施证据追溯
 
+**Current checkpoint: 2026-11-26 · main@5b666c0ef754ed32fa37c97ce2429f328c70477f**
+
+This current checkpoint supersedes older dated rows below where they conflict. Historical exact-head PASS remains valid only for the exact commit and gate named in that historical record; it is not evidence for current main or a different PR head.
+
+| Current scope | Canonical / owner | Current implementation locator | Current status / evidence |
+|---|---|---|---|
+| Theia-only fixed Source + Preview workbench | [ADR-0003](decisions/0003-native-workbench-and-markdown.md), [ADR-0005](decisions/0005-fixed-source-preview-workbench.md) | `experiments/ide-host/vscode/src/extension.mjs`, `workbench.mjs`, `preview-host.mjs`; Theia 1.76 browser-only | Current Pages deployment [#45545634726](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/45545634726) Build + Deploy PASS on `5b666c0ef754ed32fa37c97ce2429f328c70477f`. Persistent-profile restoration remains OPEN #225. |
+| CA-SL v1alpha5-only authoring | [v1alpha5 integration boundary](design/ca-sl-v1alpha5-studio-preview.md), ca-skills release lock | `language/core/v1alpha5.ts`, browser LSP, Source Patch and semantic tokens | Active language target. v1alpha4 is historical / immutable baseline only; no compatibility editor or migration. |
+| OpenAMSM Scheme C Example | Current manifest `site/samples/v1alpha5/files.json`; Owner ToolCatalog / Host Context source pins in manifest | `site/samples/v1alpha5/{establish-pdu-session-mas,modify-pdu-session-mas,release-pdu-session-mas}`, `experiments/ide-host/vscode/src/sample-loader.mjs` | Three real Create / Modify / Release Skills; pinned Owner ToolCatalog and Host Context dependency snapshots. Static source evidence is not a fresh real 5GC E2E. Importer failure atomicity remains OPEN #280. |
+| Compiler adapter | CA Skill Compiler owner; current request / result contract | `experiments/ide-host/vscode/src/compiler-request.mjs`, `compiler-integration.mjs`, `compiler-client.mjs`; CI pins in `.github/workflows/` | Studio main integrates **v2.0.2**. v2.1.0 Development Build / Verify cutover is NOT integrated; #269 / Draft #272 / #276. |
+| AI Authoring | [AI Authoring design](design/ai-procedure-authoring.md), [Issue #200](https://github.com/odango-chan/ca-skill-studio-demo/issues/200) | `experiments/ide-host/vscode/src/ai-authoring-editor.mjs` and Host Change Set / v1alpha5 Patch path | Editor Tab exists. Do not infer live Gateway, Compiler-gated Apply or end-to-end qualification from UI presence; consult current #200 and design evidence. |
+| Diagnostics / Problems | [Issue #211](https://github.com/odango-chan/ca-skill-studio-demo/issues/211) | `problem-diagnostics.mjs`, LSP session, Package Audit and Compiler Diagnostics providers | Multiple producers exist with distinct source/status. Unified validation/test architecture remains OPEN #211. |
+| Persistent Workspace restore | [Issue #225](https://github.com/odango-chan/ca-skill-studio-demo/issues/225) | OPFS / Theia restored workspace lifecycle; Example reopen tests | OPEN. Clean-profile smoke and successful deployment do not prove restored persistent-profile recovery. |
+| Remaining v1alpha5 authoring actions | [Issue #237](https://github.com/odango-chan/ca-skill-studio-demo/issues/237) | Shared Source Patch modules + native Host commands | OPEN; inventory remaining actions and stale/unsupported paths before claiming parity. |
+| Schema-driven IntelliSense / Interface Package | [Issue #261](https://github.com/odango-chan/ca-skill-studio-demo/issues/261) | Dependency snapshots, Schema completion modules and Package Explorer | OPEN; editor ZIP import completion is not Compiler v2.1.0 product integration. |
+| Product Acceptance / architecture audit | [Issue #279](https://github.com/odango-chan/ca-skill-studio-demo/issues/279) | This repository's architecture, UI commands, lifecycle, tests, workflows and documentation | OPEN; current main audit is in progress. |
+
+## Evidence status vocabulary
+
+- `MERGED`: PR is merged; does not by itself mean deployed or accepted on a later SHA.
+- `DEPLOYED`: Pages artifact reports exact source / workflow SHA and the deployment workflow succeeded.
+- `PASS`: a named gate passed on the exact SHA stated.
+- `NOT_RUN`: the named test or environment was not executed.
+- `BLOCKED`: execution could not proceed for a stated prerequisite / infrastructure reason.
+- `NOT_QUALIFIED`: no claim of Runtime, Owner, Host, Integration, 5GC or Production qualification.
+
+Do not copy historical PASS forward to a new main or PR head. Do not use unit, mock, static, clean-profile-only or deployment PASS to imply a different acceptance scope.
+
+## Revision record
+
+- **2026-11-26:** Added current main checkpoint and rows for Theia workbench, v1alpha5, current OpenAMSM Example, Compiler v2.0.2 / v2.1.0 boundary, AI Authoring, Diagnostics, persistent workspace and current open issues. Reason: prior table dated 2026-11-16 and contained obsolete Compiler v1.0.0 / PR #38 and Example provenance. Evidence: main `5b666c0ef754ed32fa37c97ce2429f328c70477f`, workflow #45545634726, current Compiler adapter, Example manifest and current GitHub issue/PR state.
+
+---
+
 **Status: Accepted · Date: 2026-11-16**
 
 `WORK` 回答 **现在到哪**；本页回答 **规范→代码→测试→何种证据**。下表不复制 owner Runtime 契约，也不把静态/Mock 宣告为 Live PASS。
