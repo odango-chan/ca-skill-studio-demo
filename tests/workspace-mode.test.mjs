@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { registerWorkspaceMode } from "../experiments/ide-host/vscode/src/workspace-mode.mjs";
 import { registerAiAuthoringEditor } from "../experiments/ide-host/vscode/src/ai-authoring-editor.mjs";
 
-function harness(saved) {
+function harness(saved, {useAuthoringStub=false} = {}) {
   const commands = new Map();
   const preferences = new Map(saved ? [["skillStudio.workspaceMode", saved]] : []);
   const document = {
@@ -51,7 +51,9 @@ function harness(saved) {
     globalState: { get: key => preferences.get(key), update: async (key, value) => preferences.set(key, value) },
     subscriptions: [],
   };
-  const authoring = registerAiAuthoringEditor(vscode, context);
+  const authoring = useAuthoringStub
+    ? {open: async () => true, getDocument: () => document}
+    : registerAiAuthoringEditor(vscode, context);
   const mode = registerWorkspaceMode(vscode, context, { authoring, showWelcome: () => false });
   function emitEditorEvent(editor) { onEditor?.(editor); }
   function activateEditor(editor) {
@@ -65,7 +67,7 @@ function harness(saved) {
 
 
 test("a delayed stale editor event cannot replace the Console source restored from AI", async () => {
-  const host = harness();
+  const host = harness(undefined, {useAuthoringStub:true});
   assert.equal(await host.mode.restore(), true);
   assert.equal(await host.commands.get("skillStudio.openConsole")(), true);
 
@@ -82,7 +84,7 @@ test("a delayed stale editor event cannot replace the Console source restored fr
 });
 
 test("a real Console navigation after restore updates the AI return target", async () => {
-  const host = harness();
+  const host = harness(undefined, {useAuthoringStub:true});
   assert.equal(await host.mode.restore(), true);
   assert.equal(await host.commands.get("skillStudio.openConsole")(), true);
 
