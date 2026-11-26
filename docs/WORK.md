@@ -25,7 +25,7 @@
 | Compiler v2.1.0 | [#269](https://github.com/odango-chan/ca-skill-studio-demo/issues/269) | Rebase and finish generic API integration; wait for formal MAS / Host Context Interface Package roots before claiming Example Build |
 | Diagnostics | [#211](https://github.com/odango-chan/ca-skill-studio-demo/issues/211) | Close Problems / Test Explorer / Compiler / Package Audit source and result-boundary acceptance |
 | Preview lifecycle | [#220](https://github.com/odango-chan/ca-skill-studio-demo/issues/220) | [#293](https://github.com/odango-chan/ca-skill-studio-demo/pull/293) fixes null-document invalidation and passes 5/5 exact-head gates on #291's base; after #291 merges, retarget to main and rerun |
-| Documentation | [#285](https://github.com/odango-chan/ca-skill-studio-demo/issues/285) | WORK compacted here; TRACEABILITY still needs evidence-prose compaction and link verification |
+| Documentation | [#285](https://github.com/odango-chan/ca-skill-studio-demo/issues/285) | WORK and TRACEABILITY are compacted; exact-head governance / link checks must pass before closing |
 
 ## Open PRs — exact current state
 
