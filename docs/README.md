@@ -9,7 +9,7 @@ Studio 拥有浏览器编辑器，不拥有正式 Skill/Runtime/MCP 业务真相
 - [CA-SL v1alpha5 Studio Integration](design/ca-sl-v1alpha5-studio-preview.md) — 正式规范来源 pin、Node-entry Wait 编辑投影、Compiler fail-closed 与产品资格边界
 
 1. [README](../README.md) 与 [AGENTS](../AGENTS.md) — 目标/开发规约
-2. [WORK](WORK.md) — **唯一当前实现与验收状态**
+2. [WORK](WORK.md) — **唯一当前实现与验收状态**；[WORK-history](WORK-history.md) 仅用于追溯旧 checkpoint
 3. [TRACEABILITY](TRACEABILITY.md) — Contract/设计 → 生产代码 → 测试 → 实际证据
 4. [Studio Ownership / Source Authority](architecture/studio-boundaries.md) — 当前 ownership、Source authority、Theia-only 产品边界
 5. [Dependency / Interface Package Architecture](architecture/dependency-and-interface-package.md) — 当前 Studio lock、immutable snapshots、Example dependency closure、Schema IntelliSense 与 Compiler v2.1.0 边界
