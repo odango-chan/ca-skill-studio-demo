@@ -245,10 +245,59 @@ function safeDirectoryEntry(name){
   return typeof name==="string"&&name.length>0&&name!=="."&&name!==".."&&
     !name.includes("/")&&!name.includes("\\")&&!name.includes("\u0000");
 }
+function isMissingTransactionEntry(error){
+  return error?.code==="FileNotFound"||error?.code==="EntryNotFound"||
+    /ENOENT|EntryNotFound|FileNotFound/i.test(String(error?.message??error));
+}
+async function readTransactionFile(fs,uri,path){
+  let lastError=null;
+  for(let attempt=0;attempt<3;attempt++){
+    try{return await fs.readFile(uri);}
+    catch(error){
+      if(!isMissingTransactionEntry(error))throw error;
+      lastError=error;
+      if(typeof fs.stat!=="function")throw error;
+      try{
+        const info=await fs.stat(uri);
+        if((info.type&1)!==1)
+          fail("Example transaction file changed type while reading: "+path);
+      }catch(statError){
+        if(isMissingTransactionEntry(statError))return null;
+        throw statError;
+      }
+    }
+  }
+  throw lastError;
+}
+async function readTransactionDirectory(fs,uri,path){
+  let lastError=null;
+  for(let attempt=0;attempt<3;attempt++){
+    try{return await fs.readDirectory(uri);}
+    catch(error){
+      if(!isMissingTransactionEntry(error))throw error;
+      lastError=error;
+      if(typeof fs.stat!=="function")throw error;
+      try{
+        const info=await fs.stat(uri);
+        if((info.type&2)!==2)
+          fail("Example transaction directory changed type while reading: "+path);
+      }catch(statError){
+        if(isMissingTransactionEntry(statError))return null;
+        throw statError;
+      }
+    }
+  }
+  throw lastError;
+}
 async function collectTreeManifest(fs,vscode,root){
   const entries=[];
   async function visit(directory,prefix){
-    for(const [name,type] of await fs.readDirectory(directory)){
+    const children=await readTransactionDirectory(fs,directory,prefix||".");
+    if(children===null){
+      if(!prefix)fail("Active Example root disappeared during transaction inventory");
+      return false;
+    }
+    for(const [name,type] of children){
       if(!safeDirectoryEntry(name))
         fail("Host file system returned an unsafe transaction path");
       const relative=prefix?prefix+"/"+name:name;
@@ -256,16 +305,21 @@ async function collectTreeManifest(fs,vscode,root){
         fail("Symbolic links are not supported in an Example replacement transaction: "+relative);
       const child=vscode.Uri.joinPath(directory,name);
       if((type&2)===2){
-        entries.push({path:relative,kind:"directory"});
-        await visit(child,relative);
+        if(await visit(child,relative))
+          entries.push({path:relative,kind:"directory"});
       }else if((type&1)===1){
-        const bytes=await fs.readFile(child);
+        const bytes=await readTransactionFile(fs,child,relative);
+        // OPFS can briefly return a stale directory entry after the file has
+        // disappeared. A missing stat confirms there is no file to back up;
+        // a still-present file is retried and otherwise fails closed.
+        if(bytes===null)continue;
         entries.push({path:relative,kind:"file",size:bytes.length,
           digest:await gitBlobSha1(bytes)});
       }else{
         fail("Unsupported file type in Example transaction: "+relative);
       }
     }
+    return true;
   }
   await visit(root,"");
   return entries.sort((a,b)=>a.path<b.path?-1:a.path>b.path?1:0);
@@ -304,7 +358,7 @@ async function pruneToManifest(vscode,fs,root,manifest){
       const expectedKind=expected.get(relative);
       const child=vscode.Uri.joinPath(directory,name);
       if(!expectedKind||expectedKind!==actualKind){
-        await fs.delete(child,{recursive:true,useTrash:false});
+        await deleteIfPresent(fs,child);
         continue;
       }
       if(actualKind==="directory")await visit(child,relative);
@@ -338,7 +392,7 @@ async function copyTreeFromSource(fs,vscode,sourceRoot,destinationRoot,entries,
 }
 async function deleteIfPresent(fs,uri){
   try{await fs.delete(uri,{recursive:true,useTrash:false});}
-  catch(error){if(error?.code!=="FileNotFound")throw error;}
+  catch(error){if(!isMissingTransactionEntry(error))throw error;}
 }
 function replacementPaths(vscode,storageUri){
   const transactionRoot=vscode.Uri.joinPath(storageUri,REPLACEMENT_TRANSACTION_DIRECTORY);
