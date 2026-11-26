@@ -26,7 +26,19 @@ function host(candidateOverride=null,{
   const files=new Map(seedFiles.map(([path,value])=>[path,new Uint8Array(value)]));
   const folders=new Set(["/global-storage",...seedFolders]);
   const staleStats=new Set();
+  const symlinks=new Map();
   const renames=[];
+  const resolvePath=path=>{
+    let resolved=path;
+    for(let depth=0;depth<8;depth++){
+      const link=[...symlinks.keys()]
+        .filter(candidate=>resolved===candidate||resolved.startsWith(candidate+"/"))
+        .sort((left,right)=>right.length-left.length)[0];
+      if(!link)break;
+      resolved=symlinks.get(link)+resolved.slice(link.length);
+    }
+    return resolved;
+  };
   function takeFault(operation,path){
     const rule=faults.find(item=>item.op===operation&&
       (item.path===path||(item.pathPrefix&&path.startsWith(item.pathPrefix)))&&
@@ -50,34 +62,37 @@ function host(candidateOverride=null,{
          bundledZipOverride!==null)return new TextEncoder().encode(bundledZipOverride);
       if(target.path.startsWith("/extension/samples/v1alpha5/"))
         return new Uint8Array(readFileSync(sampleRoot+target.path.slice("/extension/samples/v1alpha5/".length)));
-      const value=files.get(target.path);
+      const value=files.get(resolvePath(target.path));
       if(value)return new Uint8Array(value);
       throw Object.assign(Error("missing"),{code:missingEntryCode});
     },
     async createDirectory(target){
       const fault=takeFault("createDirectory",target.path);
       if(fault)throwFault(fault,"createDirectory",target.path);
-      const parts=target.path.split("/").filter(Boolean);
+      const parts=resolvePath(target.path).split("/").filter(Boolean);
       let current="";
       for(const part of parts){current+="/"+part;folders.add(current);staleStats.delete(current);}
     },
     async stat(target){
       const fault=takeFault("stat",target.path);
       if(fault)throwFault(fault,"stat",target.path);
-      if(staleStats.has(target.path))return {type:1};
-      if(folders.has(target.path)||
-         [...files.keys()].some(path=>path.startsWith(target.path+"/"))||
-         [...folders].some(path=>path.startsWith(target.path+"/")))
+      if(symlinks.has(target.path))return {type:66};
+      const resolved=resolvePath(target.path);
+      if(staleStats.has(target.path)||staleStats.has(resolved))return {type:1};
+      if(folders.has(resolved)||
+         [...files.keys()].some(path=>path.startsWith(resolved+"/"))||
+         [...folders].some(path=>path.startsWith(resolved+"/")))
         return {type:2};
-      if(files.has(target.path))return {type:1};
+      if(files.has(resolved))return {type:1};
       throw Object.assign(Error("missing"),{code:"FileNotFound"});
     },
     async readDirectory(target){
       const fault=takeFault("readDirectory",target.path);
       if(fault)throwFault(fault,"readDirectory",target.path);
-      if(!folders.has(target.path))
+      const directory=resolvePath(target.path);
+      if(!folders.has(directory))
         throw Object.assign(Error("missing directory"),{code:missingEntryCode});
-      const prefix=target.path.endsWith("/")?target.path:target.path+"/";
+      const prefix=directory.endsWith("/")?directory:directory+"/";
       const entries=new Map();
       for(const path of folders){
         if(path.startsWith(prefix)){
@@ -92,7 +107,7 @@ function host(candidateOverride=null,{
         }
       }
       for(const stale of staleDirectoryEntries){
-        if(stale.parent===target.path&&!entries.has(stale.name))
+        if((stale.parent===target.path||stale.parent===directory)&&!entries.has(stale.name))
           entries.set(stale.name,stale.type??1);
       }
       return [...entries.entries()];
@@ -102,21 +117,27 @@ function host(candidateOverride=null,{
       if(fault&&!fault.after)throwFault(fault,"delete",target.path);
       if(target.path==="/global-storage/skill-studio-demo")
         throw Object.assign(Error("active workspace root must remain stable"),{code:"NoPermissions"});
-      const prefix=target.path+"/";
+      if(symlinks.has(target.path)){
+        symlinks.delete(target.path);
+        if(fault?.after)throwFault(fault,"delete",target.path);
+        return;
+      }
+      const resolved=resolvePath(target.path);
+      const prefix=resolved+"/";
       let found=false;
       for(const path of [...files.keys()]){
-        if(path===target.path||path.startsWith(prefix)){
+        if(path===resolved||path.startsWith(prefix)){
           if(staleStatAfterDelete)staleStats.add(path);
           files.delete(path);found=true;
         }
       }
       for(const path of [...folders]){
-        if(path===target.path||path.startsWith(prefix)){
+        if(path===resolved||path.startsWith(prefix)){
           if(staleStatAfterDelete)staleStats.add(path);
           folders.delete(path);found=true;
         }
       }
-      if(staleStatAfterDelete)staleStats.add(target.path);
+      if(staleStatAfterDelete)staleStats.add(resolved);
       if(!found)throw Object.assign(Error("missing"),{code:"FileNotFound"});
       if(fault?.after)throwFault(fault,"delete",target.path);
     },
@@ -165,10 +186,11 @@ function host(candidateOverride=null,{
         }
         throwFault(fault,"writeFile",target.path);
       }
-      files.set(target.path,new Uint8Array(bytes));staleStats.delete(target.path);
+      const resolved=resolvePath(target.path);
+      files.set(resolved,new Uint8Array(bytes));staleStats.delete(resolved);
     }
   }};
-  return {vscode:{Uri:{file:uri,joinPath},workspace},files,folders,workspace,faults,renames,staleDirectoryEntries};
+  return {vscode:{Uri:{file:uri,joinPath},workspace},files,folders,symlinks,workspace,faults,renames,staleDirectoryEntries};
 }
 
 const root="/global-storage/skill-studio-demo";
