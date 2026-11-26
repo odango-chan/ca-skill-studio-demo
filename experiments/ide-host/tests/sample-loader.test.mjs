@@ -848,6 +848,7 @@ test("Confirmed replacement reconciles stale OPFS directory entries without trea
   const staleName="ssm-release_confirm_n1.output.schema.json";
   const staleParent=root+"/.skill-studio/dependencies/"+owner.snapshotDigest+"/schemas";
   assert.ok(h.folders.has(staleParent),"the stale file parent must be a real directory");
+  h.files.delete(staleParent+"/"+staleName);
   assert.equal(h.files.has(staleParent+"/"+staleName),false,
     "the injected directory entry must have no backing file");
   h.staleDirectoryEntries.push({parent:staleParent,name:staleName,type:1});
@@ -859,6 +860,12 @@ test("Confirmed replacement reconciles stale OPFS directory entries without trea
   assert.equal(getExampleReplacementStatus().state,"READY");
   assert.ok(h.files.has(procedurePath));
   assert.ok(before.files.some(([path])=>path===procedurePath));
+  const rebuiltLock=JSON.parse(decode(h.files.get(root+"/.vscode/settings.json")))
+    ["connectionAgent.skillStudio.dependencyLock"];
+  const rebuiltOwner=rebuiltLock.entries.find(entry=>entry.id==="mas");
+  assert.ok(h.files.has(root+"/.skill-studio/dependencies/"+
+    rebuiltOwner.snapshotDigest+"/schemas/"+staleName),
+    "the new pinned dependency snapshot must be complete, not reuse the stale cache");
 });
 
 test("A failure while backing up the old Example leaves the active tree untouched",async()=>{
