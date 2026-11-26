@@ -256,7 +256,7 @@ function projectOperationCatalog(snapshot) {
     const alias = operation?.dependencyId;
     const id = operation?.id;
     if (!/^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/.test(alias ?? "") ||
-        !/^[A-Za-z0-9_][A-Za-z0-9_.-]{0,159}$/.test(id ?? "")) continue;
+        !/^[A-Za-z0-9_][A-Za-z0-9_.-]*$/.test(id ?? "")) continue;
     // A v1alpha5 external Tool reference is identified by BOTH its project
     // Dependency Alias and the package-local Callable ID. Two packages may
     // legitimately export the same Callable ID; they are not ambiguous until
