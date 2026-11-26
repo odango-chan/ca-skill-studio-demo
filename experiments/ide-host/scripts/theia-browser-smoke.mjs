@@ -110,6 +110,12 @@ const command=(method,params={},sessionId)=>new Promise((resolve,reject)=>{
   ws.send(JSON.stringify({id,method,params,...(sessionId?{sessionId}:{})}));
 });
 const workerTargets=new Map(),workerTargetSetupErrors=[],discoveredTargets=[],workerRuntimeErrors=[];
+const compactWorkerStack=stackTrace=>(stackTrace?.callFrames??[]).slice(0,8).map(frame=>({
+  functionName:frame.functionName||null,
+  url:frame.url||null,
+  lineNumber:Number.isInteger(frame.lineNumber)?frame.lineNumber:null,
+  columnNumber:Number.isInteger(frame.columnNumber)?frame.columnNumber:null
+}));
 const enableTargetSession=async(sessionId,targetInfo)=>{
   const type=targetInfo?.type??"unknown";
   const targetUrl=targetInfo?.url??"";
@@ -184,11 +190,16 @@ try{
     }
     if(msg.method==="Runtime.executionContextsCleared")defaultExecutionContexts.clear();
     if(msg.method==="Runtime.exceptionThrown"){
-      const message=msg.params?.exceptionDetails?.exception?.description||
-        msg.params?.exceptionDetails?.text||"Unknown worker exception";
+      const details=msg.params?.exceptionDetails;
+      const message=details?.exception?.description||
+        details?.text||"Unknown worker exception";
       exceptions.push(message);
       const target=workerTargets.get(msg.sessionId);
-      if(target)workerRuntimeErrors.push({kind:"exception",target,message});
+      if(target)workerRuntimeErrors.push({
+        kind:"exception",target,sessionId:msg.sessionId??null,message,
+        stackTrace:compactWorkerStack(details?.stackTrace),
+        timestamp:msg.params?.timestamp??null
+      });
     }
     if(msg.method==="Network.requestWillBeSent"&&
        /markdown-language-features.*serverWorkerMain\.js|vscode_markdown_language_features.*serverWorkerMain\.js/i.test(msg.params?.request?.url??""))
@@ -213,7 +224,11 @@ try{
       if(msg.params?.type==="error"){
         consoleErrors.push(message);
         const target=workerTargets.get(msg.sessionId);
-        if(target)workerRuntimeErrors.push({kind:"console",target,message});
+        if(target)workerRuntimeErrors.push({
+          kind:"console",target,sessionId:msg.sessionId??null,message,
+          stackTrace:compactWorkerStack(msg.params?.stackTrace),
+          timestamp:msg.params?.timestamp??null
+        });
       }
     }
     if(msg.id&&pending.has(msg.id)){
