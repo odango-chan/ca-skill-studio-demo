@@ -90,8 +90,8 @@ test("TRACEABILITY stays current and archives dated evidence",()=>{
   const lines=trace.trim().split(/\r?\n/).length;
   assert.ok(lines<=60,"TRACEABILITY should remain a compact current matrix; got "+lines);
   assert.match(trace,/Current checkpoint/);
-  assert.match(trace,/Issue #280/);
-  assert.match(trace,/Issue #288/);
+  assert.match(trace,/#280/);
+  assert.match(trace,/#288/);
   assert.doesNotMatch(trace,/Historical evidence matrix/);
   assert.match(history,/Historical evidence matrix/);
   assert.match(history,/Refreshed establish-pdu-session optional references/);
