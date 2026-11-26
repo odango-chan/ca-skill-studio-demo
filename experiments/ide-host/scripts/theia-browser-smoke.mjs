@@ -1490,10 +1490,12 @@ try{
       if(matchesDirtySource(restored))break;
       await sleep(100);
     }
+    const modeDiagnostics=await studioCommand("skillStudio.internal.workspaceModeDiagnostics");
+    console.log("STUDIO_WORKSPACE_MODE_DIAGNOSTICS_CHROMIUM",JSON.stringify(modeDiagnostics));
     if(!matchesDirtySource(restored))
       throw Error("Console round trip lost selected file or unsaved Source: "+
         JSON.stringify({expectedUri:dirty.uri,actualUri:restored?.uri,
-          expectedDirty:dirty.dirty,actualDirty:restored?.dirty}));
+          expectedDirty:dirty.dirty,actualDirty:restored?.dirty,modeDiagnostics}));
     await sourceState('undo');
     for(let attempt=0;attempt<40;attempt++){
       if((await sourceState('read'))?.text===original.text)break;
