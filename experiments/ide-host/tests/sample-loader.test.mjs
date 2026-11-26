@@ -850,6 +850,78 @@ test("A symbolic-link Example root is rejected before backup or mutation",async(
   assert.equal(getExampleReplacementStatus().state,"READY");
 });
 
+test("Committed recovery rejects an active-root symlink to the retained candidate and preserves all transaction data",async()=>{
+  const transaction="/global-storage/.skill-studio-example-replacement";
+  const candidateStorage=transaction+"/candidate-storage";
+  const candidateRoot=candidateStorage+"/skill-studio-demo";
+  const backupRoot=transaction+"/backup";
+  const committedMarker=transaction+"/COMMITTED.json";
+  const h=host(null,{faults:[{op:"delete",path:candidateStorage}]});
+  await seedExistingExample(h);
+  await assert.rejects(seedExampleProject(h.vscode,uri("/extension"),uri("/global-storage"),{
+    replaceExisting:true
+  }),/committed but cleanup is pending/);
+  const candidateBefore=captureTreeAt(h,candidateRoot);
+  const backupBefore=captureTreeAt(h,backupRoot);
+  const markerBefore=Array.from(h.files.get(committedMarker));
+  replaceDirectoryWithSymlink(h,root,candidateRoot);
+  await assert.rejects(recoverExampleReplacement(h.vscode,uri("/global-storage")),
+    /recovery required/i);
+  assert.equal(getExampleReplacementStatus().state,"RECOVERY_REQUIRED");
+  assert.equal(h.symlinks.get(root),candidateRoot);
+  assert.deepEqual(captureTreeAt(h,candidateRoot),candidateBefore,
+    "the candidate target must not be removed through the active-root symlink");
+  assert.deepEqual(captureTreeAt(h,backupRoot),backupBefore,
+    "the verified backup must remain available for manual recovery");
+  assert.deepEqual(Array.from(h.files.get(committedMarker)),markerBefore,
+    "the committed journal must remain intact while recovery is blocked");
+  assert.ok(h.files.has(transaction+"/COMMITTING.json"));
+});
+
+test("Rollback recovery rejects an active-root symlink to the retained backup and preserves the backup",async()=>{
+  const transaction="/global-storage/.skill-studio-example-replacement";
+  const backupRoot=transaction+"/backup";
+  const h=host();
+  await seedExistingExample(h);
+  h.faults.push({
+    op:"writeFile",path:root+"/README.md",partial:true,remaining:2
+  });
+  await assert.rejects(seedExampleProject(h.vscode,uri("/extension"),uri("/global-storage"),{
+    replaceExisting:true
+  }),/rollback is incomplete/);
+  const backupBefore=captureTreeAt(h,backupRoot);
+  const committingMarker=Array.from(h.files.get(transaction+"/COMMITTING.json"));
+  replaceDirectoryWithSymlink(h,root,backupRoot);
+  await assert.rejects(recoverExampleReplacement(h.vscode,uri("/global-storage")),
+    /recovery required/i);
+  assert.equal(getExampleReplacementStatus().state,"RECOVERY_REQUIRED");
+  assert.equal(h.symlinks.get(root),backupRoot);
+  assert.deepEqual(captureTreeAt(h,backupRoot),backupBefore,
+    "recovery must not delete the backup that the active root links to");
+  assert.deepEqual(Array.from(h.files.get(transaction+"/COMMITTING.json")),committingMarker,
+    "the commit-intent journal must remain intact");
+  assert.ok(h.folders.has(transaction));
+});
+
+test("Non-empty transaction recovery fails closed when fs.stat is unavailable",async()=>{
+  const transaction="/global-storage/.skill-studio-example-replacement";
+  const candidateStorage=transaction+"/candidate-storage";
+  const backupRoot=transaction+"/backup";
+  const h=host(null,{faults:[{op:"delete",path:candidateStorage}]});
+  await seedExistingExample(h);
+  await assert.rejects(seedExampleProject(h.vscode,uri("/extension"),uri("/global-storage"),{
+    replaceExisting:true
+  }),/committed but cleanup is pending/);
+  const backupBefore=captureTreeAt(h,backupRoot);
+  delete h.vscode.workspace.fs.stat;
+  await assert.rejects(recoverExampleReplacement(h.vscode,uri("/global-storage")),
+    /recovery required/i);
+  assert.equal(getExampleReplacementStatus().state,"RECOVERY_REQUIRED");
+  assert.deepEqual(captureTreeAt(h,backupRoot),backupBefore,
+    "recovery without root-type inspection must retain the verified backup");
+  assert.ok(h.files.has(transaction+"/COMMITTED.json"));
+});
+
 test("A dirty Example editor that cannot save aborts before transaction mutation",async()=>{
   const h=host();
   const before=await seedExistingExample(h);
