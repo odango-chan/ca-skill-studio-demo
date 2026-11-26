@@ -789,6 +789,11 @@ export async function ensureOpenedExampleDependencies(vscode,extensionUri,storag
   if(recovery?.status==="UNSUPPORTED_HOST")
     fail(recovery.message);
   const fs=vscode.workspace.fs;
+  const rootStat=await fs.stat(root);
+  if((rootStat.type&64)===64)
+    fail("Built-in Example root cannot be a symbolic link");
+  if((rootStat.type&2)!==2)
+    return {status:"LEGACY_OR_UNKNOWN"};
   const settingsUri=vscode.Uri.joinPath(root,".vscode","settings.json");
   try{await fs.stat(settingsUri);return {status:"PRESERVED"};}
   catch(error){if(error?.code!=="FileNotFound")throw error;}
