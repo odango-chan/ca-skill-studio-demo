@@ -631,7 +631,7 @@ try{
   const paletteText=(registeredCommands.items??[]).join("\\n")+"\\n"+(registeredCommands.text??"");
   for(const label of [
     "SKILL Studio: Check Skill","SKILL Studio: Build Skill",
-    "SKILL Studio: Add Dependency","SKILL Studio: Open Procedure Designer"
+    "SKILL Studio: Add Dependency","SKILL Studio: Open Procedure Preview"
   ])if(!paletteText.includes(label))
     throw Error("Command Palette is missing "+label+": "+paletteText);
   const loadExampleRow=await evalJS(`(()=>{
