@@ -113,54 +113,34 @@ test("AGENTS safety and evidence rules are paired with repository ignore",()=>{
     assert.ok(agents.includes(mark),"Missing mandatory Agent guidance: "+mark);
   assert.match(ignore,/^\.agent-tmp\/\s*$/m);
 });
-test("WORK / D3 stages distinguish shipped A1/A2 from scoped editor-tier A3",()=>{
-  const state=content("docs/WORK.md"),spec=content("docs/design/route-designer.md");
-  assert.match(state,/\|\s*D3-A1[^\n]*\|\s*ACCEPTED\s*\|\s*IMPLEMENTED\s*\|\s*PASS/);
-  assert.match(state,/\|\s*D3-A2[^\n]*\|\s*ACCEPTED\s*\|\s*IMPLEMENTED\s*\|\s*PASS/);
-  assert.match(state,/\|\s*D3-A3[^\n]*\|\s*ACCEPTED[^\n]*\|\s*IMPLEMENTED[^\n]*\|\s*PASS/);
-  assert.match(spec,/Status: Accepted for bounded Studio editor scope/);
-  assert.match(spec,/A1\/A2 on main/);
-  assert.match(spec,/A3 implemented in PR #13/);
-  assert.match(spec,/Runtime\/5GC NOT_RUN/);
-  const trace=content("docs/TRACEABILITY.md");
-  for(const x of ["D3-A1","D3-A2","D3-A3"])assert.ok(trace.includes(x));
+test("current Theia Preview is read-only and legacy Designer docs are historical",()=>{
+  const work=content("docs/WORK.md"),map=content("docs/README.md"),agents=content("AGENTS.md");
+  const route=content("docs/design/route-designer.md");
+  const phase=content("docs/design/phase-designer.md");
+  const d1=content("docs/D1-procedure-designer.md");
+  const d2=content("docs/D2-node-designer.md");
+  assert.match(work,/Procedure \/ Contract \/ Predicate \/ Schema Preview 均为只读 Source 投影/);
+  assert.match(map,/Historical D3 Route Designer/);
+  assert.match(map,/Historical D4 Phase Designer/);
+  for(const doc of [route,phase,d1,d2])assert.match(doc,/HISTORICAL/);
+  assert.match(agents,/ADR-0005/);
+  assert.match(agents,/当前 Theia Preview 不提供 Visual mutation/);
+  assert.doesNotMatch(agents,/Route \/ Phase 改动读 docs\/design\/route-designer\.md/);
   assert.match(content("docs/DOCUMENTATION.md"),/tool-mcp-gw/);
 });
 
-test("D4 read-only consumer ABI evidence accepted; cross-producer edits still deferred",()=>{
-  const work=content("docs/WORK.md"),spec=content("docs/design/phase-designer.md");
-  assert.match(work,/\|\s*D4-A1[^\n]*\|\s*ACCEPTED[^\n]*\|\s*IMPLEMENTED[^\n]*\|\s*PASS/);
-  assert.match(work,/\|\s*D4-A2\.1[^\n]*\|\s*ACCEPTED[^\n]*\|\s*IMPLEMENTED[^\n]*\|\s*PASS/);
-  assert.match(work,/\|\s*D4-A2\.2a[^\n]*\|\s*ACCEPTED[^\n]*\|\s*IMPLEMENTED[^\n]*\|\s*PASS/);
-  assert.match(work,/\|\s*D4-A2\.2b1[^\n]*\|\s*ACCEPTED[^\n]*\|\s*IMPLEMENTED[^\n]*\|\s*PASS/);
-  assert.match(work,/\|\s*D4-A3a[^\n]*\|\s*ACCEPTED[^\n]*\|\s*IMPLEMENTED[^\n]*\|\s*PASS/);
-  assert.match(work,/\|\s*D4-A3b1[^\n]*\|\s*ACCEPTED[^\n]*\|\s*IMPLEMENTED[^\n]*\|\s*PASS/);
-  assert.match(work,/\|\s*D4-A3b2a[^\n]*\|\s*ACCEPTED[^\n]*\|\s*IMPLEMENTED[^\n]*\|\s*PASS/);
-  assert.match(work,/\|\s*D4-A3b2b1[^\n]*\|\s*ACCEPTED[^\n]*\|\s*IMPLEMENTED[^\n]*\|\s*PASS/);
-  assert.match(work,/\|\s*D4-A3b2b2a[^\n]*\|\s*ACCEPTED[^\n]*\|\s*IMPLEMENTED[^\n]*\|\s*PASS/);
-  assert.match(work,/\|\s*D4-A4a[^\n]*\|\s*ACCEPTED[^\n]*\|\s*IMPLEMENTED[^\n]*\|\s*PASS/);
-  assert.match(work,/\|\s*D4-A4b1[^\n]*\|\s*ACCEPTED[^\n]*\|\s*IMPLEMENTED[^\n]*\|\s*PASS/);
-  assert.match(work,/\|\s*D4-A2\.2b2\/A3b2b2b\/A4b2[^\n]*\|\s*DEFERRED[^\n]*\|\s*NOT_IMPLEMENTED\s*\|\s*NOT_RUN/);
-  assert.match(spec,/Runtime\/5GC NOT_RUN/);
-  const trace=content("docs/TRACEABILITY.md");
-  assert.match(trace,/D4-A1 Phase Step input rebind/);
-  assert.match(trace,/D4-A2\.1 Same-producer output reference normalization/);
-  assert.match(trace,/D4-A2\.2a Phase dependency evidence/);
-  assert.match(trace,/D4-A2\.2b1 script consumer field/);
-  assert.match(spec,/consumer schema/i);
-  assert.match(spec,/Runtime\/5GC NOT_RUN/);
-});
-
-test("current owner-pinned CreatedSession Reference example is documented without Runtime claims",()=>{
+test("historical conventional CreatedSession fixture is separate from the default OpenAMSM Example",()=>{
   const work=content("docs/WORK.md"),trace=content("docs/TRACEABILITY.md");
   const docs=content("docs/design/authoring-workbench.md");
+  assert.match(work,/conventional 5GC Skill 只保留为独立 NOT_QUALIFIED 测试 fixture/);
+  assert.match(work,/不属于默认 OpenAMSM Example/);
   assert.match(work,/eaadf9488ec3b5d6d6f60eb7090a2dee715d440b/);
   assert.match(trace,/Refreshed establish-pdu-session optional references/);
   for(const name of ["3gpp-procedure.md","session-selection.md","failure-handling.md"])
     assert.ok(work.includes("references/"+name),name);
+  assert.match(docs,/Historical UI and Editing Design/);
   assert.match(docs,/read_reference/);
   assert.match(work,/cases\//);
-  assert.match(work,/可选业务参考材料/);
 });
 
 test("Theia is the only published host and Classic has no runtime entrypoint",()=>{
