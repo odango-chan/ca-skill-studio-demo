@@ -79,7 +79,7 @@ test("AI Authoring and Source Editor docs distinguish current implementation fro
   assert.match(ai,/Compiler v2\.1\.0/);
   assert.match(ai,/Historical design and implementation planning record/);
   assert.match(source,/Historical workstream record/);
-  assert.match(map,/current F1–F4 implementation state/i);
+  assert.match(map,/当前 F1–F4 实现状态/);
   assert.match(map,/standalone Monaco Source Editor.*历史/i);
 });
 
