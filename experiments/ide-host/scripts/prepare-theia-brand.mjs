@@ -33,8 +33,8 @@ export function buildSkillStudioBrandScript(){
     check:"检查 Skill",build:"构建 Skill",inspect:"检查依赖",
     audit:"审计当前 Package",export:"导出 Package ZIP",
     addDependency:"添加依赖",refreshDependencies:"刷新依赖",
-    procedure:"打开 Procedure 设计器",contract:"打开 Contract 设计器",
-    predicates:"打开 Predicate 设计器",schema:"打开 Schema 设计器",
+    procedure:"打开 Procedure 预览",contract:"打开 Contract 预览",
+    predicates:"打开 Predicate 预览",schema:"打开 Schema 预览",
     refreshInspection:"刷新检查结果",restartLsp:"重启语言服务",
     spec:"Skill 语言规范",guide:"编写指南"
   }:{
@@ -44,8 +44,8 @@ export function buildSkillStudioBrandScript(){
     check:"Check Skill",build:"Build Skill",inspect:"Inspect Dependencies",
     audit:"Audit Current Package",export:"Export Package ZIP",
     addDependency:"Add Dependency",refreshDependencies:"Refresh Dependencies",
-    procedure:"Open Procedure Designer",contract:"Open Contract Designer",
-    predicates:"Open Predicate Designer",schema:"Open Schema Designer",
+    procedure:"Open Procedure Preview",contract:"Open Contract Preview",
+    predicates:"Open Predicate Preview",schema:"Open Schema Preview",
     refreshInspection:"Refresh Inspection",restartLsp:"Restart Language Service",
     spec:"Skill Language Specification",guide:"Authoring Guide"
   };
