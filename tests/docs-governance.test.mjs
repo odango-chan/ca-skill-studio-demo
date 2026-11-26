@@ -9,7 +9,7 @@ const pages=[
   "README.md","AGENTS.md","docs/README.md","docs/DOCUMENTATION.md",
   "docs/WORK.md","docs/WORK-history.md","docs/TRACEABILITY.md",
   "docs/architecture/studio-boundaries.md",
-  "docs/architecture/dependency-and-interface-package.md",
+  "docs/architecture/dependency-and-interface-package.md","docs/architecture/studio-boundaries.md",
   "docs/architecture/plugin-managed-configuration-v0.1.md",
   "docs/architecture/skill-project-layout.md",
   "docs/architecture/theia-workbench.md",
@@ -138,6 +138,18 @@ test("AGENTS safety and evidence rules are paired with repository ignore",()=>{
     assert.ok(agents.includes(mark),"Missing mandatory Agent guidance: "+mark);
   assert.match(ignore,/^\.agent-tmp\/\s*$/m);
 });
+test("Studio ownership document defines the current product and authority boundary",()=>{
+  const doc=content("docs/architecture/studio-boundaries.md");
+  assert.match(doc,/Status: Current product architecture baseline/);
+  assert.match(doc,/Theia 1\\.76 browser-only/);
+  assert.match(doc,/Preview is a projection/);
+  assert.match(doc,/ca-client/);
+  assert.match(doc,/#280/);
+  assert.match(doc,/#225/);
+  assert.match(doc,/Compiler v2\\.1\\.0/);
+  assert.doesNotMatch(doc,/superseded as a target design/);
+});
+
 test("current Theia Preview is read-only and legacy Designer docs are historical",()=>{
   const work=content("docs/WORK.md"),map=content("docs/README.md"),agents=content("AGENTS.md");
   const route=content("docs/design/route-designer.md");
