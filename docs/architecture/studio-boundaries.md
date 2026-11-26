@@ -1,79 +1,78 @@
-# Skill Studio Ownership, Source Authority and Product Boundaries
+# Studio Ownership / Source Authority
 
-**Status: Current implementation boundary · Updated 2026-11-26 · Audited baseline: `main@5b666c0ef754ed32fa37c97ce2429f328c70477f`**
+**Status: Current product architecture baseline · Updated: 2026-11-26**  
+**Baseline:** main `5b666c0ef754ed32fa37c97ce2429f328c70477f` · Theia 1.76 browser-only · CA-SL v1alpha5 · Compiler adapter v2.0.2 · OpenAMSM Scheme C Example.
 
-This document defines what Skill Studio owns and what it must consume from authoritative repositories. Current dependency and Interface Package details are in [Dependency, Interface Package and Schema IntelliSense Architecture](dependency-and-interface-package.md). Current implementation / acceptance status is in [WORK](../WORK.md); source-to-test evidence is in [TRACEABILITY](../TRACEABILITY.md).
+This document defines which subsystem owns each piece of Studio state and which source is authoritative. It describes the Demo product boundary, not a production Agent / Runtime architecture.
 
-## 1. Studio ownership
+## 1. Product boundary
 
-`ca-skill-studio-demo` owns the VS Code-compatible authoring extension and its Theia online host integration:
+Skill Studio is a browser-based authoring and package-inspection workbench. It owns editor buffers, local workspace presentation, language feedback, dependency inspection and Host-owned authoring interactions. It does **not** own authoritative Skill execution, Owner business state, Runtime receipts, MCP execution truth or production admission.
 
-- native Source Editor, fixed right-side Preview Host, Outline / Problems / Package Explorer composition;
-- Source projection, bounded Source Patch, Diff / confirmation / native Undo / Redo and stale-revision protection;
-- CA-SL v1alpha5 Language Service integration, semantic tokens, completion and source navigation;
-- Package inventory, project configuration, dependency acquisition, immutable snapshots, Studio lock and read-only Interface Package browsing;
-- Compiler adapter UI / worker integration, AI Authoring review UI and this repository's tests / acceptance workflows.
+The canonical language target is CA-SL v1alpha5. The current default project is the OpenAMSM Scheme C Create / Modify / Release Example. Historical v1alpha4 / v1alpha1 projects and standalone Classic / Visual Designer workflows are not compatibility modes.
 
-The online Pages product is Theia 1.76 browser-only. Classic standalone browser app, Classic fallback and `/classic/` artifact are retired. The fixed workbench is one native Source Editor group plus one contextual right-side Preview Host; the online Theia shell enforces the one-group constraint. Desktop VS Code users retain host-native ability to create additional editor groups; Studio must not claim it can control the entire desktop host layout.
+## 2. Fixed workbench surface
 
-Studio is not an Agent Runtime, 5GC controller, Owner registry, Capability authority, Host Admission service, deployment registry or production qualification system.
+- Theia 1.76 browser-only is the sole online workbench.
+- The product layout is exactly two columns: native Source Editor on the left and one Preview Host on the right. No third editor / inspector column.
+- Outline and Problems are Theia-native views. Package Explorer owns Skills and Plugin-managed Dependencies.
+- Classic and the former standalone D1–D4 Visual Designer mutation UI are retired.
+- Preview is a projection of the active Source document. Procedure, Contract, Predicate and Schema previews are read-only; they are not independent editable models.
 
-## 2. Cross-repository authority
+The current layout contract is [ADR-0005](../decisions/0005-fixed-source-preview-workbench.md). Native view ownership is described by [ADR-0003](../decisions/0003-native-workbench-and-markdown.md) and Package Explorer composition by [ADR-0004](../decisions/0004-package-first-workspace.md).
 
-| Authority owner | Owns | Studio must do |
+## 3. Source authority and editing
+
+1. The native Theia Source Editor TextDocument is the sole direct editing authority. Source revision, dirty state, undo and save belong to the host editor.
+2. Preview / Inspector projections may navigate to Source locations, but must not mutate CA-SL, create an alternate source of truth or silently write files.
+3. AI Authoring is a separate Editor Tab. The model returns an untrusted proposal; the Host binds it to the current Source revision, validates the structured Change Set, presents the diff and requires explicit Apply. The model never writes the workspace directly.
+4. Any future Visual mutation requires a new Issue and an approved Source Patch design with exact source spans, revision checks, parse / semantic validation, diff preview, explicit confirmation and undo. Do not infer permission from historical D1–D4 documents.
+
+## 4. Package, dependency and Compiler authority
+
+| Concern | Authority | Studio responsibility |
 |---|---|---|
-| [ca-skills](https://github.com/odango-chan/ca-skills) | CA-SL normative syntax, v1alpha5 authoring contract and published Skill source | Consume the frozen v1alpha5 contract; do not create another grammar or compatibility parser. |
-| [ca-skill-compiler](https://github.com/odango-chan/ca-skill-compiler) | Compiler wire contracts, parsing / linking / deterministic artifacts, formal Interface Package and Development Build APIs | Use the published versioned API; do not implement a second Compiler or linker. Current Studio main integrates v2.0.2; v2.1.0 Development Build / Verify cutover remains open in #269. |
-| OpenAMSM Owner / [ca-client-tools](https://github.com/odango-chan/ca-client-tools) | Published Owner ToolCatalog / callable contracts and separate read-only SBI Interface Package | Pin source snapshots and show provenance. A ToolCatalog snapshot or Interface Package is not Owner authorization. |
-| Host Context publisher / Host | Context schema source, Host admission and request identity | Consume exact context snapshots; do not invent Host admission or execution identity. |
-| [ca-agent-demo](https://github.com/odango-chan/ca-agent-demo) | Demo Host / integration behavior and demo execution evidence | Reference only when a specific current integration or evidence boundary requires it; never infer Runtime or 5GC qualification from editor state. |
-| [ca-runtime](https://github.com/odango-chan/ca-runtime) | Runtime execution, Run / Outcome / Receipt / Reconcile and runtime qualification | Display authoritative results only when explicitly supplied; never synthesize them. |
-| [connectionagent](https://github.com/odango-chan/connectionagent) | Ecosystem ownership and central documentation governance | Follow shared governance while preserving each repository's authority boundary. |
+| MAS callable operations | Owner-published `mas` ToolCatalog | Read pinned metadata; do not invent Owner capabilities |
+| Host Context schemas | Host-published `ca-context` Schema Bundle | Resolve / display pinned schemas; do not claim Owner authority |
+| SBI message schemas | Read-only `ca-client` Interface Package | Schema IntelliSense only; it is **not** the MAS Contract root |
+| Dependency closure | Project lock and immutable package snapshots | Inspect and preserve the lock; do not mutate imported package contents |
+| Skill compilation | Standalone CA Skill Compiler | Invoke the current v2.0.2 adapter; do not embed a second Compiler in Studio |
 
-## 3. Source authority and workbench data flow
+Compiler v2.1.0 Development Build / Verify is not integrated into main. Formal MAS and Host Context Interface Package Contract roots are still missing; the Studio must not synthesize package identities or report the Example as LINKED / BUILT without them. See [Dependency / Interface Package Architecture](dependency-and-interface-package.md) and [#269](https://github.com/odango-chan/ca-skill-studio-demo/issues/269).
 
-~~~text
-Native Skill Source + exact locked dependency snapshots
-   ↓
-CA-SL v1alpha5 Language Service / bounded source projections
-   ↓
-Preview / Outline / Problems / Package Explorer (derived views)
-   ↓
-Host-validated source patch → Diff / explicit confirmation
-   ↓
-Native WorkspaceEdit → Source revision / Undo / Redo
-~~~
+## 5. Example ownership and replacement
 
-YAML Source and immutable dependency snapshots are the authoritative inputs consumed by Studio. Graph nodes, edges, layout, selected elements, Inspector state, completion items and Problems are derived projections; they are not separate business truth. A visual edit must be tied to the exact document URI, source revision and source span, then reparsed and revalidated before it is applied. Ambiguous or stale edits fail closed.
+The default Example is the three OpenAMSM Scheme C Skills: Create, Modify and Release. The conventional `establish-pdu-session` 5GC Skill is a separate NOT_QUALIFIED fixture and is not part of the default Example.
 
-Local syntax / source diagnostics, Package Audit, Compiler diagnostics, Host Admission and Runtime Execution are separate result domains. A local hint or a successful source projection is not a Compiler PASS. A Compiler Build is not Host Admission or Runtime Execution.
+Replacing the seeded Example requires explicit confirmation. A replacement must not touch ordinary user projects or unconfirmed Example sources. The current importer still needs a staged commit / rollback journal and fault-injection coverage; until [#280](https://github.com/odango-chan/ca-skill-studio-demo/issues/280) closes, replacement failure atomicity is **OPEN** and the UI must not claim a successful replacement after partial writes.
 
-## 4. Current Example and dependency boundary
+## 6. Workspace persistence and recovery
 
-The default Example contains the three OpenAMSM Scheme C Skills:
+The browser workbench persists workspace data through the Theia browser storage provider (OPFS / IndexedDB) and the browser profile. A successful same-build reload is not evidence of old-artifact → new-artifact upgrade safety, nor does it establish production durability.
 
-- `establish-pdu-session-mas`
-- `modify-pdu-session-mas`
-- `release-pdu-session-mas`
+- [#225](https://github.com/odango-chan/ca-skill-studio-demo/issues/225): cross-artifact upgrade with the same persistent browser profile remains OPEN.
+- [#239](https://github.com/odango-chan/ca-skill-studio-demo/issues/239): intermittent storage EIO / recovery remains OPEN.
+- Workspace Identity and Package Inventory must not report READY while a restore / replacement transaction is incomplete or recoverably BLOCKED.
 
-It pins three dependency kinds: `mas` Owner ToolCatalog, `ca-context` Host Context Schema Bundle and `ca-client` read-only SBI Interface Package. `ca-client` is for query Schema IntelliSense only; it is not a MAS Contract root. The current `mas` and `ca-context` sources are not formal Compiler v2.1.0 Interface Package Contract roots. See the [dependency architecture](dependency-and-interface-package.md).
+## 7. Diagnostics and qualification
 
-The Example is DRAFT / NOT_QUALIFIED. A pinned ToolCatalog, Schema Bundle or Interface Package proves snapshot provenance, not Owner authorization, Host Admission, Runtime execution or real 5GC qualification. Do not re-add the separate illustrative conventional 5GC Skill to the default Example.
+LSP diagnostics, Package Audit, Compiler diagnostics and Runtime / Owner outcomes are separate authorities. Problems and Test Explorer must preserve the source and result type; a successful package audit is not a successful compile or Runtime execution. Result-boundary acceptance remains tracked by [#211](https://github.com/odango-chan/ca-skill-studio-demo/issues/211).
 
-## 5. Workspace and project layout
+IDE Host, Browser Host, Browser-Only Chromium, Pages build and deployment prove only their named scope on the exact tested SHA. They do not prove formal package admission, Owner commit, Host continuation, Runtime execution, real 5GC E2E or Production Qualification.
 
-The current Example importer writes to the extension-owned `skill-studio-demo/` project root. Its authored source is under `skills/`; workspace settings are host-native `.vscode/settings.json`; immutable dependency snapshots are under `.skill-studio/dependencies/<digest>/`. It does not create mandatory `lib/` or `output/` folders.
+## 8. Current open acceptance boundaries
 
-A user's existing Example is never silently replaced. Replacement requires explicit confirmation. The current importer validates bundled sources before mutation and verifies the resulting inventory, but its active-root writes do not yet provide a full failure-atomic rollback boundary; see [#280](https://github.com/odango-chan/ca-skill-studio-demo/issues/280). Persistent-profile restore / upgrade remains separately gated by [#225](https://github.com/odango-chan/ca-skill-studio-demo/issues/225).
-
-## 6. Qualification and non-goals
-
-- Browser / Theia / IDE Host / Pages tests prove only the named editor and host scope.
-- The bundled Example and Schema completions are authoring material; they do not authorize Tool invocation.
-- Studio does not execute user Python, Skill Runtime, Provider calls or 5GC procedures in the online Pages environment.
-- Do not add production signing, package admission, Runtime trust registries or 5GC orchestration to Studio merely to make the demo appear qualified.
-- Do not restore Classic, CA-SL legacy compatibility, an extra Source/Preview editor group, a second parser, a second LSP or a Studio-owned linker.
+| Area | Tracking | Current boundary |
+|---|---|---|
+| Console Source / dirty-buffer lifecycle | [#291](https://github.com/odango-chan/ca-skill-studio-demo/pull/291) | 5/5 exact-head PASS; Ready for Review, not merged |
+| Preview null-document lifecycle | [#220](https://github.com/odango-chan/ca-skill-studio-demo/issues/220), [#293](https://github.com/odango-chan/ca-skill-studio-demo/pull/293) | 5/5 exact-head PASS on #291 base; retarget and rerun after #291 merges |
+| Example replacement atomicity | [#280](https://github.com/odango-chan/ca-skill-studio-demo/issues/280) | Staging, rollback, restart recovery and fault injection not complete |
+| Persistent profile / EIO | [#225](https://github.com/odango-chan/ca-skill-studio-demo/issues/225), [#239](https://github.com/odango-chan/ca-skill-studio-demo/issues/239) | Cross-artifact same-profile upgrade and recovery not complete |
+| Visible action parity | [#237](https://github.com/odango-chan/ca-skill-studio-demo/issues/237) | Complete command → handler → UI → test inventory and retired affordance cleanup not complete |
+| Markdown worker / TreeModel | [#288](https://github.com/odango-chan/ca-skill-studio-demo/issues/288) | Actual worker / TreeModel stack not captured |
+| Compiler v2.1.0 / package roots | [#269](https://github.com/odango-chan/ca-skill-studio-demo/issues/269) | Formal MAS / Host Context package roots and v2.1.0 integration not complete |
+| Product acceptance | [#279](https://github.com/odango-chan/ca-skill-studio-demo/issues/279) | Overall product audit remains OPEN |
 
 ## Revision record
 
-- **2026-11-26:** Replaced stale 2026-11-03 ownership / source-protection statements with the current Theia-only workbench, v1alpha5 authority, current OpenAMSM Example, three dependency kinds, Compiler v2.0.2 / v2.1.0 boundary and explicit non-qualification scope. Evidence: current main SHA, extension source, dependency service and Example manifest.
+- **2026-11-26 — Replaced the superseded v0 boundary note with the current ownership / authority baseline.** Sections: product boundary, workbench surface, Source authority, dependency / Compiler ownership, Example replacement, persistence, diagnostics and open acceptance. Reason: make the document referenced as canonical by docs/README.md accurate for the current Theia / v1alpha5 product and explicit about unresolved Demo blockers. Author: ChatGPT (GPT-6.2).
