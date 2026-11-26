@@ -256,7 +256,13 @@ async function readTransactionFile(fs,uri,path){
     catch(error){
       if(!isMissingTransactionEntry(error))throw error;
       lastError=error;
-      if(typeof fs.stat!=="function")throw error;
+      if(typeof fs.stat!=="function"){
+        // FileNotFound is the provider's normalized absence result. Other
+        // missing-entry variants require stat confirmation before treating
+        // them as absent; otherwise recovery must fail closed.
+        if(error?.code==="FileNotFound")return null;
+        throw error;
+      }
       try{
         const info=await fs.stat(uri);
         if((info.type&1)!==1)
@@ -276,7 +282,13 @@ async function readTransactionDirectory(fs,uri,path){
     catch(error){
       if(!isMissingTransactionEntry(error))throw error;
       lastError=error;
-      if(typeof fs.stat!=="function")throw error;
+      if(typeof fs.stat!=="function"){
+        // FileNotFound is the provider's normalized absence result. Other
+        // missing-entry variants require stat confirmation before treating
+        // them as absent; otherwise recovery must fail closed.
+        if(error?.code==="FileNotFound")return null;
+        throw error;
+      }
       try{
         const info=await fs.stat(uri);
         if((info.type&2)!==2)
@@ -434,15 +446,12 @@ async function writeReplacementMarker(fs,vscode,paths,state,details){
   }
 }
 async function readReplacementMarker(fs,paths,state){
-  try{
-    const value=JSON.parse(decoder.decode(await fs.readFile(paths.marker(state))));
-    if(value?.schemaVersion!==1||value.state!==state)
-      fail("Invalid "+state+" Example replacement marker");
-    return value;
-  }catch(error){
-    if(error?.code==="FileNotFound")return null;
-    throw error;
-  }
+  const bytes=await readTransactionFile(fs,paths.marker(state),state+".json");
+  if(bytes===null)return null;
+  const value=JSON.parse(decoder.decode(bytes));
+  if(value?.schemaVersion!==1||value.state!==state)
+    fail("Invalid "+state+" Example replacement marker");
+  return value;
 }
 function validateReplacementMarker(marker,paths){
   if(marker?.schemaVersion!==1||
@@ -600,11 +609,9 @@ async function recoverExampleReplacementInternal(vscode,storageUri){
     return {status:"ABORTED_BEFORE_COMMIT"};
   }
   if(!Object.values(markers).some(Boolean)){
-    try{await fs.readDirectory(paths.transactionRoot);}
-    catch(error){
-      if(error?.code==="FileNotFound")return {status:"CLEAN"};
-      throw error;
-    }
+    const entries=await readTransactionDirectory(fs,paths.transactionRoot,
+      REPLACEMENT_TRANSACTION_DIRECTORY);
+    if(entries===null)return {status:"CLEAN"};
     await deleteIfPresent(fs,paths.transactionRoot);
     return {status:"ORPHAN_CLEANED"};
   }
