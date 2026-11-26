@@ -131,10 +131,19 @@ test("Welcome can be explicitly reopened while an existing project workspace is 
   assert.equal(h.handle.getDiagnostics().panelOpen,true);
   assert.equal(h.handle.getDiagnostics().createWebviewPanelAvailable,true);
   assert.equal(h.handle.getDiagnostics().lastError,null);
-  assert.match(h.webview.html,/current CA-SL 5GC Establish, MAS Establish \/ Modify \/ Release reference Skills/,
-    "Welcome must describe the single current CA-SL Example without legacy/version split");
+  assert.match(h.webview.html,/three OpenAMSM Scheme C CA-SL v1alpha5 Create, Modify and Release Skills/,
+    "Welcome must describe the three current OpenAMSM Scheme C Skills");
+  assert.doesNotMatch(h.webview.html,/5GC Establish/,
+    "the separate conventional 5GC fixture must not be presented as part of the default Example");
 });
 
+
+test("Chinese Welcome describes only the three current OpenAMSM Scheme C Skills",()=>{
+  const h=setupWelcome("zh-cn");
+  assert.match(h.webview.html,/OpenAMSM Scheme C 的 CA-SL v1alpha5 Create、Modify、Release 三个 Skill/);
+  assert.doesNotMatch(h.webview.html,/5GC\/MAS 参考 Skill/);
+  assert.match(h.webview.html,/DRAFT \/ NOT_QUALIFIED/);
+});
 
 test("retired Procedure-AST authoring commands are not exposed in the current host",()=>{
   const manifest=JSON.parse(readFileSync(
