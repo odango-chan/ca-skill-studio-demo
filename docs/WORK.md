@@ -24,7 +24,7 @@
 | Markdown worker | [#288](https://github.com/odango-chan/ca-skill-studio-demo/issues/288) | Capture the actual worker / TreeModel stack; do not conflate with Console Source restoration |
 | Compiler v2.1.0 | [#269](https://github.com/odango-chan/ca-skill-studio-demo/issues/269) | Rebase and finish generic API integration; wait for formal MAS / Host Context Interface Package roots before claiming Example Build |
 | Diagnostics | [#211](https://github.com/odango-chan/ca-skill-studio-demo/issues/211) | Close Problems / Test Explorer / Compiler / Package Audit source and result-boundary acceptance |
-| Preview lifecycle | [#220](https://github.com/odango-chan/ca-skill-studio-demo/issues/220) | Draft [#293](https://github.com/odango-chan/ca-skill-studio-demo/pull/293) covers null-document invalidation; Browser-Only retry is still pending |
+| Preview lifecycle | [#220](https://github.com/odango-chan/ca-skill-studio-demo/issues/220) | Draft [#293](https://github.com/odango-chan/ca-skill-studio-demo/pull/293) covers null-document invalidation and is stacked on #291 so Browser-Only includes the Console Source fix; combined exact-head gates are pending |
 | Documentation | [#285](https://github.com/odango-chan/ca-skill-studio-demo/issues/285) | WORK compacted here; TRACEABILITY still needs evidence-prose compaction and link verification |
 
 ## Open PRs — exact current state
@@ -34,7 +34,7 @@
 - [#289](https://github.com/odango-chan/ca-skill-studio-demo/pull/289) Preview labels: Browser-Only / Pages must be rerun after #291 lands.
 - [#291](https://github.com/odango-chan/ca-skill-studio-demo/pull/291) Console Source / dirty-buffer restoration: 5/5 exact-head gates PASS; ready for review, not merged.
 - [#292](https://github.com/odango-chan/ca-skill-studio-demo/pull/292) Markdown worker diagnostics: no worker stack captured; rerun after #291 lands.
-- [#293](https://github.com/odango-chan/ca-skill-studio-demo/pull/293) Preview null-document lifecycle: IDE Host / PR Verify / Browser Host / Pages PASS; Browser-Only Native Undo retry is in progress; not yet all-green.
+- [#293](https://github.com/odango-chan/ca-skill-studio-demo/pull/293) Preview null-document lifecycle: IDE Host / PR Verify / Browser Host / Pages PASS; stacked on #291; combined Browser-Only / Pages / host gates are in progress.
 - Older drafts are not promotable: #271 has no workflow runs and is not mergeable; #272 and #275 use old main `db8353b...`; #275 Pages failed; #276 is stacked on the old #272 head. Historical PASS is not current-main evidence.
 
 ## Current guardrails
