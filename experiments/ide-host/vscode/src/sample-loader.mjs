@@ -298,6 +298,34 @@ async function readTransactionFile(fs,uri,path){
   }
   throw lastError;
 }
+async function readWrittenTransactionFile(fs,uri,path){
+  let lastReadError=null,lastStatError=null;
+  for(let attempt=0;attempt<3;attempt++){
+    try{return await fs.readFile(uri);}
+    catch(error){
+      if(!isMissingTransactionEntry(error))throw error;
+      lastReadError=error;
+      if(typeof fs.stat!=="function")throw error;
+      try{
+        const info=await fs.stat(uri);
+        if((info.type&1)!==1)
+          fail("Published Example transaction path is not a file after write: "+path);
+      }catch(statError){
+        if(isMissingTransactionEntry(statError)){
+          lastStatError=statError;
+          continue;
+        }
+        throw statError;
+      }
+    }
+  }
+  const reason=lastStatError
+    ? "read="+String(lastReadError?.message??lastReadError)+
+      "; stat="+String(lastStatError?.message??lastStatError)
+    : String(lastReadError?.message??lastReadError);
+  fail("Published Example transaction file remained unreadable after write: "+
+    path+" ("+reason+")");
+}
 async function readTransactionDirectory(fs,uri,path){
   let lastError=null;
   for(let attempt=0;attempt<3;attempt++){
@@ -790,13 +818,19 @@ async function seedExampleProjectTransaction(vscode,extensionUri,storageUri,
     const settingsEntry=candidateInventory.find(entry=>
       entry.path===".vscode/settings.json"&&entry.kind==="file");
     if(!settingsEntry)fail("Staged Example dependency settings are missing");
-    const settingsBytes=await fs.readFile(
-      relativeUri(vscode,paths.candidateRoot,settingsEntry.path));
+    const settingsBytes=await readTransactionFile(fs,
+      relativeUri(vscode,paths.candidateRoot,settingsEntry.path),settingsEntry.path);
+    if(settingsBytes===null)
+      fail("Staged Example dependency settings disappeared before publication");
     if(await gitBlobSha1(settingsBytes)!==settingsEntry.digest)
       fail("Staged Example dependency settings changed before publication");
-    await fs.writeFile(relativeUri(vscode,paths.activeRoot,settingsEntry.path),settingsBytes);
-    const writtenSettings=await fs.readFile(
-      relativeUri(vscode,paths.activeRoot,settingsEntry.path));
+    const activeSettingsUri=relativeUri(vscode,paths.activeRoot,settingsEntry.path);
+    await fs.writeFile(activeSettingsUri,settingsBytes);
+    // OPFS can briefly report EntryNotFound for a just-published file. Retry
+    // only while the exact path is confirmed to remain a regular file; if the
+    // file is genuinely absent or changes type, keep the transaction fail-closed.
+    const writtenSettings=await readWrittenTransactionFile(fs,
+      activeSettingsUri,settingsEntry.path);
     if(await gitBlobSha1(writtenSettings)!==settingsEntry.digest)
       fail("Published Example dependency settings failed byte verification");
 
