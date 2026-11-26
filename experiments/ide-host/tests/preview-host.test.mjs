@@ -66,6 +66,8 @@ test("Procedure session reuses the same WebviewView and disposes on active file 
   assert.deepEqual(disposed,[procedure.uri.toString(),procedure.uri.toString()]);
 });
 
+// Browser-only mode-roundtrip acceptance is supplied by stacked base PR #291;
+// this focused test isolates Preview session invalidation on the null-document transition.
 test("resolving a live Preview with no active document invalidates and disposes the old session",()=>{
   const sessions=[];
   const controller=createPreviewHostController({mountProcedure(document,_,options){
