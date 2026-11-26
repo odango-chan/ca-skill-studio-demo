@@ -281,6 +281,15 @@ async function verifyTreeManifest(fs,vscode,root,expected,label){
 }
 async function pruneToManifest(vscode,fs,root,manifest){
   const expected=new Map(manifest.map(entry=>[entry.path,entry.kind]));
+  if(typeof fs.stat==="function"){
+    try{
+      const rootStat=await fs.stat(root);
+      if((rootStat.type&64)===64)
+        fail("Active Example root became a symbolic link during transaction recovery");
+      if((rootStat.type&2)!==2)
+        fail("Active Example root is not a directory during transaction recovery");
+    }catch(error){if(error?.code!=="FileNotFound")throw error;}
+  }
   await fs.createDirectory(root);
   async function visit(directory,prefix){
     for(const [name,type] of await fs.readDirectory(directory)){
