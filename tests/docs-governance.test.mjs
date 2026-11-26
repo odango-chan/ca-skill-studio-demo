@@ -75,14 +75,14 @@ test("current dependency architecture is canonical and old project proposals are
 test("WORK is a compact current snapshot and preserves dated history separately",()=>{
   const work=content("docs/WORK.md"),history=content("docs/WORK-history.md");
   const map=content("docs/README.md"),governance=content("docs/DOCUMENTATION.md");
-  const lines=work.trim().split(/\\r?\\n/).length;
+  const lines=work.trim().split(/\r?\n/).length;
   assert.ok(lines>=40&&lines<=120,"WORK must remain a 40–120 line current-state panel; got "+lines);
-  assert.match(work,/WORK-history\\.md/);
+  assert.match(work,/WORK-history\.md/);
   assert.match(history,/Historical snapshots/);
   assert.match(history,/eaadf9488ec3b5d6d6f60eb7090a2dee715d440b/);
   assert.match(history,/NOT_RUN/);
-  assert.match(map,/WORK-history\\.md/);
-  assert.match(governance,/WORK-history\\.md/);
+  assert.match(map,/WORK-history\.md/);
+  assert.match(governance,/WORK-history\.md/);
 });
 
 test("documentation governance identifies the current dependency architecture and WORK compaction follow-up",()=>{
@@ -90,7 +90,7 @@ test("documentation governance identifies the current dependency architecture an
   assert.match(governance,/Updated: 2026-11-26/);
   assert.match(governance,/dependency-and-interface-package\.md/);
   assert.match(governance,/#285/);
-  assert.match(governance,/WORK-history\\.md/);
+  assert.match(governance,/WORK-history\.md/);
 });
 
 test("current workbench and Package Explorer ADRs no longer claim implementation is pending",()=>{
@@ -132,7 +132,7 @@ test("current Theia Preview is read-only and legacy Designer docs are historical
   const phase=content("docs/design/phase-designer.md");
   const d1=content("docs/D1-procedure-designer.md");
   const d2=content("docs/D2-node-designer.md");
-  assert.match(work,/Procedure \/ Contract \/ Predicate \/ Schema Preview 均为只读 Source 投影/);
+  assert.match(work,/Procedure \/ Contract \/ Predicate \/ Schema Preview is read-only/);
   assert.match(map,/Historical D3 Route Designer/);
   assert.match(map,/Historical D4 Phase Designer/);
   for(const doc of [route,phase,d1,d2])assert.match(doc,/HISTORICAL/);
