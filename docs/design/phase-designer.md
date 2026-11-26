@@ -1,9 +1,11 @@
 # D4 Phase Designer · Runtime-used Step Authoring
 
-**Status: A1/A2.1/A2.2a/A2.2b1/A3a/A3b1/A3b2a/A3b2b1 Accepted; A3b2b2a impact Accepted (read-only); A4a observed Phase Route retarget Accepted; A4b1 bounded Phase Outcome repair Accepted; A2.2b2/A3b2b2b/A4b2 Proposed · Date: 2026-11-04**  
-**Implementation: A1/A2.1/A2.2a/A2.2b1/A3a/A3b1/A3b2a/A3b2b1/A3b2b2a merged; A4a merged; A4b1 implemented in PR #39; A2.2b2/A3b2b2b/A4b2 NOT_STARTED**  
-**Acceptance: A2.2a 245 tests + Chromium PASS; A2.2b1 258 tests + real Chromium PASS; Runtime/5GC NOT_RUN**  
+**Status: HISTORICAL — bounded standalone Phase Step Designer experiment; not the current Theia product contract · Original date: 2026-11-04**  
+**Historical implementation: the named D4 slices retain their original recorded status; they describe the former standalone editor, not the current Theia Preview**  
+**Historical acceptance: 245/258 tests and Chromium PASS apply only to the named original editor-tier heads; Runtime/5GC NOT_RUN**  
 **Tracking: [Issue #15](https://github.com/odango-chan/ca-skill-studio-demo/issues/15)**
+
+本页仅保留旧独立 Phase Step Designer 的设计与验收历史。当前 Theia Preview 对 Procedure / Contract / Predicate / Schema 均为只读投影；不得把本页的历史编辑切片视为当前可见操作或要求恢复 Visual mutation。当前 UI 以 ADR-0005 为准；如需新增编辑能力，必须先关联 Issue 并完成当前 v1alpha5 Source / Patch 设计评审。
 
 ## Model and visual hierarchy
 
@@ -188,3 +190,7 @@ Current `call` operations such as `sbi.udm.sm_data.get` and `ca.session.pcf_crea
 当前 owner `ca-agent-demo@eaadf948` 的 `bind-udm-hold` / `bind-pcf-hold` 输入绑定可显示缺少 Call 消费端 ABI；其后 `hold_bound` Verify 的输出引用可显示来源位于同 Node 的前序 Step，但没有由当前 Package 唯一证明的 Tool 输出 Schema。前驱 Node 的引用仅表示 Source 图可追溯，不等于 Runtime 结果已生成。Inspector 始终保留精确 Source 行跳转。
 
 本阶段期望的测试：纯函数针对真实当前 owner 的 UDM/PCF hold、Script 类型对照、unknown/quoted/ambiguous 反例；Chromium 检查真实 Step 行摘要、详情中的限制原因、没有新编辑控件和原始 YAML 未发生变化。[PR #53 CI #41983285953](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41983285953) 在代码提交 `71baff57` 上通过 374/374 单测、TypeScript、Build、真实 Chromium（UDM/PCF hold 来源文案、只读控件、Source 原文不变）PASS。若此文档提交产生新的 PR HEAD，必须再核对该 HEAD 的验收结果；resulting-main Pages 在合并前 NOT_RUN。正式 Tool ABI owner 契约、Runtime/5GC、Case 和发布工作台均不在本阶段。
+
+## Revision record
+
+- **2026-11-26 — Marked D4 as historical.** Sections: status and current-product boundary. Reason: separate completed standalone-editor milestones from the current read-only Theia Preview and prevent historical D4 slices from being treated as current acceptance. Author: ChatGPT (GPT-6.2).
