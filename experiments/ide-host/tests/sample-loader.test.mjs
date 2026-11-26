@@ -842,6 +842,9 @@ test("Confirmed Example replacement leaves ordinary user projects untouched and 
 test("Confirmed replacement reconciles stale OPFS directory entries without treating missing files as backup data",async()=>{
   const h=host();
   const before=await seedExistingExample(h);
+  const preservedMetadataPath=root+"/.skill-studio/user-metadata.json";
+  const preservedMetadata=encode("{\\"workspaceLabel\\":\\"my Example notes\\"}\\n");
+  h.files.set(preservedMetadataPath,preservedMetadata);
   const settings=JSON.parse(decode(h.files.get(root+"/.vscode/settings.json")));
   const owner=settings["connectionAgent.skillStudio.dependencyLock"].entries
     .find(entry=>entry.id==="mas");
@@ -866,6 +869,8 @@ test("Confirmed replacement reconciles stale OPFS directory entries without trea
   assert.ok(h.files.has(root+"/.skill-studio/dependencies/"+
     rebuiltOwner.snapshotDigest.slice(7)+"/schemas/"+staleName),
     "the new pinned dependency snapshot must be complete, not reuse the stale cache");
+  assert.deepEqual(h.files.get(preservedMetadataPath),preservedMetadata,
+    "authored .skill-studio metadata must survive dependency-cache regeneration");
 });
 
 test("Transaction backup retries a transient EntryNotFound when stat confirms the file still exists",async()=>{
