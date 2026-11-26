@@ -11,22 +11,25 @@ Studio 拥有浏览器编辑器，不拥有正式 Skill/Runtime/MCP 业务真相
 1. [README](../README.md) 与 [AGENTS](../AGENTS.md) — 目标/开发规约
 2. [WORK](WORK.md) — **唯一当前实现与验收状态**
 3. [TRACEABILITY](TRACEABILITY.md) — Contract/设计 → 生产代码 → 测试 → 实际证据
-4. [Architecture](architecture/studio-boundaries.md) — ownership、Source authority
-5. [Plugin-managed Configuration v0.1](architecture/plugin-managed-configuration-v0.1.md) — 原生 Settings、Dependency Snapshot / Lock、Compiler 输入与所有权边界
-6. [Workbench](design/authoring-workbench.md) — 当前 UX / Patch / Source 交互
-7. [AI Procedure Authoring](design/ai-procedure-authoring.md) — v1alpha5-only AI 编辑、Host-owned Change Set、独立 Go Gateway、本机 / 内网部署与 Compiler Apply gate
+4. [Studio Ownership / Source Authority](architecture/studio-boundaries.md) — 当前 ownership、Source authority、Theia-only 产品边界
+5. [Dependency / Interface Package Architecture](architecture/dependency-and-interface-package.md) — 当前 Studio lock、immutable snapshots、Example dependency closure、Schema IntelliSense 与 Compiler v2.1.0 边界
+6. [Workbench](design/authoring-workbench.md) — Source / Preview / Patch 交互历史；当前工作台布局以 ADR-0005 为准
+7. [AI Procedure Authoring](design/ai-procedure-authoring.md) — v1alpha5-only AI 编辑、Host-owned Change Set、独立 Go Gateway 与 Compiler Apply gate
    - [Authoring Core](../authoring/core/README.md) — 平台无关 Model Client / ModelProposal
    - [Go AI Gateway](https://github.com/odango-chan/ai-gateway) · [Browser CORS issue #4](https://github.com/odango-chan/ai-gateway/issues/4)
-8 [D3 Route Designer](design/route-designer.md) — `operator.on` 有界编辑已实现；Runtime 资格未验收
-9 [D4 Phase Designer](design/phase-designer.md) — A1/A2.1/A2.2a 已合入；A2.2b1 消费者 ABI 对照通过浏览器测试；A2.2b2/A3/A4 Proposed
-10 [E Source Editor](design/source-editor-workstream.md) — Monaco / shared D4 history and E2–E4 scope
-11 [Application Shell](design/application-shell.md) — Web/Local 共用菜单命令与未来本地执行边界
-12 [Skill Language Core / Browser LSP · L2-D1](design/skill-lsp-l2d-editor-acceptance.md) — 共享语言分析、Browser Worker 与真实 Theia 编辑器 Provider 验收边界
-13 [L2-D2 Live Problems](design/skill-lsp-l2d2-live-problems.md) — 原生 Problems 诊断出现、修复清除与 Package generation 验收
-14 [ADR-0002 Theia default online host (historical migration record)](decisions/0002-ide-host-spike.md) — Theia 默认在线宿主的历史迁移决策；Classic fallback 已退役
-15 [ADR-0003 Native Workbench / Inspector / Markdown](decisions/0003-native-workbench-and-markdown.md) — 原生视图、右侧 Inspector、Data Flow 与 Markdown 决策
-16 [ADR-0004 Package-first Workspace](decisions/0004-package-first-workspace.md) — Package Explorer 默认入口、Dependencies / Build Artifacts 组合及资源所有权
-17 [Documentation Governance](DOCUMENTATION.md) — canonical source map
+8. [D3 Route Designer](design/route-designer.md) — `operator.on` 有界编辑与剩余资格边界
+9. [D4 Phase Designer](design/phase-designer.md) — Phase Step 编辑范围与验收
+10. [E Source Editor](design/source-editor-workstream.md) — Source editor workstream
+11. [Application Shell](design/application-shell.md) — Web/Local 菜单命令与本地宿主边界
+12. [Skill Language Core / Browser LSP · L2-D1](design/skill-lsp-l2d-editor-acceptance.md) — 共享语言分析与真实 Theia Provider 验收
+13. [L2-D2 Live Problems](design/skill-lsp-l2d2-live-problems.md) — Problems 诊断与 Package generation
+14. [ADR-0002 Theia default online host (historical migration record)](decisions/0002-ide-host-spike.md) — Theia 默认在线宿主迁移历史；Classic 已退役
+15. [ADR-0003 Native Workbench / Inspector / Markdown](decisions/0003-native-workbench-and-markdown.md) — 原生视图、Inspector、Data Flow 与 Markdown 决策
+16. [ADR-0004 Package-first Workspace](decisions/0004-package-first-workspace.md) — Package Explorer / Dependencies / Build Artifacts 组合
+17. [ADR-0005 Fixed Source + Preview](decisions/0005-fixed-source-preview-workbench.md) — 当前固定 Source + Preview 工作台
+18. [Documentation Governance](DOCUMENTATION.md) — canonical source map
+
+**Historical proposals, not current implementation contracts:** [Plugin-managed Configuration v0.1](architecture/plugin-managed-configuration-v0.1.md) and [SKILL Project layout](architecture/skill-project-layout.md). They preserve decision history; use the current Dependency Architecture and WORK instead.
 
 ## 已完成阶段技术记录
 
