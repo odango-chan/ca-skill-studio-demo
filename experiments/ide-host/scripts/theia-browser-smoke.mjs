@@ -559,6 +559,10 @@ try{
   await revealStudioSubmenu('Project',['New Project','Open Project','Open Example Project']);
   await revealStudioSubmenu('Skill',['Check Skill','Build Skill','Inspect Dependencies']);
   await revealStudioSubmenu('Dependencies',['Add Dependency','Refresh Dependencies']);
+  await revealStudioSubmenu('Authoring',[
+    'Open Procedure Preview','Open Contract Preview',
+    'Open Predicate Preview','Open Schema Preview'
+  ]);
   await command("Input.dispatchKeyEvent",{type:"keyDown",key:"Escape",code:"Escape",windowsVirtualKeyCode:27});
   await command("Input.dispatchKeyEvent",{type:"keyUp",key:"Escape",code:"Escape",windowsVirtualKeyCode:27});
   await command("Input.dispatchMouseEvent",{type:"mousePressed",x:390,y:270,button:"left",clickCount:1});
@@ -1431,9 +1435,29 @@ try{
      upgradedIdentity?.libExists||upgradedIdentity?.outputExists||
      upgradedIdentity?.workspaceFolders?.length!==1||
      upgradedEvidence?.packageInventory?.packages?.length!==3||
-     upgradedEvidence?.failures?.length)
+     upgradedEvidence?.failures?.length){
+    try{
+      upgradedEvidence=await evalJS("(()=>{const c=window.theia?.container;if(!c)return null;const k=[...(c._bindingDictionary?._map?.keys?.()??[])].find(x=>typeof x==='function'&&x.prototype?.executeCommand&&x.prototype?.registerCommand&&x.prototype?.getCommand);return k?c.get(k).executeCommand('skillStudio.showActivationDiagnostics'):null})()");
+    }catch(error){
+      upgradedEvidence={diagnosticsError:String(error?.message??error)};
+    }
+    const activationSummary=upgradedEvidence?{
+      exampleReplacement:upgradedEvidence.exampleReplacement??null,
+      lastExampleImport:upgradedEvidence.lastExampleImport??null,
+      welcome:upgradedEvidence.welcome??null,
+      failures:upgradedEvidence.failures??null,
+      components:upgradedEvidence.components??null,
+      packageInventory:upgradedEvidence.packageInventory?{
+        state:upgradedEvidence.packageInventory.state,
+        message:upgradedEvidence.packageInventory.message,
+        availabilityState:upgradedEvidence.packageInventory.availabilityState,
+        packageCount:upgradedEvidence.packageInventory.packageCount
+      }:null
+    }:null;
     throw Error("Explicit Example replacement did not restore a clean current v1alpha5 project: "+
-      JSON.stringify({identity:upgradedIdentity,activation:upgradedEvidence}).slice(0,3200));
+      JSON.stringify({identity:upgradedIdentity,activation:activationSummary,
+        ui:await evalJS("document.body.innerText.slice(-1800)")}).slice(0,5200));
+  }
   console.log("STUDIO_LEGACY_EXAMPLE_REPLACEMENT_CHROMIUM_PASS",JSON.stringify({
     menu:recoveryMenu,legacyVersion:legacyIdentity.contractApiVersion,
     cancelPreserved:afterCancel.contractApiVersion,
@@ -1490,10 +1514,12 @@ try{
       if(matchesDirtySource(restored))break;
       await sleep(100);
     }
+    const modeDiagnostics=await studioCommand("skillStudio.internal.workspaceModeDiagnostics");
+    console.log("STUDIO_WORKSPACE_MODE_DIAGNOSTICS_CHROMIUM",JSON.stringify(modeDiagnostics));
     if(!matchesDirtySource(restored))
       throw Error("Console round trip lost selected file or unsaved Source: "+
         JSON.stringify({expectedUri:dirty.uri,actualUri:restored?.uri,
-          expectedDirty:dirty.dirty,actualDirty:restored?.dirty}));
+          expectedDirty:dirty.dirty,actualDirty:restored?.dirty,modeDiagnostics}));
     await sourceState('undo');
     for(let attempt=0;attempt<40;attempt++){
       if((await sourceState('read'))?.text===original.text)break;

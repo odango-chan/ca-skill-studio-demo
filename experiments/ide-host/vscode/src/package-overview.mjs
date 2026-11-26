@@ -159,7 +159,8 @@ function treeNode(vscode, node) {
   return item;
 }
 export function registerPackageOverview(vscode,context,getActiveDocument=()=>null,
-  {dependenciesProvider=null,compilerProvider=null,getProjectRoot=()=>null,onPackagesChanged=()=>{}}={}) {
+  {dependenciesProvider=null,compilerProvider=null,getProjectRoot=()=>null,
+    getAvailability=()=>({state:"READY"}),onPackagesChanged=()=>{}}={}) {
   let packages = [], message = '等待扫描当前 Workspace', inventoryState = 'loading', timer = null, generation = 0;
   const emitter = new vscode.EventEmitter();
   let observedRootSignature = null;
@@ -219,6 +220,17 @@ export function registerPackageOverview(vscode,context,getActiveDocument=()=>nul
     onDidChangeTreeData:emitter.event,
     async getChildren(node) {
       treeReads++;
+      const availability=getAvailability?.()??{state:"READY"};
+      if(availability.state!=="READY"){
+        packages=[];
+        inventoryState="unavailable";
+        message=availability.message??"Example replacement is in progress or requires recovery";
+        notifyPackagesChanged(packages);
+        if(node?.kind==="section"&&node.section==="skills")return skillsChildren();
+        if(node?.kind==="section")
+          return [{kind:"message",text:message,sourceSection:node.section}];
+        if(node)return [{kind:"message",text:message,sourceSection:node.sourceSection??null}];
+      }
       const readKind=node?.kind==='package'?'package':
         node?.kind==='group'?'group':node?.kind==='section'?'section':
         node?.sourceSection==='dependencies'?'dependency':
@@ -233,7 +245,15 @@ export function registerPackageOverview(vscode,context,getActiveDocument=()=>nul
             kind:'message',text:'Dependency Service unavailable',
             sourceSection:'dependencies'
           }];
-          return decorateDependencyNodes(await dependenciesProvider.getChildren());
+          const children=await dependenciesProvider.getChildren();
+          const latestAvailability=getAvailability?.()??{state:"READY"};
+          if(latestAvailability.state!=="READY"){
+            packages=[];inventoryState="unavailable";
+            message=latestAvailability.message??"Example replacement is in progress or requires recovery";
+            notifyPackagesChanged(packages);fire();
+            return [{kind:"message",text:message,sourceSection:"dependencies"}];
+          }
+          return decorateDependencyNodes(children);
         }
         if(node.section==='artifacts'){
           if(!compilerProvider)return [{kind:'message',text:'Compiler Artifact Service unavailable',sourceSection:'artifacts'}];
@@ -243,7 +263,15 @@ export function registerPackageOverview(vscode,context,getActiveDocument=()=>nul
       }
       if(node.sourceSection==='dependencies'){
         if(!dependenciesProvider)return [];
-        return decorateDependencyNodes(await dependenciesProvider.getChildren(node),node);
+        const children=await dependenciesProvider.getChildren(node);
+        const latestAvailability=getAvailability?.()??{state:"READY"};
+        if(latestAvailability.state!=="READY"){
+          packages=[];inventoryState="unavailable";
+          message=latestAvailability.message??"Example replacement is in progress or requires recovery";
+          notifyPackagesChanged(packages);fire();
+          return [{kind:"message",text:message,sourceSection:"dependencies"}];
+        }
+        return decorateDependencyNodes(children,node);
       }
       if(node.sourceSection==='artifacts'){
         if(!compilerProvider)return [];
@@ -325,6 +353,14 @@ export function registerPackageOverview(vscode,context,getActiveDocument=()=>nul
   async function refresh() {
     const ticket = ++generation;
     try {
+      const availability=getAvailability?.()??{state:"READY"};
+      if(availability.state!=="READY"){
+        observedRootSignature="";
+        packages=[];
+        inventoryState="unavailable";
+        message=availability.message??"Example replacement is in progress or requires recovery";
+        notifyPackagesChanged(packages);fire();return [];
+      }
       const activeDocument = getActiveDocument?.();
       const openDocuments = [...(vscode.workspace.textDocuments??[]),
         ...(activeDocument?[activeDocument]:[])];
@@ -373,6 +409,14 @@ export function registerPackageOverview(vscode,context,getActiveDocument=()=>nul
         }
       }
       if (ticket !== generation) return packages;
+      const latestAvailability=getAvailability?.()??{state:"READY"};
+      if(latestAvailability.state!=="READY"){
+        observedRootSignature="";
+        packages=[];
+        inventoryState="unavailable";
+        message=latestAvailability.message??"Example replacement is in progress or requires recovery";
+        notifyPackagesChanged(packages);fire();return [];
+      }
       observedRootSignature=rootSignature;
       const truncated = found.length > FILE_LIMIT;
       const visible = found.slice(0,FILE_LIMIT);
@@ -422,6 +466,12 @@ export function registerPackageOverview(vscode,context,getActiveDocument=()=>nul
     if(signature!==observedRootSignature)schedule();
   }
   function refreshDirty() {
+    const availability=getAvailability?.()??{state:"READY"};
+    if(availability.state!=="READY"){
+      packages=[];inventoryState="unavailable";
+      message=availability.message??"Example replacement is in progress or requires recovery";
+      notifyPackagesChanged(packages);fire();return;
+    }
     const dirty = new Set((vscode.workspace.textDocuments??[])
       .filter(doc=>doc.isDirty).map(doc=>doc.uri.path));
     const next=packages.map(pkg=>({...pkg,
@@ -473,11 +523,15 @@ export function registerPackageOverview(vscode,context,getActiveDocument=()=>nul
   }
   void refresh();
   function getDiagnostics(){
+    const availability=getAvailability?.()??{state:"READY"};
+    const blocked=availability.state!=="READY";
     return {
-      state:inventoryState,message,
+      state:blocked?"unavailable":inventoryState,
+      message:blocked?(availability.message??"Example replacement is in progress or requires recovery"):message,
+      availabilityState:availability.state??"READY",
       rootSignature:observedRootSignature,
-      packageCount:packages.length,
-      packages:packages.map(pkg=>({
+      packageCount:blocked?0:packages.length,
+      packages:(blocked?[]:packages).map(pkg=>({
         name:pkg.name,relativeRoot:pkg.relativeRoot,
         fileCount:pkg.fileCount,corePresent:pkg.corePresent
       })),

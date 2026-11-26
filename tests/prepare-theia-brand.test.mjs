@@ -118,3 +118,25 @@ test("Chinese labels are preserved in the generated native menu",()=>{
   assert.equal(child(menu(result.root),"01_project").label,"项目");
   assert.equal(child(menu(result.root),"05_tools").label,"工具");
 });
+
+test("Authoring submenu labels identify read-only Preview in English and Chinese",()=>{
+  const commands=new Set([
+    "skillStudio.showWelcome","skillStudio.showActivationDiagnostics",
+    "skillStudio.loadExample","skillStudio.openProcedure",
+    "skillStudio.openContract","skillStudio.openPredicates","skillStudio.openSchema"
+  ]);
+  const english=installWithCommands(commands,"en");
+  const chinese=installWithCommands(commands,"zh-CN");
+  const englishLabels=child(menu(english.root),"04_authoring").children.map(item=>item.label);
+  const chineseLabels=child(menu(chinese.root),"04_authoring").children.map(item=>item.label);
+  assert.deepEqual(englishLabels,[
+    "Open Procedure Preview","Open Contract Preview",
+    "Open Predicate Preview","Open Schema Preview"
+  ]);
+  assert.deepEqual(chineseLabels,[
+    "打开 Procedure 预览","打开 Contract 预览",
+    "打开 Predicate 预览","打开 Schema 预览"
+  ]);
+  assert.ok(englishLabels.every(label=>!label.includes("Designer")));
+  assert.ok(chineseLabels.every(label=>!label.includes("设计器")));
+});
