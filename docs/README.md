@@ -1,6 +1,8 @@
 # Skill Studio 文档地图
 
-**Status: Accepted · Date: 2026-11-03**
+**Status: Current map · Updated: 2026-11-26 · Baseline: main@5b666c0ef754ed32fa37c97ce2429f328c70477f**
+
+当前产品与 Compiler / Example 基线以 [WORK](WORK.md) 顶部的 2026-11-26 快照为准；本仓唯一在线宿主为 Theia browser-only，当前 Compiler 集成为 v2.0.2，当前内置示例为 OpenAMSM Scheme C Create / Modify / Release。早期 v1.0.0 Compiler、旧 5GC + MAS 示例和 Classic 迁移内容均为历史记录，不得作为当前执行依据。产品审计入口：[Issue #279](https://github.com/odango-chan/ca-skill-studio-demo/issues/279)；当前文档刷新：[Issue #281](https://github.com/odango-chan/ca-skill-studio-demo/issues/281)。
 
 Studio 拥有浏览器编辑器，不拥有正式 Skill/Runtime/MCP 业务真相。当前唯一活动语言目标为 CA-SL v1alpha5（FROZEN / RELEASED）；Studio 编辑器集成仍与 Compiler、Host、Runtime 资格分开。v1alpha4 仅作为不可变的规范继承基线和历史记录，不是产品兼容模式。阅读当前代码前按以下顺序：
 
