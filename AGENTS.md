@@ -6,7 +6,7 @@
 
 Skill DSL 与正式语言契约由 ca-skills 拥有；Compiler、Host Context、Tool Contract、Runtime 执行结果、MCP Tool Catalog、5GC / 环境状态分别由各自 owner 负责。Studio 只消费这些权威契约，不定义第二份语法或业务规则。
 
-当前唯一活动编辑目标是 `connectionagent.io/v1alpha5`，规范已在 `ca-skills@0abfd0e1ab99f481a4ae01f3f47efc54783dd5e5` 正式冻结发布；权威来源与字节摘要由 `language/contracts/ca-sl-v1alpha5.lock.json` 固定。v1alpha4 仅作为不可变的规范继承基线和历史记录，不是产品编辑模式，也不提供旧项目迁移或兼容。内置 Example 固定为 `ca-skills/main@de8d9f667dd1a445c3f6378e0ca793d7407d2036`。集成的 Compiler v1.0.0 只支持 v1alpha4；当前 v1alpha5 Compiler 候选 PR #38（`ea27f18549725166f304b7d06fd9339bb0554329`）尚未合并、发布或集成，因此 v1alpha5 Check / Build / Inspect 必须 fail-closed。不得把 Node-entry Wait 降级成旧版 Observation、Polling 或第五种业务阶段。
+当前唯一活动编辑目标是 `connectionagent.io/v1alpha5`，规范已在 `ca-skills@0abfd0e1ab99f481a4ae01f3f47efc54783dd5e5` 正式冻结发布；权威来源与字节摘要由 `language/contracts/ca-sl-v1alpha5.lock.json` 固定。v1alpha4 仅作为不可变的规范继承基线和历史记录，不是产品编辑模式，也不提供旧项目迁移或兼容。内置 Example 固定为当前仓 `site/samples/v1alpha5` 中的 OpenAMSM Scheme C Create / Modify / Release 三个 Skill，并锁定 Owner ToolCatalog 与 Host Context dependency snapshots；来源和 resolved revision 以 `site/samples/v1alpha5/files.json` 为准，不得再引用早期 5GC + MAS 双 Skill 示例作为当前 Example。当前集成的 CA Skill Compiler 为 v2.0.2，支持 CA-SL v1alpha5；Studio 的 Check / Build / Inspect 通过该版本的 WASM Worker 与权威结果适配器执行。Compiler v2.1.0 已有 Development Build / Verify 候选，但尚未切换到 Studio main；切换由本仓 Issue #269 跟踪（Draft PR #272 / #276），在 #269 合并并完成 exact-head 验收前，不得声称 v2.1.0 已集成。Compiler 结果仍不代表 Host Admission、Owner Receipt、Runtime、5GC 或 Production Qualification。不得把 Node-entry Wait 降级成旧版 Observation、Polling 或第五种业务阶段。
 
 Theia browser-only 是唯一在线工作台。独立 Classic 浏览器工作台、Classic 发布路径及旧构建入口已经退役；不得重新引入平行工作台、旧菜单或旧项目管理实现。
 
