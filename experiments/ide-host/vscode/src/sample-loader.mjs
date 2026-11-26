@@ -249,6 +249,25 @@ function isMissingTransactionEntry(error){
   return error?.code==="FileNotFound"||error?.code==="EntryNotFound"||
     /ENOENT|EntryNotFound|FileNotFound/i.test(String(error?.message??error));
 }
+function isDependencyCachePath(path){
+  return path===".skill-studio/dependencies"||
+    path.startsWith(".skill-studio/dependencies/");
+}
+async function assertRealTransactionDirectory(fs,uri,label){
+  if(typeof fs.stat!=="function")
+    fail(label+" root cannot be verified because the host file system does not expose stat()");
+  let info;
+  try{info=await fs.stat(uri);}
+  catch(error){
+    if(isMissingTransactionEntry(error))
+      fail(label+" root is missing during Example transaction verification");
+    throw error;
+  }
+  if((info.type&64)===64)
+    fail(label+" root cannot be a symbolic link during Example transaction verification");
+  if((info.type&2)!==2)
+    fail(label+" root is not a directory during Example transaction verification");
+}
 async function readTransactionFile(fs,uri,path){
   let lastError=null;
   for(let attempt=0;attempt<3;attempt++){
@@ -302,13 +321,16 @@ async function readTransactionDirectory(fs,uri,path){
   throw lastError;
 }
 async function collectTreeManifest(fs,vscode,root){
+  // Checking children is insufficient: a symlink at the root itself can make
+  // a verified backup/candidate appear to be the active Example. Cleanup could
+  // then delete the very tree that the active URI points to.
+  await assertRealTransactionDirectory(fs,root,"Example transaction");
   const entries=[];
   async function visit(directory,prefix){
     const children=await readTransactionDirectory(fs,directory,prefix||".");
     if(children===null){
       if(!prefix)fail("Active Example root disappeared during transaction inventory");
-      if(prefix!==".skill-studio/dependencies"&&
-         !prefix.startsWith(".skill-studio/dependencies/"))
+      if(!isDependencyCachePath(prefix))
         fail("An Example directory disappeared during transaction inventory: "+prefix);
       return false;
     }
@@ -354,18 +376,23 @@ async function verifyTreeManifest(fs,vscode,root,expected,label){
 }
 async function pruneToManifest(vscode,fs,root,manifest){
   const expected=new Map(manifest.map(entry=>[entry.path,entry.kind]));
-  if(typeof fs.stat==="function"){
-    try{
-      const rootStat=await fs.stat(root);
-      if((rootStat.type&64)===64)
-        fail("Active Example root became a symbolic link during transaction recovery");
-      if((rootStat.type&2)!==2)
-        fail("Active Example root is not a directory during transaction recovery");
-    }catch(error){if(error?.code!=="FileNotFound")throw error;}
-  }
+  if(typeof fs.stat!=="function")
+    fail("Cannot verify Active Example root type because the host file system does not expose stat()");
+  try{
+    const rootStat=await fs.stat(root);
+    if((rootStat.type&64)===64)
+      fail("Active Example root became a symbolic link during transaction recovery");
+    if((rootStat.type&2)!==2)
+      fail("Active Example root is not a directory during transaction recovery");
+  }catch(error){if(!isMissingTransactionEntry(error))throw error;}
   await fs.createDirectory(root);
   async function visit(directory,prefix){
-    for(const [name,type] of await fs.readDirectory(directory)){
+    const children=await readTransactionDirectory(fs,directory,prefix||".");
+    if(children===null){
+      if(isDependencyCachePath(prefix))return;
+      fail("An Example directory disappeared while reconciling transaction: "+prefix);
+    }
+    for(const [name,type] of children){
       if(!safeDirectoryEntry(name))
         fail("Host file system returned an unsafe transaction path");
       const relative=prefix?prefix+"/"+name:name;
