@@ -869,11 +869,8 @@ function currentGrammarCompletions(value, document, prefix, offset, lineStart) {
   if(tool && inNode && (stage==="operation"||stage==="observation")){
     // Only list exact IDs explicitly supplied with the accepted snapshot.
     // These are source hints; membership, Scope and Effect are not inferred.
-    const ids=[...new Set((value.snapshot.dependencyOperations??[])
-      .filter(item=>typeof item?.dependencyId==="string"&&
-        /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/.test(item.dependencyId)&&
-        typeof item.id==="string"&&/^[A-Za-z0-9_][A-Za-z0-9_.-]*$/.test(item.id))
-      .map(item=>item.dependencyId+"::"+item.id))];
+    const ids=[...projectOperationCatalog(value.snapshot).values()]
+      .map(item=>item.reference);
     return make(ids,tool[1],offset-tool[1].length,CompletionItemKind.Reference,
       "Unverified imported reference; Compiler must check exact Owner/Capability");
   }
@@ -904,26 +901,6 @@ connection.onCompletion(params => {
   if(pathCompletions!==null)return pathCompletions;
   const currentCompletions = currentGrammarCompletions(value,document,prefix,offset,lineStart);
   if(currentCompletions!==null)return currentCompletions;
-
-  if (document.relativePath === "assurance/procedure.yaml" &&
-      value.analysis.state === "READY" && value.snapshot.completeness === "complete") {
-    const index = symbolIndexes.get(value.snapshot.rootUri);
-    const hit = skillSymbolAt(index,document.uri,offset) ??
-      skillSymbolAt(index,document.uri,offset-1);
-    if (hit?.token.type === "skillOperation") {
-      const range = hit.token.range;
-      const typed = document.text.slice(range.start,offset);
-      const editRange = toLspRange(document.text,range);
-      return [...projectOperationCatalog(value.snapshot).values()]
-        .filter(item => item.reference.startsWith(typed))
-        .map(item => ({
-          label: item.reference,
-          kind: CompletionItemKind.Reference,
-          detail: "Tool dependency · " + item.dependencyId,
-          ...(editRange ? { textEdit: { range: editRange, newText: item.reference } } : {})
-        }));
-    }
-  }
 
   if (document.relativePath === "assurance/procedure.yaml" &&
       /^\s*script:\s*[^#]*$/.test(prefix) &&
