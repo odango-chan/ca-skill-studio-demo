@@ -12,12 +12,26 @@ function harness(saved, {useAuthoringStub=false} = {}) {
   };
   document.uri.toString = () => document.uri.path;
   const editor = { document, selection: { anchor: 3 } };
+  const contractDocument = {
+    uri: {path:"/skills/demo/assurance/contract.yaml",
+      toString(){return this.path;}},
+    getText: () => "# contract", isDirty: true, version: 7
+  };
+  const textDocuments = [document, contractDocument];
   const opened = [];
   const panels = [];
   let onEditor;
   const vscode = {
     ViewColumn: { One: 1 },
-    Uri: { joinPath: (_, ...parts) => parts.join("/") },
+    Uri: {
+      joinPath: (_, ...parts) => parts.join("/"),
+      parse: value => ({path:new URL(value).pathname,toString:()=>value})
+    },
+    workspace: {
+      textDocuments,
+      openTextDocument: async uri => textDocuments.find(item =>
+        item.uri.toString() === uri.toString()) ?? null
+    },
     window: {
       activeTextEditor: editor,
       visibleTextEditors: [editor],
@@ -61,7 +75,7 @@ function harness(saved, {useAuthoringStub=false} = {}) {
     vscode.window.visibleTextEditors = [editor];
     emitEditorEvent(editor);
   }
-  return { commands, preferences, vscode, document, editor, opened, panels, mode, activateEditor, emitEditorEvent };
+  return { commands, preferences, vscode, document, contractDocument, editor, opened, panels, mode, activateEditor, emitEditorEvent };
 }
 
 
@@ -101,6 +115,30 @@ test("a real Console navigation after restore updates the AI return target", asy
   assert.equal(await host.commands.get("skillStudio.openAiAuthoring")(), true);
   assert.equal(await host.commands.get("skillStudio.openConsole")(), true);
   assert.equal(host.opened.at(-1)[1], document.uri);
+});
+
+
+
+test("Theia current Source URI overrides stale VS Code active-editor state", async () => {
+  const host = harness(undefined, {useAuthoringStub:true});
+  assert.equal(await host.mode.restore(), true);
+  assert.equal(await host.commands.get("skillStudio.openConsole")(), true);
+
+  // Simulate Theia's current native widget moving to Contract while its VS Code
+  // activeTextEditor / visibleTextEditors projection still reports Procedure.
+  assert.equal(await host.commands.get("skillStudio.internal.nativeSourceActivated")(
+    host.contractDocument.uri.toString()), true);
+  host.emitEditorEvent(host.editor);
+
+  const diagnostics=host.commands.get("skillStudio.internal.workspaceModeDiagnostics")();
+  assert.equal(diagnostics.nativeShellBridgeSeen,true);
+  assert.equal(diagnostics.nativeShellSourceUri,host.contractDocument.uri.toString());
+  assert.equal(diagnostics.consoleEditor.uri,host.contractDocument.uri.toString());
+  assert.equal(diagnostics.activeTextEditor.uri,host.document.uri.toString());
+
+  assert.equal(await host.commands.get("skillStudio.openAiAuthoring")(), true);
+  assert.equal(await host.commands.get("skillStudio.openConsole")(), true);
+  assert.equal(host.opened.at(-1)[1],host.contractDocument.uri);
 });
 
 test("defaults to AI and restores the same dirty native buffer and AI view", async () => {
