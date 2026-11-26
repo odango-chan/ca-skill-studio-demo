@@ -8,7 +8,7 @@ const digest=async bytes=>new Uint8Array(await crypto.subtle.digest("SHA-256",by
 export const sha256=async bytes=>"sha256:"+hex(await digest(bytes));
 export async function gitBlobSha1(bytes){
   if(!(bytes instanceof Uint8Array))throw Error("Expected Git blob bytes");
-  const header=enc.encode("blob "+bytes.length+"\\0");
+  const header=enc.encode("blob "+bytes.length+"\0");
   return hex(new Uint8Array(await crypto.subtle.digest("SHA-1",concat([header,bytes]))));
 }
 export function validateSnapshotPath(path){
