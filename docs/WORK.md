@@ -1,7 +1,7 @@
 # Skill Studio 当前工作状态
 
 **Snapshot:** 2026-11-26 · **Current main:** `5b666c0ef754ed32fa37c97ce2429f328c70477f`  
-**Deployment:** Pages Build + Deploy PASS, run [#45545634726](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/45545634726), exact SHA matches main. Historical snapshots are in [WORK-history.md](WORK-history.md); do not treat their PASS as current evidence.
+**Deployment:** Pages Build + Deploy PASS, run [#45545634726](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/45545634726), exact SHA matches main. Dated WORK and traceability evidence is archived in [WORK-history.md](WORK-history.md); do not treat historical PASS as current evidence.
 
 ## Current product
 
