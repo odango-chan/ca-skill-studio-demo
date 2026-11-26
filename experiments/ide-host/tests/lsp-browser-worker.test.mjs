@@ -436,12 +436,20 @@ test("browser LSP preserves Dependency Alias in external Tool Operation identity
     assert.match(contextHover.contents.value,/ca-context::SC\.VALIDATE_SUBSCRIPTION/);
     assert.match(contextHover.contents.value,/Declared in project dependency `ca-context`/);
 
-    const completions=await lspRequest(worker,74,"textDocument/completion",{
+    const allAliasCompletions=await lspRequest(worker,74,"textDocument/completion",{
+      textDocument:{uri:procedure.uri},
+      position:positionOf(procedure.text,"tool: mas::SC.VALIDATE_SUBSCRIPTION","tool: ".length)
+    });
+    assert.ok(allAliasCompletions.some(item=>item.label==="mas::SC.VALIDATE_SUBSCRIPTION"));
+    assert.ok(allAliasCompletions.some(item=>item.label==="ca-context::SC.VALIDATE_SUBSCRIPTION"));
+
+    const narrowedCompletions=await lspRequest(worker,75,"textDocument/completion",{
       textDocument:{uri:procedure.uri},
       position:positionOf(procedure.text,"mas::SC.VALIDATE_SUBSCRIPTION","mas::SC.".length)
     });
-    assert.ok(completions.some(item=>item.label==="mas::SC.VALIDATE_SUBSCRIPTION"));
-    assert.ok(completions.some(item=>item.label==="ca-context::SC.VALIDATE_SUBSCRIPTION"));
+    assert.ok(narrowedCompletions.some(item=>item.label==="mas::SC.VALIDATE_SUBSCRIPTION"));
+    assert.ok(!narrowedCompletions.some(item=>item.label==="ca-context::SC.VALIDATE_SUBSCRIPTION"),
+      "a typed Dependency Alias must narrow completion to that exact package");
   }finally{
     await worker.terminate();
   }
