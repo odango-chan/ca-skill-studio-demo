@@ -21,13 +21,28 @@ export function registerWorkspaceMode(vscode, context, { authoring, showWelcome 
   let mode = context.globalState.get(preferenceKey) === "console" ? "console" : "ai";
   let consoleEditor;
   let switching = false;
-  let suppressEditorEvents = false;
+  let pendingConsoleRestoreDocument;
   let waitForProcedure;
 
-  // Track user navigation while Console is active. Ignore the delayed native
-  // editor event caused by restoring Console itself; it may refer to a stale tab.
+  // A native editor event may arrive after the command that restored Console has
+  // completed. Keep the intended document as the restore target until either
+  // that document is reported active or a later event agrees with the host's
+  // current activeTextEditor. This avoids a fixed timeout accepting a stale tab.
   const sourceEditorListener = vscode.window.onDidChangeActiveTextEditor(editor => {
-    if (mode !== "console" || switching || suppressEditorEvents || !editor?.document) return;
+    if (!editor?.document) return;
+    if (pendingConsoleRestoreDocument) {
+      if (editor.document === pendingConsoleRestoreDocument) {
+        consoleEditor = editor;
+        return;
+      }
+      const activeDocument = vscode.window.activeTextEditor?.document;
+      if (activeDocument === editor.document) {
+        consoleEditor = editor;
+        pendingConsoleRestoreDocument = undefined;
+      }
+      return;
+    }
+    if (mode !== "console" || switching) return;
     if (editor.document !== consoleEditor?.document) consoleEditor = editor;
   });
   context.subscriptions.push(sourceEditorListener);
@@ -37,6 +52,7 @@ export function registerWorkspaceMode(vscode, context, { authoring, showWelcome 
     waitForProcedure?.dispose();
     waitForProcedure = undefined;
     switching = true;
+    if (next === "ai") pendingConsoleRestoreDocument = undefined;
     try {
       if (next === "ai") {
         // Keep the last Console editor object (including selection/undo state).
@@ -47,12 +63,12 @@ export function registerWorkspaceMode(vscode, context, { authoring, showWelcome 
         }
         if (!await authoring.open({ pick: !startup })) return false;
       } else {
-        suppressEditorEvents = true;
         const savedDocument = consoleEditor?.document;
         const activeDocument = visibleSourceEditor(vscode)?.document;
         const document = mode === "ai" && savedDocument && !savedDocument.isClosed
           ? savedDocument : activeDocument ?? authoring.getDocument();
         if (document) {
+          pendingConsoleRestoreDocument = document;
           const previousEditor = consoleEditor;
           const options = {
             viewColumn: vscode.ViewColumn.One, preview: false, preserveFocus: false,
@@ -72,16 +88,9 @@ export function registerWorkspaceMode(vscode, context, { authoring, showWelcome 
       }
       mode = next;
       if (!startup) await context.globalState.update(preferenceKey, mode);
-      if (next === "console") {
-        // Allow Theia's restore-related active-editor event to settle before
-        // accepting subsequent user navigation as a new Console source.
-        setTimeout(() => { suppressEditorEvents = false; }, 300);
-      } else {
-        suppressEditorEvents = false;
-      }
       return true;
     } catch (error) {
-      suppressEditorEvents = false;
+      if (next === "console") pendingConsoleRestoreDocument = undefined;
       void vscode.window.showWarningMessage("SKILL Studio mode: " + String(error?.message ?? error));
       return false;
     } finally {
