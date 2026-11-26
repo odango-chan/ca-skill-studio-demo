@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { registerWorkspaceMode } from "../experiments/ide-host/vscode/src/workspace-mode.mjs";
 import { registerAiAuthoringEditor } from "../experiments/ide-host/vscode/src/ai-authoring-editor.mjs";
 
-function harness(saved) {
+function harness(saved, {useAuthoringStub=false} = {}) {
   const commands = new Map();
   const preferences = new Map(saved ? [["skillStudio.workspaceMode", saved]] : []);
   const document = {
@@ -12,12 +12,28 @@ function harness(saved) {
   };
   document.uri.toString = () => document.uri.path;
   const editor = { document, selection: { anchor: 3 } };
+  const contractDocument = {
+    uri: {path:"/skills/demo/assurance/contract.yaml",
+      toString(){return "file://"+this.path;}},
+    getText: () => "# contract", isDirty: true, version: 7
+  };
+  const textDocuments = [document, contractDocument];
   const opened = [];
   const panels = [];
   let onEditor;
   const vscode = {
     ViewColumn: { One: 1 },
-    Uri: { joinPath: (_, ...parts) => parts.join("/") },
+    Uri: {
+      joinPath: (_, ...parts) => parts.join("/"),
+      parse: value => ({path:new URL(value).pathname,toString:()=>value})
+    },
+    workspace: {
+      textDocuments,
+      openTextDocument: async uri => textDocuments.find(item =>
+        item.uri.toString() === uri.toString()) ?? null,
+      findFiles: async () => [document],
+      asRelativePath: uri => uri.path
+    },
     window: {
       activeTextEditor: editor,
       visibleTextEditors: [editor],
@@ -51,15 +67,91 @@ function harness(saved) {
     globalState: { get: key => preferences.get(key), update: async (key, value) => preferences.set(key, value) },
     subscriptions: [],
   };
-  const authoring = registerAiAuthoringEditor(vscode, context);
+  const authoring = useAuthoringStub
+    ? {open: async () => true, getDocument: () => document}
+    : registerAiAuthoringEditor(vscode, context);
   const mode = registerWorkspaceMode(vscode, context, { authoring, showWelcome: () => false });
+  function emitEditorEvent(editor) { onEditor?.(editor); }
   function activateEditor(editor) {
     vscode.window.activeTextEditor = editor;
     vscode.window.visibleTextEditors = [editor];
-    onEditor?.(editor);
+    emitEditorEvent(editor);
   }
-  return { commands, preferences, vscode, document, editor, opened, panels, mode, activateEditor };
+  return { commands, preferences, vscode, document, contractDocument, editor, opened, panels, mode, activateEditor, emitEditorEvent };
 }
+
+
+
+test("a delayed stale editor event cannot replace the Console source restored from AI", async () => {
+  const host = harness(undefined, {useAuthoringStub:true});
+  assert.equal(await host.mode.restore(), true);
+  assert.equal(await host.commands.get("skillStudio.openConsole")(), true);
+  const restoredState=host.commands.get("skillStudio.internal.workspaceModeDiagnostics")();
+  assert.equal(restoredState.mode,"console");
+  assert.equal(restoredState.pendingConsoleRestore.uri,host.document.uri.toString());
+  assert.equal(restoredState.consoleEditor.uri,host.document.uri.toString());
+
+  // The previous implementation stopped suppressing editor events after 300 ms.
+  // A delayed event for another tab could then replace the saved Console URI.
+  await new Promise(resolve => setTimeout(resolve, 350));
+  const stalePath = "/skills/demo/assurance/contract.yaml";
+  const staleDocument = { uri: { path: stalePath, toString: () => stalePath }, isClosed: false };
+  host.emitEditorEvent({ document: staleDocument });
+
+  assert.equal(await host.commands.get("skillStudio.openAiAuthoring")(), true);
+  assert.equal(await host.commands.get("skillStudio.openConsole")(), true);
+  assert.equal(host.opened.at(-1)[1], host.document.uri);
+});
+
+test("a real Console navigation after restore updates the AI return target", async () => {
+  const host = harness(undefined, {useAuthoringStub:true});
+  assert.equal(await host.mode.restore(), true);
+  assert.equal(await host.commands.get("skillStudio.openConsole")(), true);
+
+  await new Promise(resolve => setTimeout(resolve, 350));
+  const path = "/skills/demo/assurance/contract.yaml";
+  const document = { uri: { path, toString: () => path }, isClosed: false };
+  const editor = { document, selection: { anchor: 9 } };
+  host.activateEditor(editor);
+
+  assert.equal(await host.commands.get("skillStudio.openAiAuthoring")(), true);
+  assert.equal(await host.commands.get("skillStudio.openConsole")(), true);
+  assert.equal(host.opened.at(-1)[1], document.uri);
+});
+
+
+
+test("Theia current Source URI overrides stale VS Code active-editor state", async () => {
+  const host = harness(undefined, {useAuthoringStub:true});
+  assert.equal(await host.mode.restore(), true);
+  assert.equal(await host.commands.get("skillStudio.openConsole")(), true);
+
+  // Simulate Theia's current native widget moving to Contract while its VS Code
+  // activeTextEditor / visibleTextEditors projection still reports Procedure.
+  assert.equal(await host.commands.get("skillStudio.internal.nativeSourceActivated")(
+    host.contractDocument.uri.toString()), true);
+  host.emitEditorEvent(host.editor);
+
+  const diagnostics=host.commands.get("skillStudio.internal.workspaceModeDiagnostics")();
+  assert.equal(diagnostics.nativeShellBridgeSeen,true);
+  assert.equal(diagnostics.nativeShellSourceUri,host.contractDocument.uri.toString());
+  assert.equal(diagnostics.consoleEditor.uri,host.contractDocument.uri.toString());
+  assert.equal(diagnostics.activeTextEditor.uri,host.document.uri.toString());
+
+  assert.equal(await host.commands.get("skillStudio.openAiAuthoring")(), true);
+  assert.equal(await host.commands.get("skillStudio.openConsole")(), true);
+  assert.equal(host.opened.at(-1)[1],host.contractDocument.uri);
+});
+
+test("Theia native Source sync does not reopen a missing dirty TextDocument from disk", async () => {
+  const host = harness(undefined, {useAuthoringStub:true});
+  assert.equal(await host.mode.restore(), true);
+  const missingUri="file:///skills/demo/assurance/missing.yaml";
+  assert.equal(await host.commands.get("skillStudio.internal.nativeSourceActivated")(missingUri),false);
+  const diagnostics=host.commands.get("skillStudio.internal.workspaceModeDiagnostics")();
+  assert.equal(diagnostics.nativeShellBridgeSeen,false);
+  assert.equal(diagnostics.consoleEditor.uri,host.document.uri.toString());
+});
 
 test("defaults to AI and restores the same dirty native buffer and AI view", async () => {
   const host = harness();
