@@ -14,7 +14,7 @@ Studio 拥有浏览器编辑器，不拥有正式 Skill/Runtime/MCP 业务真相
 4. [Studio Ownership / Source Authority](architecture/studio-boundaries.md) — 当前 ownership、Source authority、Theia-only 产品边界
 5. [Dependency / Interface Package Architecture](architecture/dependency-and-interface-package.md) — 当前 Studio lock、immutable snapshots、Example dependency closure、Schema IntelliSense 与 Compiler v2.1.0 边界
 6. [Source-backed Authoring Workbench](design/authoring-workbench.md) — 独立浏览器工作台与 D1/D4 的历史设计、Source Patch 安全原则；当前 Theia 布局以 ADR-0005 为准
-7. [AI Procedure Authoring](design/ai-procedure-authoring.md) — v1alpha5-only AI 编辑、Host-owned Change Set、独立 Go Gateway 与 Compiler Apply gate
+7. [AI Procedure Authoring](design/ai-procedure-authoring.md) — 当前 F1–F4 实现状态、v1alpha5 Host-owned Change Set、Go Gateway / Compiler Apply gate；历史规划已明确标记
    - [Authoring Core](../authoring/core/README.md) — 平台无关 Model Client / ModelProposal
    - [Go AI Gateway](https://github.com/odango-chan/ai-gateway) · [Browser CORS issue #4](https://github.com/odango-chan/ai-gateway/issues/4)
 8. [D3 Route Designer](design/route-designer.md) — `operator.on` 有界编辑与剩余资格边界
