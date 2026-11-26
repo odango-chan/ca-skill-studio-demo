@@ -22,6 +22,8 @@ export function registerWorkspaceMode(vscode, context, { authoring, showWelcome 
   let consoleEditor;
   let switching = false;
   let pendingConsoleRestoreDocument;
+  let nativeShellBridgeSeen = false;
+  let nativeShellSourceUri = null;
   let waitForProcedure;
 
   // A native editor event may arrive after the command that restored Console has
@@ -30,6 +32,11 @@ export function registerWorkspaceMode(vscode, context, { authoring, showWelcome 
   // when they agree with the host's current activeTextEditor.
   const sourceEditorListener = vscode.window.onDidChangeActiveTextEditor(editor => {
     if (!editor?.document) return;
+    if (nativeShellBridgeSeen) {
+      const editorUri = editor.document.uri?.toString?.();
+      if (editorUri && editorUri === nativeShellSourceUri) consoleEditor = editor;
+      return;
+    }
     if (pendingConsoleRestoreDocument) {
       if (editor.document === pendingConsoleRestoreDocument) {
         consoleEditor = editor;
@@ -69,6 +76,7 @@ export function registerWorkspaceMode(vscode, context, { authoring, showWelcome 
           ? savedDocument : activeDocument ?? authoring.getDocument();
         if (document) {
           pendingConsoleRestoreDocument = document;
+          nativeShellSourceUri = document.uri?.toString?.() ?? null;
           const previousEditor = consoleEditor;
           const options = {
             viewColumn: vscode.ViewColumn.One, preview: false, preserveFocus: false,
@@ -98,6 +106,30 @@ export function registerWorkspaceMode(vscode, context, { authoring, showWelcome 
     }
   }
 
+  const nativeSourceActivated = vscode.commands.registerCommand(
+    "skillStudio.internal.nativeSourceActivated", async uriValue => {
+      const uri = typeof uriValue === "string"
+        ? vscode.Uri.parse(uriValue) : uriValue;
+      const uriKey = uri?.toString?.();
+      if (!uriKey) return false;
+      const document = (vscode.workspace.textDocuments ?? []).find(item =>
+        item.uri?.toString?.() === uriKey) ??
+        await vscode.workspace.openTextDocument(uri);
+      if (!document) return false;
+      nativeShellBridgeSeen = true;
+      nativeShellSourceUri = uriKey;
+      const editor = (vscode.window.visibleTextEditors ?? []).find(item =>
+        item.document === document || item.document?.uri?.toString?.() === uriKey);
+      if (editor) consoleEditor = editor;
+      else if (consoleEditor?.document?.uri?.toString?.() !== uriKey) {
+        consoleEditor = {document};
+      }
+      pendingConsoleRestoreDocument = undefined;
+      return true;
+    }
+  );
+  context.subscriptions.push(nativeSourceActivated);
+
   const workspaceModeDiagnostics = vscode.commands.registerCommand(
     "skillStudio.internal.workspaceModeDiagnostics", () => {
       const documentState = document => document ? {
@@ -112,7 +144,7 @@ export function registerWorkspaceMode(vscode, context, { authoring, showWelcome 
         selection:editor.selection ? String(editor.selection) : null
       } : null;
       return {
-        mode,switching,
+        mode,switching,nativeShellBridgeSeen,nativeShellSourceUri,
         pendingConsoleRestore:documentState(pendingConsoleRestoreDocument),
         consoleEditor:editorState(consoleEditor),
         activeTextEditor:editorState(vscode.window.activeTextEditor),
