@@ -387,6 +387,66 @@ test("browser LSP provides current CA-SL Definition, References, Hover, Python s
 });
 
 
+test("browser LSP preserves Dependency Alias in external Tool Operation identity",async()=>{
+  const worker=new Worker(workerEntry,{workerData:{serverUrl:serverBundle}});
+  try{
+    worker.postMessage({jsonrpc:"2.0",id:71,method:"initialize",
+      params:{processId:null,rootUri:"file:///workspace",capabilities:{}}});
+    await waitForMessage(worker,message=>message?.id===71);
+    worker.postMessage({jsonrpc:"2.0",method:"initialized",params:{}});
+
+    const snapshot=samplePackageSnapshot();
+    const procedure=snapshot.documents.find(item=>
+      item.relativePath==="assurance/procedure.yaml");
+    assert.ok(procedure);
+    procedure.text=procedure.text
+      .replace("tool: ca::sbi.udm.sm_data.get",
+        "tool: mas::SC.VALIDATE_SUBSCRIPTION")
+      .replace("tool: ca::sbi.udm.sdm_subscription.create",
+        "tool: ca-context::SC.VALIDATE_SUBSCRIPTION");
+    assert.ok(procedure.text.includes("tool: mas::SC.VALIDATE_SUBSCRIPTION"));
+    assert.ok(procedure.text.includes("tool: ca-context::SC.VALIDATE_SUBSCRIPTION"));
+
+    // Same Callable ID in two dependencies is two distinct qualified refs.
+    snapshot.dependencyOperations=[
+      {dependencyId:"mas",id:"SC.VALIDATE_SUBSCRIPTION"},
+      {dependencyId:"ca-context",id:"SC.VALIDATE_SUBSCRIPTION"},
+      {dependencyId:"mas",id:"SC.CREATE_SM_CONTEXT"}
+    ];
+    const ready=waitForMessage(worker,message=>
+      message?.method==="skillStudio/analysisStatus"&&
+      message.params?.rootUri===snapshot.rootUri&&
+      message.params?.generation===snapshot.generation&&
+      message.params?.state==="READY",15000);
+    worker.postMessage({jsonrpc:"2.0",method:"skillStudio/packageSnapshot",params:snapshot});
+    await ready;
+
+    const masHover=await lspRequest(worker,72,"textDocument/hover",{
+      textDocument:{uri:procedure.uri},
+      position:positionOf(procedure.text,"mas::SC.VALIDATE_SUBSCRIPTION")
+    });
+    assert.match(masHover.contents.value,/Tool Operation/);
+    assert.match(masHover.contents.value,/mas::SC\.VALIDATE_SUBSCRIPTION/);
+    assert.match(masHover.contents.value,/Declared in project dependency `mas`/);
+
+    const contextHover=await lspRequest(worker,73,"textDocument/hover",{
+      textDocument:{uri:procedure.uri},
+      position:positionOf(procedure.text,"ca-context::SC.VALIDATE_SUBSCRIPTION")
+    });
+    assert.match(contextHover.contents.value,/ca-context::SC\.VALIDATE_SUBSCRIPTION/);
+    assert.match(contextHover.contents.value,/Declared in project dependency `ca-context`/);
+
+    const completions=await lspRequest(worker,74,"textDocument/completion",{
+      textDocument:{uri:procedure.uri},
+      position:positionOf(procedure.text,"mas::SC.VALIDATE_SUBSCRIPTION","mas::SC.".length)
+    });
+    assert.ok(completions.some(item=>item.label==="mas::SC.VALIDATE_SUBSCRIPTION"));
+    assert.ok(completions.some(item=>item.label==="ca-context::SC.VALIDATE_SUBSCRIPTION"));
+  }finally{
+    await worker.terminate();
+  }
+});
+
 test("Package Audit Script diagnostics publish the complete YAML scalar range through LSP",async()=>{
   const worker=new Worker(workerEntry,{workerData:{serverUrl:serverBundle}});
   try{
