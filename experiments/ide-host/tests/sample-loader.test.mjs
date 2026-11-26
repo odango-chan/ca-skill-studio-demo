@@ -20,7 +20,8 @@ const joinPath=(base,...paths)=>uri(posix.normalize(posix.join(base.path,...path
 
 function host(candidateOverride=null,{
   files:seedFiles=[],folders:seedFolders=[],bundledZipOverride=null,
-  staleStatAfterDelete=false,faults=[],staleDirectoryEntries=[]
+  staleStatAfterDelete=false,faults=[],staleDirectoryEntries=[],
+  missingEntryCode="FileNotFound"
 }={}){
   const files=new Map(seedFiles.map(([path,value])=>[path,new Uint8Array(value)]));
   const folders=new Set(["/global-storage",...seedFolders]);
@@ -51,7 +52,7 @@ function host(candidateOverride=null,{
         return new Uint8Array(readFileSync(sampleRoot+target.path.slice("/extension/samples/v1alpha5/".length)));
       const value=files.get(target.path);
       if(value)return new Uint8Array(value);
-      throw Object.assign(Error("missing"),{code:"FileNotFound"});
+      throw Object.assign(Error("missing"),{code:missingEntryCode});
     },
     async createDirectory(target){
       const fault=takeFault("createDirectory",target.path);
@@ -75,7 +76,7 @@ function host(candidateOverride=null,{
       const fault=takeFault("readDirectory",target.path);
       if(fault)throwFault(fault,"readDirectory",target.path);
       if(!folders.has(target.path))
-        throw Object.assign(Error("missing directory"),{code:"FileNotFound"});
+        throw Object.assign(Error("missing directory"),{code:missingEntryCode});
       const prefix=target.path.endsWith("/")?target.path:target.path+"/";
       const entries=new Map();
       for(const path of folders){
@@ -646,6 +647,20 @@ test("A host without transaction filesystem capabilities is marked unavailable i
   assert.equal(recovered.status,"UNSUPPORTED_HOST");
   assert.equal(getExampleReplacementStatus().state,"UNAVAILABLE");
   assert.match(getExampleReplacementStatus().message,/cannot inspect or recover Example transactions/);
+});
+
+test("Startup recovery confirms OPFS EntryNotFound markers and transaction directory are absent",async()=>{
+  const h=host(null,{missingEntryCode:"EntryNotFound"});
+  const recovered=await recoverExampleReplacement(h.vscode,uri("/global-storage"));
+  assert.equal(recovered.status,"CLEAN");
+  assert.equal(getExampleReplacementStatus().state,"READY");
+});
+
+test("Startup recovery fails closed when EntryNotFound cannot be confirmed without stat",async()=>{
+  const h=host(null,{missingEntryCode:"EntryNotFound"});
+  delete h.vscode.workspace.fs.stat;
+  await assert.rejects(recoverExampleReplacement(h.vscode,uri("/global-storage")),/missing/);
+  assert.equal(getExampleReplacementStatus().state,"RECOVERY_REQUIRED");
 });
 
 test("Startup recovery does not require fs.stat when the host exposes no transaction directory",async()=>{
