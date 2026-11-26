@@ -2,12 +2,12 @@
 // Replacing an existing Example is a deliberate, user-confirmed operation that
 // refreshes authored files in the Example root from the single pinned v1alpha5 source.
 // Ordinary projects are never passed to this importer. It never creates lib/ or output/.
-import {writeImmutableSnapshot} from "./dependency-service.mjs";
+import {writeImmutableSnapshot,loadVerifiedSnapshot} from "./dependency-service.mjs";
 import {EXAMPLE_INTERFACE_ARCHIVE,prepareExampleInterfaceDependency,
   exampleWorkspaceSettingsContent} from "./example-interface-dependency.mjs";
 import {prepareExampleOwnerDependency} from "./example-owner-dependency.mjs";
 import {prepareExampleHostContextDependency} from "./example-host-context-dependency.mjs";
-import {gitBlobSha1} from "./dependency-snapshot.mjs";
+import {gitBlobSha1,canonicalJson} from "./dependency-snapshot.mjs";
 
 export const EXAMPLE_PROJECT_NAME="skill-studio-demo";
 const SKILLS=Object.freeze(["establish-pdu-session-mas","modify-pdu-session-mas","release-pdu-session-mas"]);
@@ -197,15 +197,597 @@ async function persistExampleDependenciesIfAbsent(vscode,root,prepared,
   return true;
 }
 
+
+const REPLACEMENT_TRANSACTION_DIRECTORY=".skill-studio-example-replacement";
+const replacementEncoder=new TextEncoder();
+const replacementMarkerNames=[
+  "PREPARING","PREPARED","COMMITTING","RECOVERY_REQUIRED",
+  "COMMITTED","ROLLED_BACK","ABORTED"
+];
+let replacementBusy=false;
+let replacementStatus={state:"READY",message:null,phase:null};
+
+export function getExampleReplacementStatus(){
+  return {...replacementStatus};
+}
+function dirtyExampleDocuments(vscode,root){
+  const rootPath=root.toString().replace(/\/+$/,"");
+  return (vscode.workspace.textDocuments??[]).filter(document=>{
+    const uri=document?.uri?.toString?.();
+    return document?.isDirty&&uri&&(uri===rootPath||uri.startsWith(rootPath+"/"));
+  });
+}
+async function saveDirtyExampleDocuments(vscode,root){
+  const documents=dirtyExampleDocuments(vscode,root);
+  for(const document of documents){
+    const uri=document.uri.toString();
+    if(typeof document.save!=="function")
+      fail("Cannot replace Example while a dirty editor cannot be saved: "+uri);
+    const saved=await document.save();
+    if(saved!==true||document.isDirty)
+      fail("Cannot replace Example because a dirty editor did not save successfully: "+uri);
+  }
+  assertNoDirtyExampleDocuments(vscode,root);
+}
+function assertNoDirtyExampleDocuments(vscode,root){
+  const dirty=dirtyExampleDocuments(vscode,root);
+  if(dirty.length)
+    fail("Example editor became dirty during replacement staging; save or close it and retry: "+
+      dirty.map(document=>document.uri.toString()).join(", "));
+}
+function setExampleReplacementStatus(state,message=null,phase=null){
+  replacementStatus={state,message,phase};
+}
+function relativeUri(vscode,root,relative){
+  return vscode.Uri.joinPath(root,...relative.split("/"));
+}
+function safeDirectoryEntry(name){
+  return typeof name==="string"&&name.length>0&&name!=="."&&name!==".."&&
+    !name.includes("/")&&!name.includes("\\")&&!name.includes("\u0000");
+}
+async function collectTreeManifest(fs,vscode,root){
+  const entries=[];
+  async function visit(directory,prefix){
+    for(const [name,type] of await fs.readDirectory(directory)){
+      if(!safeDirectoryEntry(name))
+        fail("Host file system returned an unsafe transaction path");
+      const relative=prefix?prefix+"/"+name:name;
+      if((type&64)===64)
+        fail("Symbolic links are not supported in an Example replacement transaction: "+relative);
+      const child=vscode.Uri.joinPath(directory,name);
+      if((type&2)===2){
+        entries.push({path:relative,kind:"directory"});
+        await visit(child,relative);
+      }else if((type&1)===1){
+        const bytes=await fs.readFile(child);
+        entries.push({path:relative,kind:"file",size:bytes.length,
+          digest:await gitBlobSha1(bytes)});
+      }else{
+        fail("Unsupported file type in Example transaction: "+relative);
+      }
+    }
+  }
+  await visit(root,"");
+  return entries.sort((a,b)=>a.path<b.path?-1:a.path>b.path?1:0);
+}
+function sameManifest(left,right){
+  return JSON.stringify(left)===JSON.stringify(right);
+}
+async function verifyTreeManifest(fs,vscode,root,expected,label){
+  const actual=await collectTreeManifest(fs,vscode,root);
+  if(!sameManifest(actual,expected))
+    fail(label+" inventory does not match the verified transaction manifest");
+  return actual;
+}
+async function pruneToManifest(vscode,fs,root,manifest){
+  const expected=new Map(manifest.map(entry=>[entry.path,entry.kind]));
+  await fs.createDirectory(root);
+  async function visit(directory,prefix){
+    for(const [name,type] of await fs.readDirectory(directory)){
+      if(!safeDirectoryEntry(name))
+        fail("Host file system returned an unsafe transaction path");
+      const relative=prefix?prefix+"/"+name:name;
+      if((type&64)===64)
+        fail("Symbolic links are not supported while reconciling an Example transaction: "+relative);
+      const actualKind=(type&2)===2?"directory":(type&1)===1?"file":"unknown";
+      if(actualKind==="unknown")
+        fail("Unsupported file type while reconciling Example transaction: "+relative);
+      const expectedKind=expected.get(relative);
+      const child=vscode.Uri.joinPath(directory,name);
+      if(!expectedKind||expectedKind!==actualKind){
+        await fs.delete(child,{recursive:true,useTrash:false});
+        continue;
+      }
+      if(actualKind==="directory")await visit(child,relative);
+    }
+  }
+  await visit(root,"");
+}
+async function copyTreeFromSource(fs,vscode,sourceRoot,destinationRoot,entries,
+  {skip=()=>false}={}){
+  await fs.createDirectory(destinationRoot);
+  const selected=entries.filter(entry=>!skip(entry));
+  const directories=selected.filter(entry=>entry.kind==="directory")
+    .sort((a,b)=>a.path.split("/").length-b.path.split("/").length||
+      (a.path<b.path?-1:a.path>b.path?1:0));
+  for(const entry of directories)
+    await fs.createDirectory(relativeUri(vscode,destinationRoot,entry.path));
+  for(const entry of selected.filter(item=>item.kind==="file")){
+    const source=relativeUri(vscode,sourceRoot,entry.path);
+    const destination=relativeUri(vscode,destinationRoot,entry.path);
+    const bytes=await fs.readFile(source);
+    if(bytes.length!==entry.size||await gitBlobSha1(bytes)!==entry.digest)
+      fail("Transaction source changed while copying: "+entry.path);
+    const parts=entry.path.split("/");
+    if(parts.length>1)
+      await fs.createDirectory(vscode.Uri.joinPath(destinationRoot,...parts.slice(0,-1)));
+    await fs.writeFile(destination,bytes);
+    const written=await fs.readFile(destination);
+    if(written.length!==entry.size||await gitBlobSha1(written)!==entry.digest)
+      fail("Transaction copy verification failed: "+entry.path);
+  }
+}
+async function deleteIfPresent(fs,uri){
+  try{await fs.delete(uri,{recursive:true,useTrash:false});}
+  catch(error){if(error?.code!=="FileNotFound")throw error;}
+}
+function replacementPaths(vscode,storageUri){
+  const transactionRoot=vscode.Uri.joinPath(storageUri,REPLACEMENT_TRANSACTION_DIRECTORY);
+  return {
+    transactionRoot,
+    candidateStorage:vscode.Uri.joinPath(transactionRoot,"candidate-storage"),
+    candidateRoot:vscode.Uri.joinPath(transactionRoot,"candidate-storage",EXAMPLE_PROJECT_NAME),
+    backupRoot:vscode.Uri.joinPath(transactionRoot,"backup"),
+    marker:name=>vscode.Uri.joinPath(transactionRoot,name+".json"),
+    activeRoot:vscode.Uri.joinPath(storageUri,EXAMPLE_PROJECT_NAME)
+  };
+}
+async function writeReplacementMarker(fs,vscode,paths,state,details){
+  const payload={...(details??{})};
+  delete payload.schemaVersion;
+  delete payload.state;
+  const value={...payload,schemaVersion:1,state};
+  const encoded=JSON.stringify(value);
+  const uri=paths.marker(state);
+  try{
+    await fs.writeFile(uri,replacementEncoder.encode(encoded));
+    const actual=decoder.decode(await fs.readFile(uri));
+    if(actual!==encoded)
+      fail("Could not durably verify "+state+" Example replacement marker");
+    return value;
+  }catch(error){
+    // A marker is authoritative only after exact read-back. Remove an
+    // unverified partial marker so the previous verified state remains usable.
+    try{await fs.delete(uri,{recursive:false,useTrash:false});}
+    catch{/* A retained COMMITTING marker still directs recovery fail-closed. */}
+    throw error;
+  }
+}
+async function readReplacementMarker(fs,paths,state){
+  try{
+    const value=JSON.parse(decoder.decode(await fs.readFile(paths.marker(state))));
+    if(value?.schemaVersion!==1||value.state!==state)
+      fail("Invalid "+state+" Example replacement marker");
+    return value;
+  }catch(error){
+    if(error?.code==="FileNotFound")return null;
+    throw error;
+  }
+}
+function validateReplacementMarker(marker,paths){
+  if(marker?.schemaVersion!==1||
+     marker.rootUri!==paths.activeRoot.toString()||
+     !Array.isArray(marker.backupInventory)||
+     !Array.isArray(marker.candidateInventory))
+    fail("Example replacement marker is incomplete or targets another workspace");
+  const validateInventory=(entries,label)=>{
+    const byPath=new Map();
+    for(const entry of entries){
+      if(!entry||typeof entry.path!=="string"||
+         entry.path.startsWith("/")||entry.path.includes("\\")||
+         entry.path.includes("\u0000")||
+         entry.path.split("/").some(part=>!part||part==="."||part==="..")||
+         !["file","directory"].includes(entry.kind))
+        fail("Invalid "+label+" path in Example replacement marker");
+      if(byPath.has(entry.path))
+        fail("Duplicate "+label+" path in Example replacement marker");
+      if(entry.kind==="file"&&(!Number.isInteger(entry.size)||entry.size<0||
+         !/^[a-f0-9]{40}$/.test(entry.digest??"")))
+        fail("Invalid "+label+" file metadata in Example replacement marker");
+      byPath.set(entry.path,entry.kind);
+    }
+    for(const [path,kind] of byPath){
+      const parts=path.split("/");
+      for(let i=1;i<parts.length;i++){
+        const parent=parts.slice(0,i).join("/");
+        if(byPath.get(parent)!=="directory")
+          fail("Missing "+label+" parent directory in Example replacement marker: "+parent);
+      }
+      if(kind==="file"&&[...byPath.keys()].some(other=>other.startsWith(path+"/")))
+        fail("File path shadows a "+label+" directory in Example replacement marker");
+    }
+  };
+  validateInventory(marker.backupInventory,"backup");
+  validateInventory(marker.candidateInventory,"candidate");
+}
+async function cleanupReplacementTransaction(fs,vscode,paths,terminalState){
+  // Keep the terminal marker until both recovery trees have been removed.
+  await deleteIfPresent(fs,paths.candidateStorage);
+  await deleteIfPresent(fs,paths.backupRoot);
+  for(const name of replacementMarkerNames){
+    if(name===terminalState)continue;
+    await deleteIfPresent(fs,paths.marker(name));
+  }
+  await deleteIfPresent(fs,paths.marker(terminalState));
+  await deleteIfPresent(fs,paths.transactionRoot);
+}
+async function verifyDependencySnapshots(vscode,root){
+  const fs=vscode.workspace.fs;
+  const settingsUri=vscode.Uri.joinPath(root,".vscode","settings.json");
+  const settings=JSON.parse(decoder.decode(await fs.readFile(settingsUri)));
+  const dependencies=settings["connectionAgent.skillStudio.dependencies"];
+  const lock=settings["connectionAgent.skillStudio.dependencyLock"];
+  if(!Array.isArray(dependencies)||!lock||lock.version!=="skillc.lock/v0.1"||
+     !Array.isArray(lock.entries))
+    fail("Example dependency declarations or lock are missing");
+  const expected=["ca-client","ca-context","mas"];
+  const ids=dependencies.map(item=>item?.id).sort();
+  const lockIds=lock.entries.map(item=>item?.id).sort();
+  if(!sameManifest(ids,expected)||!sameManifest(lockIds,expected))
+    fail("Example dependency declarations and lock do not contain the exact pinned set");
+  for(const entry of lock.entries){
+    const declaration=dependencies.find(item=>item.id===entry.id);
+    if(!declaration||declaration.kind!==entry.kind||
+       canonicalJson(declaration.source)!==canonicalJson(entry.source))
+      fail("Example dependency declaration and lock source differ: "+entry.id);
+  }
+  const snapshots=[];
+  for(const entry of lock.entries)
+    snapshots.push(await loadVerifiedSnapshot(vscode,root,entry));
+  return {settings,lockEntries:lock.entries,snapshots};
+}
+async function restoreExampleBackup(vscode,paths,marker){
+  const fs=vscode.workspace.fs;
+  validateReplacementMarker(marker,paths);
+  await verifyTreeManifest(fs,vscode,paths.backupRoot,
+    marker.backupInventory,"Example backup");
+  await pruneToManifest(vscode,fs,paths.activeRoot,marker.backupInventory);
+  await copyTreeFromSource(fs,vscode,paths.backupRoot,paths.activeRoot,
+    marker.backupInventory);
+  await verifyTreeManifest(fs,vscode,paths.activeRoot,
+    marker.backupInventory,"Restored Example");
+}
+async function recoverExampleReplacementInternal(vscode,storageUri){
+  if(!vscode?.workspace?.fs||!storageUri||!vscode.Uri?.joinPath)
+    fail("Host file system unavailable for Example replacement recovery");
+  const fs=vscode.workspace.fs;
+  const paths=replacementPaths(vscode,storageUri);
+  const required=["readFile","readDirectory","writeFile","createDirectory","delete"];
+  const missing=required.filter(name=>typeof fs[name]!=="function");
+  if(missing.length)
+    return {status:"UNSUPPORTED_HOST",
+      message:"Host file system cannot inspect or recover Example transactions; missing: "+missing.join(", ")};
+  // Do not require stat() just to establish an empty transaction directory:
+  // some Theia host adapters expose readFile/readDirectory before stat.
+  const markers={},markerErrors={};
+  for(const name of replacementMarkerNames){
+    try{markers[name]=await readReplacementMarker(fs,paths,name);}
+    catch(error){
+      markerErrors[name]=error;
+      // COMMITTING is the only authority that permits active-root mutation.
+      // If it is unreadable, do not guess whether a commit had started.
+      if(name==="COMMITTING")throw error;
+    }
+  }
+  const finishRollback=async marker=>{
+    validateReplacementMarker(marker,paths);
+    try{
+      await verifyTreeManifest(fs,vscode,paths.activeRoot,
+        marker.backupInventory,"Rolled-back Example");
+    }catch{
+      // ROLLED_BACK is written only after a verified restore. If the marker
+      // survived but the active tree was later interrupted, retry from backup.
+      await restoreExampleBackup(vscode,paths,marker);
+    }
+    await writeReplacementMarker(fs,vscode,paths,"ROLLED_BACK",marker);
+    await cleanupReplacementTransaction(fs,vscode,paths,"ROLLED_BACK");
+    return {status:"ROLLED_BACK"};
+  };
+  if(markers.COMMITTED){
+    validateReplacementMarker(markers.COMMITTED,paths);
+    try{
+      await verifyTreeManifest(fs,vscode,paths.activeRoot,
+        markers.COMMITTED.candidateInventory,"Committed Example");
+      await verifyDependencySnapshots(vscode,paths.activeRoot);
+    }catch(error){
+      if(markers.ROLLED_BACK)
+        return await finishRollback(markers.ROLLED_BACK);
+      if(markers.COMMITTING||markers.RECOVERY_REQUIRED)
+        return await finishRollback(markers.COMMITTING??markers.RECOVERY_REQUIRED);
+      throw error;
+    }
+    await cleanupReplacementTransaction(fs,vscode,paths,"COMMITTED");
+    return {status:"COMMITTED_RECOVERED"};
+  }
+  if(markers.ROLLED_BACK)
+    return await finishRollback(markers.ROLLED_BACK);
+  if(markers.COMMITTING||markers.RECOVERY_REQUIRED)
+    return await finishRollback(markers.COMMITTING??markers.RECOVERY_REQUIRED);
+
+  if(markerErrors.COMMITTED||markerErrors.ROLLED_BACK||markerErrors.RECOVERY_REQUIRED)
+    fail("Example replacement terminal marker is unreadable and no verified recovery marker remains");
+  if(markerErrors.PREPARED)
+    fail("Prepared Example transaction marker is unreadable; keep the backup and transaction data intact");
+  if(markers.PREPARED){
+    validateReplacementMarker(markers.PREPARED,paths);
+    // PREPARED is written only after the backup and candidate are verified.
+    // Without a verified COMMITTING marker, the active tree must still equal
+    // that backup; if it does, discard staging. If it does not, fail closed.
+    await verifyTreeManifest(fs,vscode,paths.activeRoot,
+      markers.PREPARED.backupInventory,"Active Example before commit");
+    await writeReplacementMarker(fs,vscode,paths,"ABORTED",markers.PREPARED);
+    await cleanupReplacementTransaction(fs,vscode,paths,"ABORTED");
+    return {status:"ABORTED_BEFORE_COMMIT"};
+  }
+  if(!Object.values(markers).some(Boolean)){
+    try{await fs.readDirectory(paths.transactionRoot);}
+    catch(error){
+      if(error?.code==="FileNotFound")return {status:"CLEAN"};
+      throw error;
+    }
+    await deleteIfPresent(fs,paths.transactionRoot);
+    return {status:"ORPHAN_CLEANED"};
+  }
+
+  // PREPARING (or an empty transaction directory) means the verified
+  // commit-intent marker was never published, so the active Example is intact.
+  await writeReplacementMarker(fs,vscode,paths,"ABORTED",{
+    rootUri:paths.activeRoot.toString(),
+    backupInventory:[],candidateInventory:[],sourceSha:null
+  });
+  await cleanupReplacementTransaction(fs,vscode,paths,"ABORTED");
+  return {status:"ABORTED_BEFORE_COMMIT"};
+}
+export async function recoverExampleReplacement(vscode,storageUri){
+  if(replacementBusy)
+    fail("Example replacement is already in progress; wait for it to finish");
+  replacementBusy=true;
+  setExampleReplacementStatus("IN_PROGRESS","Recovering the built-in Example transaction","startup-recovery");
+  try{
+    const result=await recoverExampleReplacementInternal(vscode,storageUri);
+    if(result.status==="UNSUPPORTED_HOST")
+      setExampleReplacementStatus("UNAVAILABLE",result.message,"startup-recovery");
+    else
+      setExampleReplacementStatus("READY",null,null);
+    return result;
+  }catch(error){
+    const message=String(error?.message??error);
+    let recoveryLocation="";
+    try{
+      const paths=replacementPaths(vscode,storageUri);
+      recoveryLocation=" Recovery transaction: "+paths.transactionRoot.toString()+
+        "; verified backup: "+paths.backupRoot.toString()+
+        ". Keep both intact; do not delete or edit the transaction data.";
+    }catch{}
+    setExampleReplacementStatus("RECOVERY_REQUIRED",message+recoveryLocation,"startup-recovery");
+    throw Error("Example replacement recovery required: "+message+recoveryLocation+
+      " Reopen SKILL Studio to retry recovery. The active workspace is blocked from READY.");
+  }finally{
+    replacementBusy=false;
+  }
+}
+async function seedExampleProjectTransaction(vscode,extensionUri,storageUri,
+  {onProgress=()=>{}}={}){
+  const fs=vscode.workspace.fs;
+  const paths=replacementPaths(vscode,storageUri);
+  let phase="create-transaction";
+  let transactionCreated=false;
+  let commitStarted=false;
+  let committed=false;
+  let markerDetails=null;
+  const report=event=>{try{onProgress?.(event);}catch{}};
+  try{
+    report({phase:"replacement-started"});
+    await fs.createDirectory(paths.transactionRoot);
+    transactionCreated=true;
+    await writeReplacementMarker(fs,vscode,paths,"PREPARING",{
+      rootUri:paths.activeRoot.toString(),
+      backupInventory:[],candidateInventory:[],sourceSha:null
+    });
+    phase="backup-existing-example";
+    const backupInventory=await collectTreeManifest(fs,vscode,paths.activeRoot);
+    await copyTreeFromSource(fs,vscode,paths.activeRoot,paths.backupRoot,backupInventory);
+    await verifyTreeManifest(fs,vscode,paths.backupRoot,backupInventory,"Example backup");
+
+    phase="stage-current-example";
+    await fs.createDirectory(paths.candidateStorage);
+    const metadataEntries=backupInventory.filter(entry=>
+      entry.path===".skill-studio"||entry.path.startsWith(".skill-studio/"));
+    if(metadataEntries.length)
+      await copyTreeFromSource(fs,vscode,paths.backupRoot,
+        paths.candidateRoot,metadataEntries);
+    const staged=await seedExampleProjectInPlace(vscode,extensionUri,
+      paths.candidateStorage,{
+        replaceExisting:false,
+        onProgress:event=>{
+          if(event?.phase!=="project-ready")report(event);
+        }
+      });
+    phase="verify-staged-example";
+    const candidateInventory=await collectTreeManifest(fs,vscode,paths.candidateRoot);
+    await verifyTreeManifest(fs,vscode,paths.candidateRoot,
+      candidateInventory,"Staged Example");
+    await verifyDependencySnapshots(vscode,paths.candidateRoot);
+    const expectedRootNames=[".skill-studio",".vscode","README.md","skills"];
+    const rootNames=candidateInventory.filter(entry=>!entry.path.includes("/"))
+      .map(entry=>entry.path).sort();
+    if(!sameManifest(rootNames,expectedRootNames))
+      fail("Staged Example root inventory is incomplete: "+rootNames.join(", "));
+    const skillNames=candidateInventory.filter(entry=>
+      entry.kind==="directory"&&entry.path.startsWith("skills/")&&
+      !entry.path.slice("skills/".length).includes("/"))
+      .map(entry=>entry.path.slice("skills/".length)).sort();
+    if(!sameManifest(skillNames,[...SKILLS].sort()))
+      fail("Staged Example does not contain exactly the three current Skills");
+
+    markerDetails={
+      schemaVersion:1,
+      rootUri:paths.activeRoot.toString(),
+      backupInventory,candidateInventory,
+      sourceSha:staged.sourceSha,
+      dependencySnapshotDigests:staged.exampleDependencySnapshotDigests
+    };
+    phase="verify-active-example-before-commit";
+    await verifyTreeManifest(fs,vscode,paths.activeRoot,
+      backupInventory,"Active Example changed while replacement was staged");
+    assertNoDirtyExampleDocuments(vscode,paths.activeRoot);
+    phase="write-prepared-marker";
+    await writeReplacementMarker(fs,vscode,paths,"PREPARED",markerDetails);
+    phase="verify-active-before-commit-intent";
+    await verifyTreeManifest(fs,vscode,paths.activeRoot,
+      backupInventory,"Active Example changed before commit intent");
+    assertNoDirtyExampleDocuments(vscode,paths.activeRoot);
+    phase="write-commit-intent";
+    await writeReplacementMarker(fs,vscode,paths,"COMMITTING",markerDetails);
+    commitStarted=true;
+
+    phase="prune-active-example";
+    // The active workspace root and its .skill-studio metadata directory stay
+    // at the same URI. No whole-root rename is assumed on any provider.
+    await pruneToManifest(vscode,fs,paths.activeRoot,candidateInventory);
+    phase="copy-staged-example";
+    await copyTreeFromSource(fs,vscode,paths.candidateRoot,paths.activeRoot,
+      candidateInventory,{skip:entry=>entry.path===".vscode/settings.json"});
+    phase="publish-dependency-lock";
+    const settingsEntry=candidateInventory.find(entry=>
+      entry.path===".vscode/settings.json"&&entry.kind==="file");
+    if(!settingsEntry)fail("Staged Example dependency settings are missing");
+    const settingsBytes=await fs.readFile(
+      relativeUri(vscode,paths.candidateRoot,settingsEntry.path));
+    if(await gitBlobSha1(settingsBytes)!==settingsEntry.digest)
+      fail("Staged Example dependency settings changed before publication");
+    await fs.writeFile(relativeUri(vscode,paths.activeRoot,settingsEntry.path),settingsBytes);
+    const writtenSettings=await fs.readFile(
+      relativeUri(vscode,paths.activeRoot,settingsEntry.path));
+    if(await gitBlobSha1(writtenSettings)!==settingsEntry.digest)
+      fail("Published Example dependency settings failed byte verification");
+
+    phase="verify-active-example";
+    await verifyTreeManifest(fs,vscode,paths.activeRoot,
+      candidateInventory,"Active Example");
+    await verifyDependencySnapshots(vscode,paths.activeRoot);
+    assertNoDirtyExampleDocuments(vscode,paths.activeRoot);
+    phase="write-committed-marker";
+    await writeReplacementMarker(fs,vscode,paths,"COMMITTED",markerDetails);
+    committed=true;
+    phase="cleanup-committed-transaction";
+    await cleanupReplacementTransaction(fs,vscode,paths,"COMMITTED");
+    setExampleReplacementStatus("READY",null,null);
+    report({phase:"project-ready"});
+    const procedures=Object.fromEntries(SKILLS.map(name=>
+      [name,vscode.Uri.joinPath(paths.activeRoot,"skills",name,"assurance","procedure.yaml")]));
+    return {
+      ...staged,
+      root:paths.activeRoot,
+      skillsRoot:vscode.Uri.joinPath(paths.activeRoot,"skills"),
+      procedure:procedures[SKILLS[0]],procedures,
+      created:staged.files,skipped:0,replacedExisting:true,readmeUpdated:true,
+      exampleDependencySeeded:true,
+      transactionCleanupPending:false
+    };
+  }catch(error){
+    const message=String(error?.message??error);
+    const failedPhase=phase;
+    if(!transactionCreated){
+      setExampleReplacementStatus("READY",message,phase);
+      report({phase:"replacement-aborted"});
+      throw Error("Example replacement could not create its transaction workspace: "+message);
+    }
+    if(committed){
+      const recoveryMessage="The replacement is committed and verified, but transaction cleanup failed: "+
+        message+"; recovery transaction: "+paths.transactionRoot.toString()+
+        "; retained backup: "+paths.backupRoot.toString()+
+        ". Keep both intact and reopen SKILL Studio to finish cleanup.";
+      setExampleReplacementStatus("RECOVERY_REQUIRED",recoveryMessage,phase);
+      report({phase:"replacement-recovery-required"});
+      throw Error("Example replacement committed but cleanup is pending at "+
+        paths.transactionRoot.toString()+"; retained backup: "+paths.backupRoot.toString()+
+        ": "+message+"; keep the transaction data intact and reopen SKILL Studio to finish cleanup before Package Inventory becomes READY");
+    }
+    if(commitStarted&&markerDetails){
+      try{
+        phase="rollback-active-example";
+        await restoreExampleBackup(vscode,paths,markerDetails);
+        await writeReplacementMarker(fs,vscode,paths,"ROLLED_BACK",markerDetails);
+        await cleanupReplacementTransaction(fs,vscode,paths,"ROLLED_BACK");
+        setExampleReplacementStatus("READY",null,null);
+        report({phase:"replacement-rolled-back"});
+      }catch(rollbackError){
+        const rollbackMessage=String(rollbackError?.message??rollbackError);
+        try{
+          await writeReplacementMarker(fs,vscode,paths,"RECOVERY_REQUIRED",{
+            ...markerDetails,failedPhase,commitError:message,
+            rollbackError:rollbackMessage
+          });
+        }catch{/* COMMITTING remains the durable recovery instruction. */}
+        setExampleReplacementStatus("RECOVERY_REQUIRED",
+          "Replacement failed at "+failedPhase+"; rollback is incomplete: "+rollbackMessage+
+          "; recovery transaction: "+paths.transactionRoot.toString()+
+          "; verified backup: "+paths.backupRoot.toString()+
+          ". Keep both intact and reopen SKILL Studio to retry recovery.",
+          failedPhase);
+        report({phase:"replacement-recovery-required"});
+        throw Error("Example replacement failed at "+failedPhase+
+          "; rollback is incomplete. Recovery transaction: "+paths.transactionRoot.toString()+
+          "; verified backup: "+paths.backupRoot.toString()+
+          ". Keep both intact and reopen SKILL Studio to retry recovery. Do not use this Example until recovery succeeds. "+
+          rollbackMessage);
+      }
+    }else{
+      try{
+        await writeReplacementMarker(fs,vscode,paths,"ABORTED",{
+          rootUri:paths.activeRoot.toString(),
+          backupInventory:markerDetails?.backupInventory??[],
+          candidateInventory:markerDetails?.candidateInventory??[],
+          sourceSha:markerDetails?.sourceSha??null
+        });
+        await cleanupReplacementTransaction(fs,vscode,paths,"ABORTED");
+        setExampleReplacementStatus("READY",null,null);
+        report({phase:"replacement-aborted"});
+      }catch(cleanupError){
+        const cleanupMessage=String(cleanupError?.message??cleanupError);
+        setExampleReplacementStatus("RECOVERY_REQUIRED",
+          "Preparation did not mutate the active Example, but staging cleanup failed: "+cleanupMessage+
+          "; recovery transaction: "+paths.transactionRoot.toString()+
+          ". Keep it intact and reopen SKILL Studio to finish cleanup.",
+          phase);
+        report({phase:"replacement-recovery-required"});
+        throw Error("Example replacement preparation failed at "+phase+
+          "; staging cleanup is pending at "+paths.transactionRoot.toString()+
+          ": "+cleanupMessage);
+      }
+    }
+    throw Error("Example replacement failed at "+failedPhase+
+      (commitStarted?" and the previous Example was restored: ":" before commit; the active Example was left untouched: ")+message);
+  }
+}
+
 // Safe one-time migration for a previously opened CURRENT Example after an
 // online Studio upgrade. Never replace sources, settings or ordinary projects.
 // Stale legacy Example data is intentionally left for explicit Replace Example.
-export async function ensureOpenedExampleDependencies(vscode,extensionUri,storageUri){
+export async function ensureOpenedExampleDependencies(vscode,extensionUri,storageUri,
+  {recoveryResult=null,recoveryError=null}={}){
+  const recovery=recoveryResult??(recoveryError?null:
+    await recoverExampleReplacement(vscode,storageUri));
   const root=vscode.Uri.joinPath(storageUri,EXAMPLE_PROJECT_NAME);
   const folders=vscode.workspace.workspaceFolders??[];
   if(vscode.workspace.workspaceFile||folders.length!==1||
      folders[0]?.uri?.toString?.()!==root.toString())
     return {status:"NOT_EXAMPLE"};
+  if(recoveryError)
+    fail("Example replacement recovery failed: "+String(recoveryError?.message??recoveryError));
+  if(recovery?.status==="UNSUPPORTED_HOST")
+    fail(recovery.message);
   const fs=vscode.workspace.fs;
   const settingsUri=vscode.Uri.joinPath(root,".vscode","settings.json");
   try{await fs.stat(settingsUri);return {status:"PRESERVED"};}
@@ -254,7 +836,7 @@ export async function ensureOpenedExampleDependencies(vscode,extensionUri,storag
       [item.declaration.id,item.snapshotDigest]))};
 }
 
-export async function seedExampleProject(vscode,extensionUri,storageUri,
+async function seedExampleProjectInPlace(vscode,extensionUri,storageUri,
   {replaceExisting=false,onProgress=()=>{}}={}){
   let phase="initial";
   const report=event=>{if(typeof onProgress==="function")onProgress(event);};
@@ -396,4 +978,57 @@ export async function seedExampleProject(vscode,extensionUri,storageUri,
         item.declaration.id==="ca-client").snapshotDigest
     };
   }catch(error){throw Error(phase+": "+String(error?.message??error));}
+}
+
+export async function seedExampleProject(vscode,extensionUri,storageUri,options={}){
+  if(replacementBusy)
+    fail("Example replacement is already in progress; wait for it to finish");
+  replacementBusy=true;
+  setExampleReplacementStatus("IN_PROGRESS","Preparing the built-in Example","seed-example");
+  let transactionalReplacement=false;
+  let transactionStarted=false;
+  let recoveryCompleted=false;
+  let recoveryUnsupported=false;
+  try{
+    const recovery=await recoverExampleReplacementInternal(vscode,storageUri);
+    if(recovery.status==="UNSUPPORTED_HOST"){
+      recoveryUnsupported=true;
+      setExampleReplacementStatus("UNAVAILABLE",recovery.message,"startup-recovery");
+      throw Error(recovery.message);
+    }
+    recoveryCompleted=true;
+    const root=vscode.Uri.joinPath(storageUri,EXAMPLE_PROJECT_NAME);
+    let existing=false;
+    try{await vscode.workspace.fs.stat(root);existing=true;}
+    catch(error){if(error?.code!=="FileNotFound")throw error;}
+    transactionalReplacement=Boolean(options.replaceExisting&&existing);
+    if(transactionalReplacement){
+      // Save dirty documents before the verified backup is taken. The same
+      // URI remains open; if replacement rolls back, the saved user bytes are
+      // part of the restored backup instead of being lost in an editor buffer.
+      await saveDirtyExampleDocuments(vscode,root);
+      transactionStarted=true;
+      return await seedExampleProjectTransaction(vscode,extensionUri,storageUri,options);
+    }
+    const result=await seedExampleProjectInPlace(vscode,extensionUri,storageUri,{
+      ...options,replaceExisting:false,
+      onProgress:event=>{
+        if(event?.phase==="project-ready")setExampleReplacementStatus("READY",null,null);
+        options.onProgress?.(event);
+      }
+    });
+    setExampleReplacementStatus("READY",null,null);
+    return result;
+  }catch(error){
+    if(!recoveryCompleted){
+      setExampleReplacementStatus(recoveryUnsupported?"UNAVAILABLE":"RECOVERY_REQUIRED",
+        String(error?.message??error),"startup-recovery");
+    }else if(replacementStatus.state==="IN_PROGRESS"){
+      setExampleReplacementStatus(transactionStarted?"RECOVERY_REQUIRED":"READY",
+        String(error?.message??error),transactionStarted?"replacement":"save-dirty-documents");
+    }
+    throw error;
+  }finally{
+    replacementBusy=false;
+  }
 }

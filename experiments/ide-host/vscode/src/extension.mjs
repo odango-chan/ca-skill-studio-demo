@@ -14,7 +14,8 @@ function newNonce(){
   return [...bytes].map(n=>n.toString(16).padStart(2,"0")).join("");
 }
 import {EXAMPLE_PROJECT_NAME,seedExampleProject,
-  ensureOpenedExampleDependencies} from "./sample-loader.mjs";
+  ensureOpenedExampleDependencies,recoverExampleReplacement,
+  getExampleReplacementStatus} from "./sample-loader.mjs";
 import {openProjectFolder,isSingleFolderWorkspace,restorePendingExampleProject,PENDING_EXAMPLE_OPEN_KEY} from "./project-navigation.mjs";
 import {registerProjectWelcome} from "./project-welcome.mjs";
 
@@ -62,7 +63,10 @@ function toolbarIconButton(id,name,label,{pressed=false}={}){
     '" aria-label="'+escaped(label)+'"'+
     (pressed?' aria-pressed="false"':'')+'>'+svgIcon(name)+'</button>';
 }
-export function activate(context){
+export async function activate(context){
+  let replacementRecoveryResult=null,replacementRecoveryError=null;
+  try{replacementRecoveryResult=await recoverExampleReplacement(vscode,context.globalStorageUri);}
+  catch(error){replacementRecoveryError=error;}
   let workbench=null,packageOverview=null,projectWelcome=null,workbenchReady=false;
   const activationFailures=[];
   const activationComponents=Object.create(null);
@@ -82,6 +86,10 @@ export function activate(context){
       }catch{}
     }
   };
+  if(replacementRecoveryError)
+    recordActivationFailure("Example replacement recovery",replacementRecoveryError);
+  else
+    activationComponents["Example replacement recovery"]=getExampleReplacementStatus().state;
   const registerSafely=(component,register,fallback=null)=>{
     try{
       const value=register();
@@ -141,6 +149,7 @@ export function activate(context){
         components:{...activationComponents},
         failures:[...activationFailures],
         packageInventory,
+        exampleReplacement:getExampleReplacementStatus(),
         workbenchReady
       };
       console.info("SKILL_STUDIO_ACTIVATION_DIAGNOSTICS",JSON.stringify(report));
@@ -175,6 +184,31 @@ export function activate(context){
         dependenciesProvider:dependencyIntegration.provider,
         compilerProvider:compilerIntegration.provider,
         getProjectRoot:dependencyIntegration.getProjectRoot,
+        getAvailability:()=>{
+          const exampleRoot=vscode.Uri.joinPath(context.globalStorageUri,EXAMPLE_PROJECT_NAME);
+          const examplePath=exampleRoot.path;
+          const isWithinExample=uri=>{
+            const path=uri?.path;
+            return typeof path==="string"&&
+              (path===examplePath||path.startsWith(examplePath+"/"));
+          };
+          const scanScopeTouchesExample=uri=>{
+            const path=uri?.path;
+            return typeof path==="string"&&
+              (isWithinExample(uri)||examplePath.startsWith(path+"/"));
+          };
+          const folders=vscode.workspace.workspaceFolders??[];
+          const selectedRoot=dependencyIntegration.getProjectRoot?.()??null;
+          const active=folders.some(folder=>scanScopeTouchesExample(folder.uri))||
+            scanScopeTouchesExample(selectedRoot)||
+            (!folders.length&&[
+              ...(vscode.workspace.textDocuments??[]),
+              ...(workbench?.getActiveDocument?.()?[workbench.getActiveDocument()]:[]),
+              ...(vscode.window.activeTextEditor?.document
+                ?[vscode.window.activeTextEditor.document]:[])
+            ].some(document=>isWithinExample(document?.uri)));
+          return active?getExampleReplacementStatus():{state:"READY"};
+        },
         onPackagesChanged:packages=>workbench?.syncPackages?.(packages)
       }),{
         refresh:async()=>[],revealPackages:async()=>false,
@@ -487,6 +521,14 @@ export function activate(context){
     "skillStudio.internal.workspaceIdentityAcceptance",async(options={})=>{
       const folders=vscode.workspace.workspaceFolders??[];
       const exampleRoot=vscode.Uri.joinPath(context.globalStorageUri,EXAMPLE_PROJECT_NAME);
+      const root=folders.length===1?folders[0].uri:null;
+      const isExample=root?.toString?.()===exampleRoot.toString();
+      if(isExample){
+        const status=getExampleReplacementStatus();
+        if(status.state!=="READY")
+          throw Error("Example workspace identity is blocked while replacement state is "+
+            status.state+": "+(status.message??"recovery has not completed"));
+      }
       let seededApiVersion=null;
       if(options?.seedLegacyExample===true){
         if(folders.length!==1||folders[0].uri.toString()!==exampleRoot.toString())
@@ -507,7 +549,6 @@ export function activate(context){
         ));
         seededApiVersion="connectionagent.io/v1alpha1";
       }
-      const root=folders.length===1?folders[0].uri:null;
       const defaultProcedure=root?vscode.Uri.joinPath(root,
         "skills","establish-pdu-session-mas","assurance","procedure.yaml"):null;
       const masProcedure=root?vscode.Uri.joinPath(root,
@@ -549,7 +590,6 @@ export function activate(context){
         /^\s*start\s*:/m.test(procedureRead.text)&&
         /^\s*nodes\s*:/m.test(procedureRead.text)&&
         !/^\s*procedures\s*:/m.test(procedureRead.text));
-      const isExample=root?.toString?.()===exampleRoot.toString();
       const dependencies=isExample
         ?await resolveLockedDependencies(vscode,root):null;
       const interfaceSnapshot=dependencies?.snapshots?.find(item=>
@@ -560,7 +600,7 @@ export function activate(context){
         item.id==="mas"&&item.kind==="tool-catalog");
       const ownerCatalog=ownerSnapshot
         ?projectLockedToolCatalog(ownerSnapshot):{available:false,operations:[]};
-      return {
+      const identity={
         workspaceName:vscode.workspace.name??null,
         workspaceFile:vscode.workspace.workspaceFile?.toString?.()??null,
         root:root?.toString?.()??null,
@@ -594,6 +634,13 @@ export function activate(context){
         }}:{}),
         ...(seededApiVersion?{seededApiVersion}:{})
       };
+      if(isExample){
+        const latestStatus=getExampleReplacementStatus();
+        if(latestStatus.state!=="READY")
+          throw Error("Example workspace identity changed during inspection; replacement state is "+
+            latestStatus.state+": "+(latestStatus.message??"recovery has not completed"));
+      }
+      return identity;
     }
   ));
   let exampleLoadPromise=null;
@@ -605,6 +652,9 @@ export function activate(context){
     replaceAction:"替换 Example",
     cancelAction:"取消",
     starting:"正在准备 current CA-SL Skills…",
+    replacing:"正在验证旧 Example 备份并提交替换…",
+    rollback:"替换未完成，正在恢复旧 Example…",
+    recoveryRequired:"Example 恢复未完成；工作区已阻止就绪状态，请保留恢复数据。",
     manifest:"正在读取示例清单…",
     files:(completed,total)=>"正在导入示例文件（"+completed+"/"+total+"）…",
     workspace:"正在打开示例工作区…",
@@ -618,6 +668,9 @@ export function activate(context){
     replaceAction:"Replace Example",
     cancelAction:"Cancel",
     starting:"Preparing current CA-SL Skills…",
+    replacing:"Verifying the previous Example backup and committing replacement…",
+    rollback:"Replacement did not complete; restoring the previous Example…",
+    recoveryRequired:"Example recovery is incomplete; the workspace is blocked. Keep the recovery data intact.",
     manifest:"Reading example manifests…",
     files:(completed,total)=>"Importing sample files ("+completed+"/"+total+")…",
     workspace:"Opening example workspace…",
@@ -668,7 +721,16 @@ export function activate(context){
                 vscode,context.extensionUri,context.globalStorageUri,{
                   replaceExisting,
                   onProgress:({phase,completed,total})=>{
-                    if(phase==="manifest")report(exampleText.manifest);
+                    if(phase==="replacement-started"||
+                       phase==="replacement-rolled-back"||
+                       phase==="replacement-aborted"||
+                       phase==="replacement-recovery-required"||
+                       phase==="project-ready")
+                      void packageOverview?.refresh?.();
+                    if(phase==="replacement-started")report(exampleText.replacing);
+                    else if(phase==="replacement-rolled-back")report(exampleText.rollback);
+                    else if(phase==="replacement-recovery-required")report(exampleText.recoveryRequired);
+                    else if(phase==="manifest")report(exampleText.manifest);
                     else if(phase==="files")report(
                       exampleText.files(completed,total),{completed,total});
                     else if(phase==="project-ready")report(exampleText.workspace);
@@ -761,6 +823,10 @@ export function activate(context){
             }catch(error){
               const message=exampleText.failure+" ["+stage+"]："+String(error?.message??error);
               projectWelcome?.setImportStatus({state:"error",message});
+              // A pre-commit abort leaves the old Example READY; a failed
+              // rollback remains blocked. Re-read either state before showing
+              // the error so Package Explorer cannot retain a stale snapshot.
+              try{await packageOverview?.refresh?.();}catch{}
               void vscode.window.showErrorMessage(
                 "SKILL 示例载入失败 ["+stage+"]："+String(error?.message??error));
               return null;
@@ -935,13 +1001,18 @@ export function activate(context){
   // earlier Studio. Never mutate another workspace or existing user settings.
   // This runs after extension providers are registered, before navigation.
   void ensureOpenedExampleDependencies(vscode,context.extensionUri,
-    context.globalStorageUri).then(async result=>{
+    context.globalStorageUri,{
+      recoveryResult:replacementRecoveryResult,recoveryError:replacementRecoveryError
+    }).then(async result=>{
       if(result.status==="SEEDED"){
         console.log("STUDIO_EXAMPLE_INTERFACE_MIGRATED",JSON.stringify(result));
         workbench?.invalidateDependencyAnalysis?.();
         try{await vscode.commands.executeCommand("skillStudio.refreshDependencies");}
         catch{/* The lock is already durable; the next Explorer read verifies it. */}
       }
+      // Startup recovery may have unblocked an Example after the initial
+      // Package Explorer refresh was intentionally held in RECOVERY_REQUIRED.
+      await packageOverview?.refresh?.();
     },error=>{
       console.warn("STUDIO_EXAMPLE_INTERFACE_MIGRATION_BLOCKED",String(error?.message??error));
     });
