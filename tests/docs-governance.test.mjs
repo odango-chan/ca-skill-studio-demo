@@ -13,6 +13,8 @@ const pages=[
   "docs/architecture/plugin-managed-configuration-v0.1.md",
   "docs/architecture/skill-project-layout.md",
   "docs/architecture/theia-workbench.md",
+  "docs/decisions/0003-native-workbench-and-markdown.md",
+  "docs/decisions/0004-package-first-workspace.md",
   "docs/decisions/0005-fixed-source-preview-workbench.md",
   "docs/design/authoring-workbench.md","docs/design/source-editor-workstream.md",
   "docs/design/ai-procedure-authoring.md","docs/design/skill-lsp-l2d-editor-acceptance.md",
@@ -67,6 +69,18 @@ test("current dependency architecture is canonical and old project proposals are
   assert.match(layout,/Historical proposal/);
   assert.match(boundary,/Theia 1\.76 browser-only/);
   assert.match(boundary,/Classic.*retired/);
+});
+
+test("current workbench and Package Explorer ADRs no longer claim implementation is pending",()=>{
+  const a3=content("docs/decisions/0003-native-workbench-and-markdown.md");
+  const a4=content("docs/decisions/0004-package-first-workspace.md");
+  const a5=content("docs/decisions/0005-fixed-source-preview-workbench.md");
+  assert.match(a3,/host acceptance closeout completed in #176/);
+  assert.match(a4,/Interface Package import and Schema IntelliSense merged in #267/);
+  assert.match(a4,/default `ca-client` preload merged in #270/);
+  assert.match(a4,/Dependency Architecture/);
+  assert.match(a5,/fixed Source \+ Preview host integration is implemented on main and deployed/);
+  assert.match(a5,/Issue #220 remains open/);
 });
 
 test("AI Authoring and Source Editor docs distinguish current implementation from historical plans",()=>{
