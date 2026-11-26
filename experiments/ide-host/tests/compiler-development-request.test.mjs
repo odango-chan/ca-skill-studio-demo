@@ -62,9 +62,15 @@ test("v2.1.0 Development Build request exactly reproduces the official Compiler 
 test("Development Build includes only the exact transitive closure of Contract roots",async()=>{
   const input=await fixtureInput();
   const unused={...input.resolvedDependencies.snapshots[0],id:"unused-extra-root"};
+  const unrelatedToolCatalog={...input.resolvedDependencies.snapshots[0],
+    id:"mas",kind:"tool-catalog",files:[]};
+  const unrelatedSchemaBundle={...input.resolvedDependencies.snapshots[0],
+    id:"ca-context",kind:"schema-bundle",files:[]};
   const request=await createCompilerDevelopmentBuildRequest({
     ...input,
-    resolvedDependencies:{status:"READY",snapshots:[...input.resolvedDependencies.snapshots,unused]}
+    resolvedDependencies:{status:"READY",snapshots:[
+      ...input.resolvedDependencies.snapshots,unused,unrelatedToolCatalog,unrelatedSchemaBundle
+    ]}
   });
   assert.equal(request.snapshots.length,3);
   assert.equal(request.lock.packages.length,3);
@@ -140,10 +146,18 @@ test("tampered resolver bytes and unsupported snapshot kinds fail closed",async(
   );
 
   const unsupported=await fixtureInput();
-  unsupported.resolvedDependencies.snapshots[0].kind="tool-catalog";
+  unsupported.resolvedDependencies.snapshots.find(item=>item.id==="ca").kind="tool-catalog";
   await assert.rejects(
     createCompilerDevelopmentBuildRequest(unsupported),
-    error=>error.code==="DEVELOPMENT_BUILD_DEPENDENCY_KIND_UNSUPPORTED"
+    error=>error.code==="DEVELOPMENT_BUILD_DEPENDENCY_KIND_UNSUPPORTED"&&
+      error.message.includes("tool-catalog")
+  );
+  const unsupportedSchema=await fixtureInput();
+  unsupportedSchema.resolvedDependencies.snapshots.find(item=>item.id==="ca").kind="schema-bundle";
+  await assert.rejects(
+    createCompilerDevelopmentBuildRequest(unsupportedSchema),
+    error=>error.code==="DEVELOPMENT_BUILD_DEPENDENCY_KIND_UNSUPPORTED"&&
+      error.message.includes("schema-bundle")
   );
 });
 
