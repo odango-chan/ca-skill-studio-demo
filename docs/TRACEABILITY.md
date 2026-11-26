@@ -21,7 +21,7 @@ This matrix maps current scope to canonical design, implementation and exact-hea
 | v1alpha5 action parity / retired affordances | [#237](https://github.com/odango-chan/ca-skill-studio-demo/issues/237) | `package.json`, `package.nls*.json`, `package-overview.mjs`, `extension.mjs`, webview handlers | 32 contributed commands require complete action → handler → test inventory. [PR #289](https://github.com/odango-chan/ca-skill-studio-demo/pull/289) updates Preview labels but needs rerun after #291; hidden legacy route-patch markup still requires cleanup. |
 | Markdown worker / TreeModel lifecycle | [#288](https://github.com/odango-chan/ca-skill-studio-demo/issues/288), [PR #292](https://github.com/odango-chan/ca-skill-studio-demo/pull/292) | Package Overview, native Markdown worker, Theia Browser smoke | Root stack not captured yet. Keep separate from the Console Source / dirty-buffer regression fixed by #291. |
 | Product acceptance audit | [#279](https://github.com/odango-chan/ca-skill-studio-demo/issues/279) | Architecture, commands, lifecycle, docs, exact-head workflows | OPEN. Product Acceptance is not complete; no automatic merge or Harness prompt before all in-scope gates close. |
-| Documentation governance | [#285](https://github.com/odango-chan/ca-skill-studio-demo/issues/285) | `WORK.md`, `WORK-history.md`, `TRACEABILITY.md`, docs governance tests | WORK is within 40–120 lines; dated snapshots and historical traceability are archived. Candidate-head tests / links must pass before closing #285. |
+| Documentation governance | [#285](https://github.com/odango-chan/ca-skill-studio-demo/issues/285) | `WORK.md`, `WORK-history.md`, `TRACEABILITY.md`, docs governance tests | WORK 52 lines; TRACEABILITY 41 lines; history archive preserves dated evidence. Latest tested #282 head passes PR Verify + Pages Build / real Chromium on #291 base; main deployment follows merge. |
 
 ## Evidence status vocabulary
 
@@ -38,3 +38,5 @@ Do not copy historical PASS to a new main or PR head. Unit, mock, static, clean-
 
 - **2026-11-26 — Replaced the oversized historical matrix with the current scope → design → code/test → exact-head evidence map.** Sections: current rows, evidence vocabulary and current checkpoint. Reason: keep current traceability actionable while preserving dated implementation evidence in WORK-history.md. Author: ChatGPT (GPT-6.2).
 - **2026-11-26 — Preview lifecycle candidate updated.** PR #293 head `f2db96c0409dfb7db183944cfd5808c4e81b1fec` passes 5/5 gates on the dependent #291 base; retarget to main and rerun after #291 merges. Author: ChatGPT (GPT-6.2).
+
+- **2026-11-26 — Documentation acceptance evidence advanced.** Sections: documentation governance row. Reason: record candidate-head PR Verify and Pages Chromium PASS while keeping main deployment / merge boundary explicit. Author: ChatGPT (GPT-6.2).
