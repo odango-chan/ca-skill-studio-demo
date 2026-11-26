@@ -111,7 +111,7 @@ test("immutable snapshot reads retry transient OPFS missing-entry results when s
     const ready=await applyDependency(h.vscode,h.root,"example",acquired,
       {confirm:async()=>true});
     assert.equal(injected,true,code+" must be injected during post-rename snapshot verification");
-    assert.match(injectedPath,/\\.skill-studio\\/dependencies|\\.skill-studio\\/dependencies/);
+    assert.ok(injectedPath.includes("/.skill-studio/dependencies/"));
     assert.equal(ready.status,"READY",code+" must be retried only after stat confirms the file");
     assert.equal((await resolveLockedDependencies(h.vscode,h.root)).status,"READY");
   }
