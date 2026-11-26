@@ -14,7 +14,9 @@ const pages=[
   "docs/architecture/skill-project-layout.md",
   "docs/architecture/theia-workbench.md",
   "docs/decisions/0005-fixed-source-preview-workbench.md",
-  "docs/design/authoring-workbench.md","docs/design/route-designer.md",
+  "docs/design/authoring-workbench.md","docs/design/source-editor-workstream.md",
+  "docs/design/ai-procedure-authoring.md","docs/design/skill-lsp-l2d-editor-acceptance.md",
+  "docs/design/skill-lsp-l2d2-live-problems.md","docs/design/route-designer.md",
   "docs/decisions/0001-source-first-visual.md",
   "docs/D1-procedure-designer.md","docs/D2-node-designer.md",
   "docs/ux/ux-consolidation.md",
@@ -65,6 +67,20 @@ test("current dependency architecture is canonical and old project proposals are
   assert.match(layout,/Historical proposal/);
   assert.match(boundary,/Theia 1\.76 browser-only/);
   assert.match(boundary,/Classic.*retired/);
+});
+
+test("AI Authoring and Source Editor docs distinguish current implementation from historical plans",()=>{
+  const ai=content("docs/design/ai-procedure-authoring.md");
+  const source=content("docs/design/source-editor-workstream.md");
+  const map=content("docs/README.md");
+  assert.match(ai,/Current status: F1–F4 IMPLEMENTED \/ MERGED \/ DEPLOYED/);
+  assert.match(ai,/Issue #200 CLOSED/);
+  assert.match(ai,/Compiler v2\.0\.2/);
+  assert.match(ai,/Compiler v2\.1\.0/);
+  assert.match(ai,/Historical design and implementation planning record/);
+  assert.match(source,/Historical workstream record/);
+  assert.match(map,/current F1–F4 implementation state/i);
+  assert.match(map,/standalone Monaco Source Editor.*历史/i);
 });
 
 test("AGENTS safety and evidence rules are paired with repository ignore",()=>{
