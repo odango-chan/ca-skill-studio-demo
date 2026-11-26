@@ -1437,8 +1437,21 @@ try{
     }catch(error){
       upgradedEvidence={diagnosticsError:String(error?.message??error)};
     }
+    const activationSummary=upgradedEvidence?{
+      exampleReplacement:upgradedEvidence.exampleReplacement??null,
+      lastExampleImport:upgradedEvidence.lastExampleImport??null,
+      welcome:upgradedEvidence.welcome??null,
+      failures:upgradedEvidence.failures??null,
+      components:upgradedEvidence.components??null,
+      packageInventory:upgradedEvidence.packageInventory?{
+        state:upgradedEvidence.packageInventory.state,
+        message:upgradedEvidence.packageInventory.message,
+        availabilityState:upgradedEvidence.packageInventory.availabilityState,
+        packageCount:upgradedEvidence.packageInventory.packageCount
+      }:null
+    }:null;
     throw Error("Explicit Example replacement did not restore a clean current v1alpha5 project: "+
-      JSON.stringify({identity:upgradedIdentity,activation:upgradedEvidence,
+      JSON.stringify({identity:upgradedIdentity,activation:activationSummary,
         ui:await evalJS("document.body.innerText.slice(-1800)")}).slice(0,5200));
   }
   console.log("STUDIO_LEGACY_EXAMPLE_REPLACEMENT_CHROMIUM_PASS",JSON.stringify({
