@@ -213,6 +213,27 @@ function captureExampleTree(h){
       .sort(([left],[right])=>left.localeCompare(right))
   };
 }
+function captureTreeAt(h,treeRoot){
+  const prefix=treeRoot+"/";
+  return {
+    directories:[...h.folders].filter(path=>path===treeRoot||path.startsWith(prefix)).sort(),
+    files:[...h.files.entries()]
+      .filter(([path])=>path===treeRoot||path.startsWith(prefix))
+      .map(([path,bytes])=>[path,Array.from(bytes)])
+      .sort(([left],[right])=>left.localeCompare(right))
+  };
+}
+function removeTreeAt(h,treeRoot){
+  const prefix=treeRoot+"/";
+  for(const path of [...h.files.keys()])
+    if(path===treeRoot||path.startsWith(prefix))h.files.delete(path);
+  for(const path of [...h.folders])
+    if(path===treeRoot||path.startsWith(prefix))h.folders.delete(path);
+}
+function replaceDirectoryWithSymlink(h,linkPath,targetPath){
+  removeTreeAt(h,linkPath);
+  h.symlinks.set(linkPath,targetPath);
+}
 async function existingExampleWithUserData(){
   const h=host();
   await seedExampleProject(h.vscode,uri("/extension"),uri("/global-storage"));
