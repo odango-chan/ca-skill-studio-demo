@@ -479,7 +479,7 @@ The following text is the prior `docs/architecture/studio-boundaries.md` before 
 
 **Status: Current implementation boundary · Updated 2026-11-26 · Audited baseline: `main@5b666c0ef754ed32fa37c97ce2429f328c70477f`**
 
-This document defines what Skill Studio owns and what it must consume from authoritative repositories. Current dependency and Interface Package details are in [Dependency, Interface Package and Schema IntelliSense Architecture](dependency-and-interface-package.md). Current implementation / acceptance status is in [WORK](../WORK.md); source-to-test evidence is in [TRACEABILITY](../TRACEABILITY.md).
+This document defines what Skill Studio owns and what it must consume from authoritative repositories. Current dependency and Interface Package details are in [Dependency, Interface Package and Schema IntelliSense Architecture](architecture/dependency-and-interface-package.md). Current implementation / acceptance status is in [WORK](WORK.md); source-to-test evidence is in [TRACEABILITY](TRACEABILITY.md).
 
 ## 1. Studio ownership
 
@@ -533,7 +533,7 @@ The default Example contains the three OpenAMSM Scheme C Skills:
 - `modify-pdu-session-mas`
 - `release-pdu-session-mas`
 
-It pins three dependency kinds: `mas` Owner ToolCatalog, `ca-context` Host Context Schema Bundle and `ca-client` read-only SBI Interface Package. `ca-client` is for query Schema IntelliSense only; it is not a MAS Contract root. The current `mas` and `ca-context` sources are not formal Compiler v2.1.0 Interface Package Contract roots. See the [dependency architecture](dependency-and-interface-package.md).
+It pins three dependency kinds: `mas` Owner ToolCatalog, `ca-context` Host Context Schema Bundle and `ca-client` read-only SBI Interface Package. `ca-client` is for query Schema IntelliSense only; it is not a MAS Contract root. The current `mas` and `ca-context` sources are not formal Compiler v2.1.0 Interface Package Contract roots. See the [dependency architecture](architecture/dependency-and-interface-package.md).
 
 The Example is DRAFT / NOT_QUALIFIED. A pinned ToolCatalog, Schema Bundle or Interface Package proves snapshot provenance, not Owner authorization, Host Admission, Runtime execution or real 5GC qualification. Do not re-add the separate illustrative conventional 5GC Skill to the default Example.
 
