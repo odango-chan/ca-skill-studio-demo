@@ -428,14 +428,21 @@ async function copyTreeFromSource(fs,vscode,sourceRoot,destinationRoot,entries,
   for(const entry of selected.filter(item=>item.kind==="file")){
     const source=relativeUri(vscode,sourceRoot,entry.path);
     const destination=relativeUri(vscode,destinationRoot,entry.path);
-    const bytes=await fs.readFile(source);
+    const bytes=await readTransactionFile(fs,source,entry.path);
+    if(bytes===null)
+      fail("Transaction source disappeared while copying: "+entry.path);
     if(bytes.length!==entry.size||await gitBlobSha1(bytes)!==entry.digest)
       fail("Transaction source changed while copying: "+entry.path);
     const parts=entry.path.split("/");
     if(parts.length>1)
       await fs.createDirectory(vscode.Uri.joinPath(destinationRoot,...parts.slice(0,-1)));
     await fs.writeFile(destination,bytes);
-    const written=await fs.readFile(destination);
+    // OPFS may briefly return EntryNotFound immediately after a successful
+    // write. Confirm existence with stat and retry rather than rolling back
+    // a valid copy because of a transient directory-index lag.
+    const written=await readTransactionFile(fs,destination,entry.path);
+    if(written===null)
+      fail("Transaction destination disappeared after copy: "+entry.path);
     if(written.length!==entry.size||await gitBlobSha1(written)!==entry.digest)
       fail("Transaction copy verification failed: "+entry.path);
   }
