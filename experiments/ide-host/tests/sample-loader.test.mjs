@@ -1039,6 +1039,40 @@ test("Confirmed replacement recreates a same-digest dependency directory missing
     "the regenerated cache must restore the schema file beneath the recreated directory");
 });
 
+test("Transaction rollback retries a transient EntryNotFound after restoring the active settings file",async()=>{
+  const h=await existingExampleWithUserData();
+  const before=captureExampleTree(h);
+  const settingsPath=root+"/.vscode/settings.json";
+  h.faults.push({
+    op:"writeFile",path:root+"/README.md",partial:true,remaining:1
+  });
+  const fs=h.vscode.workspace.fs;
+  const originalReadFile=fs.readFile.bind(fs);
+  const originalWriteFile=fs.writeFile.bind(fs);
+  let activeSettingsWritten=false,injected=false;
+  fs.writeFile=async(target,bytes)=>{
+    const result=await originalWriteFile(target,bytes);
+    if(target.path===settingsPath)activeSettingsWritten=true;
+    return result;
+  };
+  fs.readFile=async target=>{
+    if(activeSettingsWritten&&!injected&&target.path===settingsPath){
+      injected=true;
+      throw Object.assign(Error("transient OPFS EntryNotFound after write"),
+        {code:"EntryNotFound"});
+    }
+    return originalReadFile(target);
+  };
+  await assert.rejects(seedExampleProject(h.vscode,uri("/extension"),uri("/global-storage"),{
+    replaceExisting:true
+  }),/previous Example was restored/);
+  assert.equal(injected,true,
+    "the fault must occur on read-after-write verification of the restored settings file");
+  assert.equal(getExampleReplacementStatus().state,"READY");
+  assert.deepEqual(captureExampleTree(h),before,
+    "a transient OPFS read-after-write miss must not turn a verified rollback into RECOVERY_REQUIRED");
+});
+
 test("Transaction backup retries a transient EntryNotFound when stat confirms the file still exists",async()=>{
   const h=await existingExampleWithUserData();
   h.faults.push({
