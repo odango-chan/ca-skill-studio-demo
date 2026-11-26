@@ -1101,6 +1101,9 @@ export async function runWorkbenchAcceptance({
     const highlightSourceFocus=await nativeCommand(
       "skillStudio.internal.openProcedureSourceForHighlightDiagnostics",defaultProcedureUri);
     console.log("STUDIO_HIGHLIGHT_SOURCE_FOCUS_CHROMIUM",JSON.stringify(highlightSourceFocus));
+    const highlightSourcePair=await assertSourceVisualPair(evalJS,sleep,
+      "procedure.yaml","CA-SL current Procedure after Schema completion");
+    console.log("STUDIO_HIGHLIGHT_SOURCE_PAIR_CHROMIUM",JSON.stringify(highlightSourcePair));
     for(let attempt=0;attempt<40;attempt++){
       semanticTokenEvidence=await nativeCommand("skillStudio.internal.semanticTokenDiagnostics");
       const renderer=semanticTokenEvidence?.rendererDiagnostics;
@@ -1122,7 +1125,7 @@ export async function runWorkbenchAcceptance({
       throw Error("Native v1alpha5 semantic token ranges were not applied to the visible editor: "+
         JSON.stringify({semanticTokenEvidence,rendererState}));
     const predicateColorEvidence=await evalJS(`(()=>{
-      const widget=document.getElementById(${JSON.stringify(procedurePair.source.id)});
+      const widget=document.getElementById(${JSON.stringify(highlightSourcePair.source.id)});
       const editor=widget?.querySelector('.monaco-editor')??
         [...document.querySelectorAll('.monaco-editor')].find(node=>{
           const r=node.getBoundingClientRect();return r.width>150&&r.height>100;
@@ -1139,7 +1142,7 @@ export async function runWorkbenchAcceptance({
     const outcomeMarker=await nativeCommand("skillStudio.internal.revealSemanticColorAcceptance");
     await sleep(180);
     const outcomeColorEvidence=await evalJS(`(()=>{
-      const widget=document.getElementById(${JSON.stringify(procedurePair.source.id)});
+      const widget=document.getElementById(${JSON.stringify(highlightSourcePair.source.id)});
       const editor=widget?.querySelector('.monaco-editor')??
         [...document.querySelectorAll('.monaco-editor')].find(node=>{
           const r=node.getBoundingClientRect();return r.width>150&&r.height>100;
