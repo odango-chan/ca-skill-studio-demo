@@ -10,7 +10,7 @@
 
 ## Real editor acceptance
 
-The real Chromium smoke uses the loaded establish-pdu-session Package and the public VS Code diagnostics API, then inspects the native Theia Problems panel.
+The real Chromium smoke uses the dedicated `tests/fixtures/v1alpha5-conventional/establish-pdu-session` fixture (not the default OpenAMSM Scheme C Example) and the public VS Code diagnostics API, then inspects the native Theia Problems panel.
 
 1. Apply a temporary malformed YAML edit to the open assurance/procedure.yaml through a native WorkspaceEdit.
 2. Wait for a newer Package generation to reach SKILL LSP: PARTIAL.
