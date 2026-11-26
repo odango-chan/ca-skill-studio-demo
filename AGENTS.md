@@ -16,7 +16,7 @@ Theia browser-only 是唯一在线工作台。独立 Classic 浏览器工作台�
 
 1. README.md / docs/README.md — 当前产品和文档地图；
 2. docs/WORK.md — 唯一当前状态；docs/TRACEABILITY.md — contract → code → test → acceptance → evidence；
-3. 边界改动读 docs/architecture/studio-boundaries.md 和 docs/architecture/plugin-managed-configuration-v0.1.md；
+3. 边界改动读 docs/architecture/studio-boundaries.md；依赖 / Interface Package 改动必须读 docs/architecture/dependency-and-interface-package.md。plugin-managed-configuration-v0.1.md 是历史提案，不是当前实现指南；
 4. Extension / Host 改动读 experiments/ide-host/README.md、experiments/ide-host/vscode/ 与对应测试；
 5. UI / Projection / Patch 改动读 docs/design/authoring-workbench.md、相关共享模块和测试；
 6. Route / Phase 改动读 docs/design/route-designer.md、docs/D1-procedure-designer.md、docs/D2-node-designer.md；
