@@ -30,7 +30,9 @@ function harness(saved, {useAuthoringStub=false} = {}) {
     workspace: {
       textDocuments,
       openTextDocument: async uri => textDocuments.find(item =>
-        item.uri.toString() === uri.toString()) ?? null
+        item.uri.toString() === uri.toString()) ?? null,
+      findFiles: async () => [document],
+      asRelativePath: uri => uri.path
     },
     window: {
       activeTextEditor: editor,
