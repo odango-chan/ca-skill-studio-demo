@@ -9,6 +9,11 @@ const pages=[
   "README.md","AGENTS.md","docs/README.md","docs/DOCUMENTATION.md",
   "docs/WORK.md","docs/TRACEABILITY.md",
   "docs/architecture/studio-boundaries.md",
+  "docs/architecture/dependency-and-interface-package.md",
+  "docs/architecture/plugin-managed-configuration-v0.1.md",
+  "docs/architecture/skill-project-layout.md",
+  "docs/architecture/theia-workbench.md",
+  "docs/decisions/0005-fixed-source-preview-workbench.md",
   "docs/design/authoring-workbench.md","docs/design/route-designer.md",
   "docs/decisions/0001-source-first-visual.md",
   "docs/D1-procedure-designer.md","docs/D2-node-designer.md",
@@ -44,6 +49,24 @@ test("README stays an entrypoint and historical UX has explicit deprecated statu
   assert.match(content("docs/reference/README-pre-compact-2026-11-03.md"),
     /Status: Deprecated/);
 });
+test("current dependency architecture is canonical and old project proposals are historical",()=>{
+  const map=content("docs/README.md"),agents=content("AGENTS.md");
+  const current=content("docs/architecture/dependency-and-interface-package.md");
+  const old=content("docs/architecture/plugin-managed-configuration-v0.1.md");
+  const layout=content("docs/architecture/skill-project-layout.md");
+  const boundary=content("docs/architecture/studio-boundaries.md");
+  assert.match(map,/dependency-and-interface-package\.md/);
+  assert.match(agents,/dependency-and-interface-package\.md/);
+  for(const term of ["skillc.lock/v0.1","interface-dependency-lock/v1alpha1",
+    "establish-pdu-session-mas","modify-pdu-session-mas","release-pdu-session-mas",
+    "ca-context","ca-client","NOT_QUALIFIED","Compiler v2.0.2","Compiler v2.1.0"])
+    assert.ok(current.includes(term),"Current dependency architecture missing "+term);
+  assert.match(old,/Historical v0\.1 design proposal/);
+  assert.match(layout,/Historical proposal/);
+  assert.match(boundary,/Theia 1\.76 browser-only/);
+  assert.match(boundary,/Classic.*retired/);
+});
+
 test("AGENTS safety and evidence rules are paired with repository ignore",()=>{
   const agents=content("AGENTS.md"),ignore=content(".gitignore");
   for(const mark of ["docs/WORK.md","docs/TRACEABILITY.md","/tmp","CA_AGENT_TMPDIR",
