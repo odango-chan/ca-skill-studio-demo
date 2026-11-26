@@ -1,9 +1,9 @@
 # D2 Node Designer · source-backed authoring
 
-**Status: Accepted (completed D2 milestone record) · Date: 2026-11-03**  
-**Current state:** [WORK](WORK.md) · [TRACEABILITY](TRACEABILITY.md)
+**Status: HISTORICAL — completed D2 standalone Node Designer milestone record · Original date: 2026-11-03**  
+**Current state:** native Source + read-only Preview per [ADR-0005](decisions/0005-fixed-source-preview-workbench.md) · [WORK](WORK.md) · [TRACEABILITY](TRACEABILITY.md)
 
-此文记录 D2-A1 至 A5 的实现及验收边界；后续 Route/Phase 的拟议能力见 [D3](design/route-designer.md)，不能将 D3 的 Proposed 写成 D2 PASS。
+此文仅记录 D2-A1 至 A5 在早期独立 Designer 中的实现及验收边界。它们不是当前 Theia Preview 的可见编辑操作；后续 D3/D4 文档同样属于历史设计，不得据此恢复 Visual mutation。
 
 Status: D2-A1 through D2-A5 bounded editing and editor checks implemented. Full Runtime qualification remains out of scope.
 
@@ -171,3 +171,7 @@ Run `npm test`, `npm run typecheck`, `npm run build`,
 `node scripts/edge-smoke.mjs`. Validate both pinned package baselines,
 advisory warnings after editing, Diff/Apply/Undo/Redo, Source failure
 recovery into a Child Procedure and a 95-Node real-browser fallback.
+
+## Revision record
+
+- **2026-11-26 — Marked D2 as historical.** Sections: status, current state and scope note. Reason: distinguish legacy standalone Node editing from the current read-only Theia Preview. Author: ChatGPT (GPT-6.2).
