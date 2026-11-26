@@ -868,6 +868,20 @@ test("Confirmed replacement reconciles stale OPFS directory entries without trea
     "the new pinned dependency snapshot must be complete, not reuse the stale cache");
 });
 
+test("Transaction backup retries a transient EntryNotFound when stat confirms the file still exists",async()=>{
+  const h=await existingExampleWithUserData();
+  h.faults.push({
+    op:"readFile",path:procedurePath,code:"EntryNotFound",remaining:1
+  });
+  const result=await seedExampleProject(h.vscode,uri("/extension"),uri("/global-storage"),{
+    replaceExisting:true
+  });
+  assert.equal(result.replacedExisting,true);
+  assert.equal(result.created,total);
+  assert.equal(getExampleReplacementStatus().state,"READY");
+  assert.match(decode(h.files.get(procedurePath)),/^start:/m);
+});
+
 test("A failure while backing up the old Example leaves the active tree untouched",async()=>{
   const h=await existingExampleWithUserData();
   const before=captureExampleTree(h);
