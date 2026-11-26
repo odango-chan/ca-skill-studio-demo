@@ -843,7 +843,7 @@ test("Confirmed replacement reconciles stale OPFS directory entries without trea
   const h=host();
   const before=await seedExistingExample(h);
   const preservedMetadataPath=root+"/.skill-studio/user-metadata.json";
-  const preservedMetadata=encode("{\\"workspaceLabel\\":\\"my Example notes\\"}\\n");
+  const preservedMetadata=encode('{"workspaceLabel":"my Example notes"}\n');
   h.files.set(preservedMetadataPath,preservedMetadata);
   const settings=JSON.parse(decode(h.files.get(root+"/.vscode/settings.json")));
   const owner=settings["connectionAgent.skillStudio.dependencyLock"].entries
