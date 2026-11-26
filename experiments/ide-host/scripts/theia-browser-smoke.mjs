@@ -559,6 +559,10 @@ try{
   await revealStudioSubmenu('Project',['New Project','Open Project','Open Example Project']);
   await revealStudioSubmenu('Skill',['Check Skill','Build Skill','Inspect Dependencies']);
   await revealStudioSubmenu('Dependencies',['Add Dependency','Refresh Dependencies']);
+  await revealStudioSubmenu('Authoring',[
+    'Open Procedure Preview','Open Contract Preview',
+    'Open Predicate Preview','Open Schema Preview'
+  ]);
   await command("Input.dispatchKeyEvent",{type:"keyDown",key:"Escape",code:"Escape",windowsVirtualKeyCode:27});
   await command("Input.dispatchKeyEvent",{type:"keyUp",key:"Escape",code:"Escape",windowsVirtualKeyCode:27});
   await command("Input.dispatchMouseEvent",{type:"mousePressed",x:390,y:270,button:"left",clickCount:1});
@@ -631,7 +635,7 @@ try{
   const paletteText=(registeredCommands.items??[]).join("\\n")+"\\n"+(registeredCommands.text??"");
   for(const label of [
     "SKILL Studio: Check Skill","SKILL Studio: Build Skill",
-    "SKILL Studio: Add Dependency","SKILL Studio: Open Procedure Designer"
+    "SKILL Studio: Add Dependency","SKILL Studio: Open Procedure Preview"
   ])if(!paletteText.includes(label))
     throw Error("Command Palette is missing "+label+": "+paletteText);
   const loadExampleRow=await evalJS(`(()=>{

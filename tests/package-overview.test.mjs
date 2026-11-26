@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
 import {buildPackageInventory,packageFileCommand,packageScanRoots,registerPackageOverview}
   from '../experiments/ide-host/vscode/src/package-overview.mjs';
 
@@ -88,19 +89,37 @@ test('C4 keeps incomplete packages visible when only assurance markers exist',()
     'assurance/predicates.yaml'));
 });
 
-test('C4 uses exact file-kind Designer commands and native Source for other files',()=>{
+test('C4 uses current read-only Preview navigation commands and native Source for other files',()=>{
   const file=uri('/workspace/skill/schemas/request.schema.yaml');
-  assert.equal(packageFileCommand('assurance/procedure.yaml',file).command,
-    'skillStudio.openProcedure');
-  assert.equal(packageFileCommand('assurance/contract.yaml',file).command,
-    'skillStudio.openContract');
-  assert.equal(packageFileCommand('assurance/predicates.yaml',file).command,
-    'skillStudio.openPredicates');
-  assert.equal(packageFileCommand('schemas/request.schema.yaml',file).command,
-    'skillStudio.openSchema');
+  const procedure=packageFileCommand('assurance/procedure.yaml',file);
+  const contract=packageFileCommand('assurance/contract.yaml',file);
+  const predicates=packageFileCommand('assurance/predicates.yaml',file);
+  const schema=packageFileCommand('schemas/request.schema.yaml',file);
+  assert.equal(procedure.command,'skillStudio.openProcedure');
+  assert.equal(procedure.title,'Open Procedure Preview');
+  assert.equal(contract.command,'skillStudio.openContract');
+  assert.equal(contract.title,'Open Contract Preview');
+  assert.equal(predicates.command,'skillStudio.openPredicates');
+  assert.equal(predicates.title,'Open Predicate Preview');
+  assert.equal(schema.command,'skillStudio.openSchema');
+  assert.equal(schema.title,'Open Schema Preview');
   assert.equal(packageFileCommand('scripts/evaluate.py',file).command,'vscode.open');
   assert.equal(packageFileCommand('references/3gpp.md',file).command,'vscode.open');
-  assert.deepEqual(packageFileCommand('assurance/contract.yaml',file).arguments,[file]);
+  assert.deepEqual(contract.arguments,[file]);
+});
+
+test('Theia command labels describe read-only Preview navigation in English and Chinese',()=>{
+  const english=JSON.parse(readFileSync(new URL(
+    '../experiments/ide-host/vscode/package.nls.json',import.meta.url),'utf8'));
+  const chinese=JSON.parse(readFileSync(new URL(
+    '../experiments/ide-host/vscode/package.nls.zh-cn.json',import.meta.url),'utf8'));
+  for(const key of ['command.openProcedure','command.openContract',
+    'command.openPredicates','command.openSchema']){
+    assert.match(english[key],/Preview$/);
+    assert.doesNotMatch(english[key],/Designer/);
+    assert.match(chinese[key],/预览$/);
+    assert.doesNotMatch(chinese[key],/设计器/);
+  }
 });
 
 test('C4 reports bounded inventory instead of implying a complete scan',()=>{
