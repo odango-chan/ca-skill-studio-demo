@@ -64,10 +64,11 @@ function host(candidateOverride=null,{
       const fault=takeFault("stat",target.path);
       if(fault)throwFault(fault,"stat",target.path);
       if(staleStats.has(target.path))return {type:1};
-      if(files.has(target.path)||folders.has(target.path)||
+      if(folders.has(target.path)||
          [...files.keys()].some(path=>path.startsWith(target.path+"/"))||
          [...folders].some(path=>path.startsWith(target.path+"/")))
-        return {type:1};
+        return {type:2};
+      if(files.has(target.path))return {type:1};
       throw Object.assign(Error("missing"),{code:"FileNotFound"});
     },
     async readDirectory(target){
