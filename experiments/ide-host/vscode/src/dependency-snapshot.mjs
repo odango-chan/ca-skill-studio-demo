@@ -83,6 +83,22 @@ export async function calculateSnapshot(files){
   return {snapshotDigest:await sha256(concat(parts)),files:lockFiles,
     wireFiles};
 }
+/**
+ * Compute the exact immutable Interface Package snapshot digest used by
+ * CA Skill Compiler v2.1.0 Development Build. This is deliberately separate
+ * from the existing Studio v0.1 cache digest: Compiler hashes original file
+ * bytes with its frozen domain and length framing, not per-file SHA-256 values.
+ */
+export async function calculateCompilerDependencySnapshotDigest(files){
+  const ordered=sortedFiles(files);
+  const parts=[enc.encode("CA-SKILL-DEPENDENCY-SNAPSHOT\u0000v1\u0000"),u32(ordered.length)];
+  for(const file of ordered){
+    const name=enc.encode(file.path);
+    parts.push(u32(name.length),name,u64(file.bytes.length),file.bytes);
+  }
+  return sha256(concat(parts));
+}
+
 export async function verifyLockedFiles(lockEntry,wireFiles){
   if(!lockEntry||!Array.isArray(lockEntry.files))
     throw Error("Missing dependency lock metadata");
