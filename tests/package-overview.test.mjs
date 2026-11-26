@@ -299,3 +299,132 @@ test('C4 registers Package Explorer and renders Skills under the unified tree',a
   assert.equal(treeItem.label,'establish-pdu-session');
   assert.equal(treeItem.collapsibleState,1);
 });
+test('Package Inventory and dependency nodes stay unavailable during Example recovery',async()=>{
+  const commands=new Map(),treeProviders=new Map();
+  class Emitter{constructor(){this.event=()=>{};}fire(){}dispose(){}}
+  class Item{constructor(label,state){this.label=label;this.collapsibleState=state;}}
+  class RelativePattern{constructor(base,pattern){this.baseUri=base;this.pattern=pattern;}}
+  const noop=()=>({dispose(){}});
+  let scans=0;
+  const vscode={
+    EventEmitter:Emitter,TreeItem:Item,RelativePattern,
+    TreeItemCollapsibleState:{Collapsed:1,None:0,Expanded:2},
+    workspace:{
+      workspaceFolders:[{uri:uri('/global-storage/skill-studio-demo')}],
+      textDocuments:[],
+      async findFiles(){scans++;return files;},
+      asRelativePath:value=>value.path,
+      onDidChangeWorkspaceFolders:noop
+    },
+    window:{registerTreeDataProvider(id,provider){
+      treeProviders.set(id,provider);return noop();
+    }},
+    commands:{registerCommand(id,fn){commands.set(id,fn);return noop();}}
+  };
+  const context={subscriptions:[]};
+  const view=registerPackageOverview(vscode,context,()=>null,{
+    getAvailability:()=>({state:'RECOVERY_REQUIRED',
+      message:'Example replacement rollback is incomplete; retry startup recovery'})
+  });
+  await commands.get('skillStudio.refreshPackages')();
+  assert.equal(scans,0,'blocked Example must not be scanned');
+  const diagnostics=view.getDiagnostics();
+  assert.equal(diagnostics.state,'unavailable');
+  assert.equal(diagnostics.availabilityState,'RECOVERY_REQUIRED');
+  assert.match(diagnostics.message,/rollback is incomplete/);
+  const provider=treeProviders.get('skillStudio.packages');
+  const sections=await provider.getChildren();
+  const skills=await provider.getChildren(sections[0]);
+  assert.equal(skills[0].kind,'summary');
+  assert.equal(skills[1].kind,'notice');
+  const dependencies=await provider.getChildren(sections[1]);
+  assert.equal(dependencies[0].kind,'message');
+  assert.match(dependencies[0].text,/rollback is incomplete/);
+});
+test('An in-flight Package Inventory scan cannot publish READY after Example replacement starts',async()=>{
+  const commands=new Map(),treeProviders=new Map();
+  class Emitter{constructor(){this.event=()=>{};}fire(){}dispose(){}}
+  class Item{constructor(label,state){this.label=label;this.collapsibleState=state;}}
+  class RelativePattern{constructor(base,pattern){this.baseUri=base;this.pattern=pattern;}}
+  const noop=()=>({dispose(){}});
+  let scans=0,resolveScan;
+  const pending=new Promise(resolve=>{resolveScan=resolve;});
+  const availability={state:'READY',message:null};
+  const vscode={
+    EventEmitter:Emitter,TreeItem:Item,RelativePattern,
+    TreeItemCollapsibleState:{Collapsed:1,None:0,Expanded:2},
+    workspace:{
+      workspaceFolders:[{uri:uri('/global-storage/skill-studio-demo')}],
+      textDocuments:[],
+      async findFiles(){scans++;return pending;},
+      asRelativePath:value=>value.path,
+      onDidChangeWorkspaceFolders:noop
+    },
+    window:{registerTreeDataProvider(id,provider){
+      treeProviders.set(id,provider);return noop();
+    }},
+    commands:{registerCommand(id,fn){commands.set(id,fn);return noop();}}
+  };
+  const view=registerPackageOverview(vscode,{subscriptions:[]},()=>null,{
+    getAvailability:()=>availability
+  });
+  const scanPromise=view.refresh();
+  await new Promise(resolve=>setImmediate(resolve));
+  assert.ok(scans>=1,'at least one scan should be waiting on the deferred file listing');
+  availability.state='IN_PROGRESS';
+  availability.message='Example replacement is committing';
+  resolveScan(files);
+  await scanPromise;
+  const diagnostics=view.getDiagnostics();
+  assert.equal(diagnostics.state,'unavailable');
+  assert.equal(diagnostics.availabilityState,'IN_PROGRESS');
+  assert.equal(diagnostics.packageCount,0);
+  const provider=treeProviders.get('skillStudio.packages');
+  const sections=await provider.getChildren();
+  const skills=await provider.getChildren(sections[0]);
+  assert.equal(skills[0].kind,'summary');
+  assert.equal(skills[1].kind,'notice');
+});
+
+
+
+test('An in-flight dependency-tree read cannot publish stale nodes after Example replacement starts',async()=>{
+  const commands=new Map(),treeProviders=new Map();
+  class Emitter{constructor(){this.event=()=>{};}fire(){}dispose(){}}
+  class Item{constructor(label,state){this.label=label;this.collapsibleState=state;}}
+  class RelativePattern{constructor(base,pattern){this.baseUri=base;this.pattern=pattern;}}
+  const noop=()=>({dispose(){}});
+  let resolveDependencies;
+  const pending=new Promise(resolve=>{resolveDependencies=resolve;});
+  const availability={state:'READY',message:null};
+  const vscode={
+    EventEmitter:Emitter,TreeItem:Item,RelativePattern,
+    TreeItemCollapsibleState:{Collapsed:1,None:0,Expanded:2},
+    workspace:{
+      workspaceFolders:[{uri:uri('/global-storage/skill-studio-demo')}],
+      textDocuments:[],
+      async findFiles(){return files;},
+      asRelativePath:value=>value.path,
+      onDidChangeWorkspaceFolders:noop
+    },
+    window:{registerTreeDataProvider(id,provider){
+      treeProviders.set(id,provider);return noop();
+    }},
+    commands:{registerCommand(id,fn){commands.set(id,fn);return noop();}}
+  };
+  registerPackageOverview(vscode,{subscriptions:[]},()=>null,{
+    getAvailability:()=>availability,
+    dependenciesProvider:{async getChildren(){return pending;}}
+  });
+  const provider=treeProviders.get('skillStudio.packages');
+  const sections=await provider.getChildren();
+  const dependencyRead=provider.getChildren(sections[1]);
+  await new Promise(resolve=>setImmediate(resolve));
+  availability.state='IN_PROGRESS';
+  availability.message='Example replacement is committing';
+  resolveDependencies([{kind:'dependency',label:'stale snapshot'}]);
+  const result=await dependencyRead;
+  assert.equal(result.length,1);
+  assert.equal(result[0].kind,'message');
+  assert.match(result[0].text,/replacement is committing/);
+});

@@ -1431,9 +1431,29 @@ try{
      upgradedIdentity?.libExists||upgradedIdentity?.outputExists||
      upgradedIdentity?.workspaceFolders?.length!==1||
      upgradedEvidence?.packageInventory?.packages?.length!==3||
-     upgradedEvidence?.failures?.length)
+     upgradedEvidence?.failures?.length){
+    try{
+      upgradedEvidence=await evalJS("(()=>{const c=window.theia?.container;if(!c)return null;const k=[...(c._bindingDictionary?._map?.keys?.()??[])].find(x=>typeof x==='function'&&x.prototype?.executeCommand&&x.prototype?.registerCommand&&x.prototype?.getCommand);return k?c.get(k).executeCommand('skillStudio.showActivationDiagnostics'):null})()");
+    }catch(error){
+      upgradedEvidence={diagnosticsError:String(error?.message??error)};
+    }
+    const activationSummary=upgradedEvidence?{
+      exampleReplacement:upgradedEvidence.exampleReplacement??null,
+      lastExampleImport:upgradedEvidence.lastExampleImport??null,
+      welcome:upgradedEvidence.welcome??null,
+      failures:upgradedEvidence.failures??null,
+      components:upgradedEvidence.components??null,
+      packageInventory:upgradedEvidence.packageInventory?{
+        state:upgradedEvidence.packageInventory.state,
+        message:upgradedEvidence.packageInventory.message,
+        availabilityState:upgradedEvidence.packageInventory.availabilityState,
+        packageCount:upgradedEvidence.packageInventory.packageCount
+      }:null
+    }:null;
     throw Error("Explicit Example replacement did not restore a clean current v1alpha5 project: "+
-      JSON.stringify({identity:upgradedIdentity,activation:upgradedEvidence}).slice(0,3200));
+      JSON.stringify({identity:upgradedIdentity,activation:activationSummary,
+        ui:await evalJS("document.body.innerText.slice(-1800)")}).slice(0,5200));
+  }
   console.log("STUDIO_LEGACY_EXAMPLE_REPLACEMENT_CHROMIUM_PASS",JSON.stringify({
     menu:recoveryMenu,legacyVersion:legacyIdentity.contractApiVersion,
     cancelPreserved:afterCancel.contractApiVersion,
