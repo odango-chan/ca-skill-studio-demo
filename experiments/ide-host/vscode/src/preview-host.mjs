@@ -100,6 +100,11 @@ export function createPreviewHostController({mountProcedure,mountContract,mountP
       view=nextView;
       if(activeDocument)update(activeDocument);
       else{
+        // A null active document is a real Preview lifecycle transition. Invalidate
+        // queued messages before disposing the previous renderer, then expose the
+        // empty state with no retained Source identity.
+        ++generation;
+        clear();
         view.webview.options={enableScripts:false};
         view.webview.html=previewEmptyHtml("none");
       }
