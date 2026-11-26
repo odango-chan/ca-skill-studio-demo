@@ -1073,6 +1073,41 @@ test("Transaction rollback retries a transient EntryNotFound after restoring the
     "a transient OPFS read-after-write miss must not turn a verified rollback into RECOVERY_REQUIRED");
 });
 
+test("Publishing Example dependency settings retries a transient EntryNotFound after write when stat confirms the file exists",async()=>{
+  const h=await existingExampleWithUserData();
+  const settingsPath=root+"/.vscode/settings.json";
+  const fs=h.vscode.workspace.fs;
+  const originalReadFile=fs.readFile.bind(fs);
+  const originalWriteFile=fs.writeFile.bind(fs);
+  let activeSettingsWritten=false,injected=false;
+  fs.writeFile=async(target,bytes)=>{
+    const result=await originalWriteFile(target,bytes);
+    if(target.path===settingsPath)activeSettingsWritten=true;
+    return result;
+  };
+  fs.readFile=async target=>{
+    if(activeSettingsWritten&&!injected&&target.path===settingsPath){
+      injected=true;
+      throw Object.assign(Error("transient OPFS EntryNotFound after publishing settings"),
+        {code:"EntryNotFound"});
+    }
+    return originalReadFile(target);
+  };
+  const result=await seedExampleProject(h.vscode,uri("/extension"),uri("/global-storage"),{
+    replaceExisting:true
+  });
+  assert.equal(result.replacedExisting,true);
+  assert.equal(injected,true,
+    "the fault must occur on the active settings read immediately after publication");
+  assert.equal(getExampleReplacementStatus().state,"READY");
+  assert.ok(h.files.has(settingsPath));
+  const settings=JSON.parse(decode(h.files.get(settingsPath)));
+  assert.equal(settings["connectionAgent.skillStudio.dependencyLock"].version,
+    "skillc.lock/v0.1");
+  assert.deepEqual(settings["connectionAgent.skillStudio.dependencies"].map(item=>item.id).sort(),
+    ["ca-client","ca-context","mas"]);
+});
+
 test("Transaction backup retries a transient EntryNotFound when stat confirms the file still exists",async()=>{
   const h=await existingExampleWithUserData();
   h.faults.push({
