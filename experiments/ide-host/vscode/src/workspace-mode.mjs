@@ -25,9 +25,9 @@ export function registerWorkspaceMode(vscode, context, { authoring, showWelcome 
   let waitForProcedure;
 
   // A native editor event may arrive after the command that restored Console has
-  // completed. Keep the intended document as the restore target until either
-  // that document is reported active or a later event agrees with the host's
-  // current activeTextEditor. This avoids a fixed timeout accepting a stale tab.
+  // completed. Keep the intended document as the restore target: events for that
+  // document confirm the restore; events for another document are accepted only
+  // when they agree with the host's current activeTextEditor.
   const sourceEditorListener = vscode.window.onDidChangeActiveTextEditor(editor => {
     if (!editor?.document) return;
     if (pendingConsoleRestoreDocument) {
@@ -52,7 +52,7 @@ export function registerWorkspaceMode(vscode, context, { authoring, showWelcome 
     waitForProcedure?.dispose();
     waitForProcedure = undefined;
     switching = true;
-    if (next === "ai") pendingConsoleRestoreDocument = undefined;
+    pendingConsoleRestoreDocument = undefined;
     try {
       if (next === "ai") {
         // Keep the last Console editor object (including selection/undo state).
