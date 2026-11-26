@@ -96,8 +96,12 @@ test("Bundled CustomTextEditor uses native document, guarded WorkspaceEdit and n
   }finally{
     Module._load=original;
   }
-  const context={extensionUri:makeUri("/extension"),globalStorageUri:makeUri("/global-storage"),subscriptions:[]};
-  activate(context);
+  const context={
+    extensionUri:makeUri("/extension"),globalStorageUri:makeUri("/global-storage"),
+    subscriptions:[],globalState:{get:()=>undefined,update:async()=>{}}
+  };
+  // Extension activation now awaits transaction recovery before registering providers.
+  await activate(context);
   assert.ok(previewProvider);
   assert.ok(commands.has("skillStudio.openProcedure"));
   for(const retired of ["skillStudio.renameNode","skillStudio.editNodeOperatorValue",
