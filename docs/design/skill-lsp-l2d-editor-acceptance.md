@@ -10,7 +10,7 @@
 
 ## Real editor-provider acceptance
 
-The browser-only Chromium smoke uses the real Theia command registry and the public VS Code language-provider commands. It must query the loaded `establish-pdu-session` Package and verify:
+The browser-only Chromium smoke uses the real Theia command registry and public VS Code language-provider commands. It loads the dedicated `tests/fixtures/v1alpha5-conventional/establish-pdu-session` fixture (not the default OpenAMSM Scheme C Example) and verifies:
 
 1. Definition from the Procedure's declared script path resolves to the exact `scripts/select_establishment_configuration.py` file.
 2. Hover returns the declared Skill Script metadata, not a guessed symbol.
