@@ -32,13 +32,13 @@ function classify(path) {
 }
 export function packageFileCommand(path, uri) {
   if (path === 'assurance/procedure.yaml')
-    return {command:'skillStudio.openProcedure',title:'Open Procedure Designer',arguments:[uri]};
+    return {command:'skillStudio.openProcedure',title:'Open Procedure Preview',arguments:[uri]};
   if (path === 'assurance/contract.yaml')
-    return {command:'skillStudio.openContract',title:'Open Contract Designer',arguments:[uri]};
+    return {command:'skillStudio.openContract',title:'Open Contract Preview',arguments:[uri]};
   if (path === 'assurance/predicates.yaml')
-    return {command:'skillStudio.openPredicates',title:'Open Predicate Designer',arguments:[uri]};
+    return {command:'skillStudio.openPredicates',title:'Open Predicate Preview',arguments:[uri]};
   if (/^schemas\/.+\.schema\.ya?ml$/i.test(path))
-    return {command:'skillStudio.openSchema',title:'Open Schema Designer',arguments:[uri]};
+    return {command:'skillStudio.openSchema',title:'Open Schema Preview',arguments:[uri]};
   return {command:'vscode.open',title:'Open Source',arguments:[uri]};
 }
 
