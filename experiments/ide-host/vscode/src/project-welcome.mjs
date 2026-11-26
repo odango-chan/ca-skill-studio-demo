@@ -21,13 +21,13 @@ export function registerProjectWelcome(vscode,context){
   const zh=language.startsWith("zh");
   const labels=zh?{
     title:"欢迎使用 SKILL Studio",
-    description:"创建或打开 Skill 项目。示例包含当前 CA-SL 5GC/MAS 参考 Skill（DRAFT / NOT_QUALIFIED）。",
+    description:"创建或打开 Skill 项目。示例包含 OpenAMSM Scheme C 的 CA-SL v1alpha5 Create、Modify、Release 三个 Skill（DRAFT / NOT_QUALIFIED）。",
     newProject:"新建项目",openProject:"打开项目",example:"打开示例项目",
     reference:"文档",spec:"Skill 语言规范",guide:"编写指南",
     importing:"正在加载示例项目…",completed:"示例项目已打开",failed:"示例项目载入失败"
   }:{
     title:"Welcome to SKILL Studio",
-    description:"Create or open a Skill project. The Example contains current CA-SL 5GC Establish, MAS Establish / Modify / Release reference Skills (DRAFT / NOT_QUALIFIED).",
+    description:"Create or open a Skill project. The Example contains the three OpenAMSM Scheme C CA-SL v1alpha5 Create, Modify and Release Skills (DRAFT / NOT_QUALIFIED).",
     newProject:"New Project",openProject:"Open Project",example:"Open Example Project",
     reference:"Documentation",spec:"Skill Language Specification",guide:"Authoring Guide",
     importing:"Loading example project…",completed:"Example project opened",failed:"Example project failed to load"
