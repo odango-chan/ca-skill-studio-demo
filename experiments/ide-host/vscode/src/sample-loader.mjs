@@ -295,6 +295,9 @@ async function collectTreeManifest(fs,vscode,root){
     const children=await readTransactionDirectory(fs,directory,prefix||".");
     if(children===null){
       if(!prefix)fail("Active Example root disappeared during transaction inventory");
+      if(prefix!==".skill-studio/dependencies"&&
+         !prefix.startsWith(".skill-studio/dependencies/"))
+        fail("An Example directory disappeared during transaction inventory: "+prefix);
       return false;
     }
     for(const [name,type] of children){
@@ -312,7 +315,11 @@ async function collectTreeManifest(fs,vscode,root){
         // OPFS can briefly return a stale directory entry after the file has
         // disappeared. A missing stat confirms there is no file to back up;
         // a still-present file is retried and otherwise fails closed.
-        if(bytes===null)continue;
+        if(bytes===null){
+          if(!relative.startsWith(".skill-studio/dependencies/"))
+            fail("An authored Example file disappeared during transaction inventory: "+relative);
+          continue;
+        }
         entries.push({path:relative,kind:"file",size:bytes.length,
           digest:await gitBlobSha1(bytes)});
       }else{
