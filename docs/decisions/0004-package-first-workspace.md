@@ -1,10 +1,16 @@
 # ADR-0004 · Package-first Workspace and Unified Package Explorer
 
-**Status: Accepted · initial Package Explorer implementation merged in PR #175; follow-up lifecycle UI remains deferred · Date: 2026-11-12**
+**Status: Accepted · Package Explorer / dependency integration implemented; Interface Package import and Schema IntelliSense merged in #267; default `ca-client` preload merged in #270 · Updated: 2026-11-26 (original decision 2026-11-12)**
 
 **Supersedes:** ADR-0003 §2 only for the primary-sidebar ordering and the user-facing placement of Package / Dependency / Build navigation. It also supersedes the presentation assumptions in the C4 Package Overview note that Packages are only a secondary inventory inside a dedicated Skill Studio Activity Bar.
 
-**Does not supersede:** ADR-0001 Source-first authority and bounded Source Patch rules; ADR-0003's native workbench ownership, right-side Inspector, native Outline / Problems, Data Flow semantics, Markdown behavior, or Classic retirement gates; the frozen Plugin-managed Configuration & Tool Integration v0.1 ownership and persistence contract.
+**Does not supersede:** ADR-0001 Source-first authority and bounded Source Patch rules; ADR-0003's native workbench ownership, right-side Inspector, native Outline / Problems, Data Flow semantics, Markdown behavior, or Classic retirement gates; current dependency acquisition / snapshot semantics are owned by [Dependency Architecture](../architecture/dependency-and-interface-package.md), not the historical Plugin-managed v0.1 proposal.
+
+## Current implementation update · 2026-11-26
+
+The Package Explorer composition is implemented in the current Theia extension. It combines Skills, Plugin-managed Dependencies and verified Build Artifacts under the native Explorer; multi-root projects require explicit root selection. The editor-first Interface Package ZIP import / read-only Schema browsing / Schema-driven LSP completion is merged in [PR #267](https://github.com/odango-chan/ca-skill-studio-demo/pull/267), and the default Example's `ca-client` read-only Interface Package preload is merged in [PR #270](https://github.com/odango-chan/ca-skill-studio-demo/pull/270). Compiler v2.1.0 Development Build / Verify integration remains a separate open follow-up [#269](https://github.com/odango-chan/ca-skill-studio-demo/issues/269).
+
+This ADR remains authoritative for Package Explorer placement and composition. Current dependency kinds, lock ownership, Example dependency closure and Compiler version boundaries are defined in [Dependency Architecture](../architecture/dependency-and-interface-package.md).
 
 ## Context
 
