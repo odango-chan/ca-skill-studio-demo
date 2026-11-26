@@ -66,3 +66,4 @@ Studio 拥有浏览器编辑器，不拥有正式 Skill/Runtime/MCP 业务真相
 ## Revision record
 
 - **2026-11-26 — Clarified current Theia read-only Preview boundary and historical Designer map.** Sections: current product boundary, D3/D4 reading list, D1/D2 milestone records and canonical table. Reason: prevent future contributors and Harness runs from treating retired standalone mutation UI as current product behavior. Author: ChatGPT (GPT-6.2).
+- **2026-11-26 — Refreshed the canonical Studio ownership / Source authority document.** Sections: current architecture map and ownership boundary. Reason: replace the superseded v0 implementation note with the current Theia / v1alpha5 product boundary; preserve the old note in WORK-history.md. Author: ChatGPT (GPT-6.2).
