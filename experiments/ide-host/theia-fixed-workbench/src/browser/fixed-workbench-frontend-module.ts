@@ -304,7 +304,15 @@ export default new ContainerModule((bind, unbind, isBound, rebind) => {
                     if (sourceUri && sourceUri !== lastNativeSourceUri) {
                         lastNativeSourceUri = sourceUri;
                         void commands.executeCommand('skillStudio.internal.nativeSourceActivated', sourceUri)
-                            .catch(error => console.warn('SKILL Studio native Source state could not be synchronized:', error));
+                            .then(accepted => {
+                                if (accepted !== true && lastNativeSourceUri === sourceUri) {
+                                    lastNativeSourceUri = '';
+                                }
+                            })
+                            .catch(error => {
+                                if (lastNativeSourceUri === sourceUri) lastNativeSourceUri = '';
+                                console.warn('SKILL Studio native Source state could not be synchronized:', error);
+                            });
                     }
                     if (!current || !hasVisualizableSourceEditor([current])) return;
                     if (current.id === lastSourceWidgetId) return;
