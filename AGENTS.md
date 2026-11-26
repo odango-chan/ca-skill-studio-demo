@@ -18,8 +18,8 @@ Theia browser-only 是唯一在线工作台。独立 Classic 浏览器工作台�
 2. docs/WORK.md — 唯一当前状态；docs/TRACEABILITY.md — contract → code → test → acceptance → evidence；
 3. 边界改动读 docs/architecture/studio-boundaries.md；依赖 / Interface Package 改动必须读 docs/architecture/dependency-and-interface-package.md。plugin-managed-configuration-v0.1.md 是历史提案，不是当前实现指南；
 4. Extension / Host 改动读 experiments/ide-host/README.md、experiments/ide-host/vscode/ 与对应测试；
-5. UI / Projection / Patch 改动读 docs/design/authoring-workbench.md、相关共享模块和测试；
-6. Route / Phase 改动读 docs/design/route-designer.md、docs/D1-procedure-designer.md、docs/D2-node-designer.md；
+5. 当前 UI / Preview / Projection / lifecycle 改动读 [ADR-0005](docs/decisions/0005-fixed-source-preview-workbench.md)、docs/architecture/studio-boundaries.md、docs/design/ca-sl-v1alpha5-studio-preview.md、对应共享模块和测试；AI Change Set 改动另读 docs/design/ai-procedure-authoring.md 与 authoring/core/README.md。docs/design/authoring-workbench.md 仅作为历史 Source-editing safety principles 参考，不是当前 UI / 布局契约；
+6. Route / Phase 语义改动以 CA-SL v1alpha5 正式规范和 `language/core/v1alpha5.ts` 为准，并阅读 docs/design/ca-sl-v1alpha5-studio-preview.md 与相关测试。D1 / D2 / D3 / D4 Designer 文档仅作历史参考，不是当前 UI mutation contract。当前 Theia Preview 为只读，不得恢复或新增 Visual Designer mutation controls；
 7. 语言服务改动读 docs/design/skill-lsp-l2d-editor-acceptance.md 与 docs/design/skill-lsp-l2d2-live-problems.md；
 8. 文档改动读 docs/DOCUMENTATION.md，并参考 ConnectionAgent 文档治理。
 
@@ -28,7 +28,7 @@ Theia browser-only 是唯一在线工作台。独立 Classic 浏览器工作台�
 ## Non-negotiable editing invariants
 
 - 原始 Skill 工作副本 / Source Document 为唯一业务真源；Graph、ELK、Inspector、符号索引和选中状态均为派生视图。
-- 所有 Visual mutation 必须定位精确 AST/CST span，核对 Source revision 与资格，执行结构重解析、Diff Preview、显式确认和 Undo/Redo。未经确认不得回写；不得整文件 dump YAML 或擦除未知内容。
+- 当前 Theia Preview 不提供 Visual mutation；原生 Source 是直接编辑入口，AI Authoring 通过独立 Host-owned Change Set 受控修改。只有在独立 Issue 明确批准新增 Visual mutation 后，才允许按精确 AST/CST span、Source revision、资格核验、结构重解析、Diff Preview、显式确认和 Undo/Redo 实施；未经确认不得回写，不得整文件 dump YAML 或擦除未知内容。
 - on 是 YAML 1.2 **字符串键**。不能混淆 operator.on、preconditions.on、postconditions.on 或多 Outcome；绘图 bundle 不得替代原始身份。
 - 未知语法、引用、别名、Anchor、quoted scalar 或编辑资格不明确时 fail closed，提供 Source-only；不能因图上有拖动手柄就越权修改。
 - 不新增 CreatedSession 专用平行 Node / Route 变更器，不猜 Tool Effect / Runtime 许可。
@@ -71,3 +71,7 @@ export TMPDIR="$AGENT_TMP" TMP="$AGENT_TMP" TEMP="$AGENT_TMP"
 ~~~
 
 只能清理当前任务创建的 scratch，不扫描、杀掉或删除其他用户、进程、任务或 Agent 的资源。.agent-tmp/ 必须被 .gitignore 忽略。
+
+## Revision record
+
+- **2026-11-26 — Updated current UI / Route / Phase required reading.** Sections: Required reading 5–6 and Non-negotiable editing invariants. Reason: align Agent execution with ADR-0005 and Issue #237; prevent retired D1–D4 Designer mutation documents from being treated as active implementation instructions. Author: ChatGPT (GPT-6.2).
