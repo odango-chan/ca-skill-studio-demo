@@ -13,7 +13,7 @@ Studio 拥有浏览器编辑器，不拥有正式 Skill/Runtime/MCP 业务真相
 3. [TRACEABILITY](TRACEABILITY.md) — Contract/设计 → 生产代码 → 测试 → 实际证据
 4. [Studio Ownership / Source Authority](architecture/studio-boundaries.md) — 当前 ownership、Source authority、Theia-only 产品边界
 5. [Dependency / Interface Package Architecture](architecture/dependency-and-interface-package.md) — 当前 Studio lock、immutable snapshots、Example dependency closure、Schema IntelliSense 与 Compiler v2.1.0 边界
-6. [Workbench](design/authoring-workbench.md) — Source / Preview / Patch 交互历史；当前工作台布局以 ADR-0005 为准
+6. [Source-backed Authoring Workbench](design/authoring-workbench.md) — 独立浏览器工作台与 D1/D4 的历史设计、Source Patch 安全原则；当前 Theia 布局以 ADR-0005 为准
 7. [AI Procedure Authoring](design/ai-procedure-authoring.md) — v1alpha5-only AI 编辑、Host-owned Change Set、独立 Go Gateway 与 Compiler Apply gate
    - [Authoring Core](../authoring/core/README.md) — 平台无关 Model Client / ModelProposal
    - [Go AI Gateway](https://github.com/odango-chan/ai-gateway) · [Browser CORS issue #4](https://github.com/odango-chan/ai-gateway/issues/4)
