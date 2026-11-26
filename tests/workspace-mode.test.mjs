@@ -14,7 +14,7 @@ function harness(saved, {useAuthoringStub=false} = {}) {
   const editor = { document, selection: { anchor: 3 } };
   const contractDocument = {
     uri: {path:"/skills/demo/assurance/contract.yaml",
-      toString(){return this.path;}},
+      toString(){return "file://"+this.path;}},
     getText: () => "# contract", isDirty: true, version: 7
   };
   const textDocuments = [document, contractDocument];
