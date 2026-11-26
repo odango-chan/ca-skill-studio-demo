@@ -66,6 +66,30 @@ test("Procedure session reuses the same WebviewView and disposes on active file 
   assert.deepEqual(disposed,[procedure.uri.toString(),procedure.uri.toString()]);
 });
 
+test("resolving a live Preview with no active document invalidates and disposes the old session",()=>{
+  const sessions=[];
+  const controller=createPreviewHostController({mountProcedure(document,_,options){
+    const session={document,options,disposed:false,dispose(){this.disposed=true;}};
+    sessions.push(session);return session;
+  }});
+  const view=makeView(),procedure=doc("/skills/demo/assurance/procedure.yaml");
+  controller.resolve(view,procedure);
+  const old=sessions[0],generation=controller.state.generation;
+  assert.equal(old.options.isCurrent(),true);
+
+  controller.resolve(view,null);
+
+  assert.equal(old.disposed,true);
+  assert.equal(old.options.isCurrent(),false,"queued messages from the old Source must be stale");
+  assert.equal(controller.state.uri,null);
+  assert.equal(controller.state.kind,null);
+  assert.ok(controller.state.generation>generation);
+  assert.equal(controller.state.attached,true);
+  assert.equal(view.webview.options.enableScripts,false);
+  assert.equal(view.webview.html,previewEmptyHtml("none"));
+  controller.dispose();
+});
+
 test("disposed and replaced Preview WebviewViews cannot retain old Source sessions",()=>{
   const sessions=[];
   const controller=createPreviewHostController({mountProcedure(doc,_,options){
