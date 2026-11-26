@@ -287,8 +287,33 @@ export default new ContainerModule((bind, unbind, isBound, rebind) => {
                 // Listen for Source widgets after that handoff, not just for
                 // the creation of the Preview container on the Welcome page.
                 const ready = state.reachedState('ready');
+                let lastNativeSourceUri = '';
                 const sourceChanged = () => {
                     const current = shell.getCurrentWidget('main');
+                    if (isAiWorkbench(current)) {
+                        lastNativeSourceUri = '';
+                        return;
+                    }
+                    const sourceWidget = current as (Widget & {
+                        editor?: { uri?: { toString(): string } };
+                        resource?: { toString(): string };
+                    }) | undefined;
+                    const rawSourceUri = sourceWidget?.editor?.uri ?? sourceWidget?.resource;
+                    const sourceUri = typeof rawSourceUri?.toString === 'function'
+                        ? rawSourceUri.toString() : '';
+                    if (sourceUri && sourceUri !== lastNativeSourceUri) {
+                        lastNativeSourceUri = sourceUri;
+                        void commands.executeCommand('skillStudio.internal.nativeSourceActivated', sourceUri)
+                            .then(accepted => {
+                                if (accepted !== true && lastNativeSourceUri === sourceUri) {
+                                    lastNativeSourceUri = '';
+                                }
+                            })
+                            .catch(error => {
+                                if (lastNativeSourceUri === sourceUri) lastNativeSourceUri = '';
+                                console.warn('SKILL Studio native Source state could not be synchronized:', error);
+                            });
+                    }
                     if (!current || !hasVisualizableSourceEditor([current])) return;
                     if (current.id === lastSourceWidgetId) return;
                     lastSourceWidgetId = current.id;
