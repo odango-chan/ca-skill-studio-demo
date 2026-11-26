@@ -143,6 +143,16 @@ test("Theia current Source URI overrides stale VS Code active-editor state", asy
   assert.equal(host.opened.at(-1)[1],host.contractDocument.uri);
 });
 
+test("Theia native Source sync does not reopen a missing dirty TextDocument from disk", async () => {
+  const host = harness(undefined, {useAuthoringStub:true});
+  assert.equal(await host.mode.restore(), true);
+  const missingUri="file:///skills/demo/assurance/missing.yaml";
+  assert.equal(await host.commands.get("skillStudio.internal.nativeSourceActivated")(missingUri),false);
+  const diagnostics=host.commands.get("skillStudio.internal.workspaceModeDiagnostics")();
+  assert.equal(diagnostics.nativeShellBridgeSeen,false);
+  assert.equal(diagnostics.consoleEditor.uri,host.document.uri.toString());
+});
+
 test("defaults to AI and restores the same dirty native buffer and AI view", async () => {
   const host = harness();
   assert.equal(await host.mode.restore(), true);
