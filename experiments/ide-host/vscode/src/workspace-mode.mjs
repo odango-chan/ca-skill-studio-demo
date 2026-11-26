@@ -112,9 +112,10 @@ export function registerWorkspaceMode(vscode, context, { authoring, showWelcome 
         ? vscode.Uri.parse(uriValue) : uriValue;
       const uriKey = uri?.toString?.();
       if (!uriKey) return false;
+      // Never reopen from disk as a fallback: that could discard a dirty
+      // document if the extension-host projection has not registered it yet.
       const document = (vscode.workspace.textDocuments ?? []).find(item =>
-        item.uri?.toString?.() === uriKey) ??
-        await vscode.workspace.openTextDocument(uri);
+        item.uri?.toString?.() === uriKey);
       if (!document) return false;
       nativeShellBridgeSeen = true;
       nativeShellSourceUri = uriKey;
