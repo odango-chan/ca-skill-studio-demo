@@ -42,13 +42,13 @@ Studio 拥有浏览器编辑器，不拥有正式 Skill/Runtime/MCP 业务真相
 | 主题 | Canonical |
 |---|---|
 | Owner / Authority / Source truth | [Architecture](architecture/studio-boundaries.md) |
-| Plugin-managed Project / Dependency / Build ownership | [Plugin-managed Configuration v0.1](architecture/plugin-managed-configuration-v0.1.md) |
+| Current dependency acquisition / Interface Package / Schema IntelliSense | [Dependency Architecture](architecture/dependency-and-interface-package.md) |
 | 现有 UI 和 Source-backed 编辑契约 | [Workbench](design/authoring-workbench.md) |
 | AI Procedure Authoring P1（v1alpha5 / Go Gateway） | [AI Procedure Authoring](design/ai-procedure-authoring.md) |
 | Route 编辑 D3 设计 | [D3 Route Designer](design/route-designer.md) |
 | Phase Step 输入绑定与后续结构编辑 | [D4 Phase Designer](design/phase-designer.md) |
 | 为何采用 Source-first | [ADR-0001](decisions/0001-source-first-visual.md) |
-| E1 Monaco Source Editor / E2–E4 boundaries | [E Source Editor](design/source-editor-workstream.md) |
+| Historical standalone Source Editor workstream | [E Source Editor](design/source-editor-workstream.md) |
 | 当前应用菜单 / 本地宿主边界 | [Application Shell](design/application-shell.md) |
 | Skill Language Core / Browser LSP · L2-D1 | [L2-D1 Editor Acceptance](design/skill-lsp-l2d-editor-acceptance.md) |
 | Native Problems diagnostics lifecycle · L2-D2 | [L2-D2 Live Problems](design/skill-lsp-l2d2-live-problems.md) |
