@@ -20,7 +20,7 @@ const joinPath=(base,...paths)=>uri(posix.normalize(posix.join(base.path,...path
 
 function host(candidateOverride=null,{
   files:seedFiles=[],folders:seedFolders=[],bundledZipOverride=null,
-  staleStatAfterDelete=false,faults=[]
+  staleStatAfterDelete=false,faults=[],staleDirectoryEntries=[]
 }={}){
   const files=new Map(seedFiles.map(([path,value])=>[path,new Uint8Array(value)]));
   const folders=new Set(["/global-storage",...seedFolders]);
@@ -89,6 +89,10 @@ function host(candidateOverride=null,{
           const name=path.slice(prefix.length);
           if(name&&!name.includes("/"))entries.set(name,1);
         }
+      }
+      for(const stale of staleDirectoryEntries){
+        if(stale.parent===target.path&&!entries.has(stale.name))
+          entries.set(stale.name,stale.type??1);
       }
       return [...entries.entries()];
     },
@@ -163,7 +167,7 @@ function host(candidateOverride=null,{
       files.set(target.path,new Uint8Array(bytes));staleStats.delete(target.path);
     }
   }};
-  return {vscode:{Uri:{file:uri,joinPath},workspace},files,folders,workspace,faults,renames};
+  return {vscode:{Uri:{file:uri,joinPath},workspace},files,folders,workspace,faults,renames,staleDirectoryEntries};
 }
 
 const root="/global-storage/skill-studio-demo";
@@ -834,6 +838,28 @@ test("Confirmed Example replacement leaves ordinary user projects untouched and 
 });
 
 
+
+test("Confirmed replacement reconciles stale OPFS directory entries without treating missing files as backup data",async()=>{
+  const h=host();
+  const before=await seedExistingExample(h);
+  const settings=JSON.parse(decode(h.files.get(root+"/.vscode/settings.json")));
+  const owner=settings["connectionAgent.skillStudio.dependencyLock"].entries
+    .find(entry=>entry.id==="mas");
+  const staleName="ssm-release_confirm_n1.output.schema.json";
+  const staleParent=root+"/.skill-studio/dependencies/"+owner.snapshotDigest+"/schemas";
+  assert.ok(h.folders.has(staleParent),"the stale file parent must be a real directory");
+  assert.equal(h.files.has(staleParent+"/"+staleName),false,
+    "the injected directory entry must have no backing file");
+  h.staleDirectoryEntries.push({parent:staleParent,name:staleName,type:1});
+  const result=await seedExampleProject(h.vscode,uri("/extension"),uri("/global-storage"),{
+    replaceExisting:true
+  });
+  assert.equal(result.replacedExisting,true);
+  assert.equal(result.created,total);
+  assert.equal(getExampleReplacementStatus().state,"READY");
+  assert.ok(h.files.has(procedurePath));
+  assert.ok(before.files.some(([path])=>path===procedurePath));
+});
 
 test("A failure while backing up the old Example leaves the active tree untouched",async()=>{
   const h=await existingExampleWithUserData();
