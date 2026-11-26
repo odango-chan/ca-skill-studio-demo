@@ -61,11 +61,21 @@ test("v2.1.0 Development Build request exactly reproduces the official Compiler 
 
 test("Development Build includes only the exact transitive closure of Contract roots",async()=>{
   const input=await fixtureInput();
-  const unused={...input.resolvedDependencies.snapshots[0],id:"unused-extra-root"};
+  const unused={...input.resolvedDependencies.snapshots[0],id:"ca-client",
+    files:input.resolvedDependencies.snapshots[0].files.map(file=>({...file}))};
+  const manifestFile=unused.files.find(file=>file.path==="package.json");
+  const manifest=JSON.parse(decoder.decode(decodeBase64(manifestFile.bytes)));
+  manifest.packageId="urn:example:editor:ca-client";
+  manifest.version="1.0.0";
+  manifest.dependencies=[];
+  manifestFile.bytes=base64Bytes(new TextEncoder().encode(JSON.stringify(manifest)));
+  unused.snapshotDigest=(await calculateSnapshot(unused.files.map(file=>({
+    path:file.path,bytes:decodeBase64(file.bytes)
+  })))).snapshotDigest;
   const unrelatedToolCatalog={...input.resolvedDependencies.snapshots[0],
     id:"mas",kind:"tool-catalog",files:[]};
   const unrelatedSchemaBundle={...input.resolvedDependencies.snapshots[0],
-    id:"ca-context",kind:"schema-bundle",files:[]};
+    id:"other-context",kind:"schema-bundle",files:[]};
   const request=await createCompilerDevelopmentBuildRequest({
     ...input,
     resolvedDependencies:{status:"READY",snapshots:[
@@ -146,14 +156,14 @@ test("tampered resolver bytes and unsupported snapshot kinds fail closed",async(
   );
 
   const unsupported=await fixtureInput();
-  unsupported.resolvedDependencies.snapshots.find(item=>item.id==="ca").kind="tool-catalog";
+  unsupported.resolvedDependencies.snapshots.find(item=>item.id==="ca-context").kind="tool-catalog";
   await assert.rejects(
     createCompilerDevelopmentBuildRequest(unsupported),
     error=>error.code==="DEVELOPMENT_BUILD_DEPENDENCY_KIND_UNSUPPORTED"&&
       error.message.includes("tool-catalog")
   );
   const unsupportedSchema=await fixtureInput();
-  unsupportedSchema.resolvedDependencies.snapshots.find(item=>item.id==="ca").kind="schema-bundle";
+  unsupportedSchema.resolvedDependencies.snapshots.find(item=>item.id==="ca-context").kind="schema-bundle";
   await assert.rejects(
     createCompilerDevelopmentBuildRequest(unsupportedSchema),
     error=>error.code==="DEVELOPMENT_BUILD_DEPENDENCY_KIND_UNSUPPORTED"&&
