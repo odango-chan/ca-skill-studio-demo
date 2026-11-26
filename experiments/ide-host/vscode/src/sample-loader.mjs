@@ -999,8 +999,14 @@ export async function seedExampleProject(vscode,extensionUri,storageUri,options=
     recoveryCompleted=true;
     const root=vscode.Uri.joinPath(storageUri,EXAMPLE_PROJECT_NAME);
     let existing=false;
-    try{await vscode.workspace.fs.stat(root);existing=true;}
-    catch(error){if(error?.code!=="FileNotFound")throw error;}
+    try{
+      const rootStat=await vscode.workspace.fs.stat(root);
+      if((rootStat.type&64)===64)
+        fail("Built-in Example root cannot be a symbolic link");
+      if((rootStat.type&2)!==2)
+        fail("Built-in Example root exists but is not a directory");
+      existing=true;
+    }catch(error){if(error?.code!=="FileNotFound")throw error;}
     transactionalReplacement=Boolean(options.replaceExisting&&existing);
     if(transactionalReplacement){
       // Save dirty documents before the verified backup is taken. The same
