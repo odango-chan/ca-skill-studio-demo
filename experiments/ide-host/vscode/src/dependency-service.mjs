@@ -20,7 +20,8 @@ async function readSnapshotFile(fs,uri,label){
     catch(error){
       if(!missing(error))throw error;
       lastError=error;
-      if(typeof fs.stat!=="function")throw error;
+      if(typeof fs.stat!=="function")
+        fail("BLOCKED","Cannot confirm pinned dependency snapshot file after missing read: "+label);
       try{
         const info=await fs.stat(uri);
         if((info.type&1)!==1)
