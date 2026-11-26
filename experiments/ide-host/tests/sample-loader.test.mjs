@@ -1003,6 +1003,42 @@ test("Confirmed replacement reconciles stale OPFS directory entries without trea
     "authored .skill-studio metadata must survive dependency-cache regeneration");
 });
 
+test("Confirmed replacement recreates a same-digest dependency directory missing from a stale OPFS listing",async()=>{
+  const h=host();
+  await seedExistingExample(h);
+  const settings=JSON.parse(decode(h.files.get(root+"/.vscode/settings.json")));
+  const owner=settings["connectionAgent.skillStudio.dependencyLock"].entries
+    .find(entry=>entry.id==="mas");
+  const digest=owner.snapshotDigest;
+  const dependencyRoot=root+"/.skill-studio/dependencies/"+digest.slice(7);
+  const staleDirectory=dependencyRoot+"/schemas";
+  const staleName="ssm-release_confirm_n1.output.schema.json";
+  assert.ok(h.folders.has(dependencyRoot),"the dependency snapshot root must exist");
+  assert.ok(h.folders.has(staleDirectory),"the schemas directory must exist before fault injection");
+  for(const file of [...h.files.keys()])
+    if(file.startsWith(staleDirectory+"/"))h.files.delete(file);
+  for(const folder of [...h.folders])
+    if(folder===staleDirectory||folder.startsWith(staleDirectory+"/"))h.folders.delete(folder);
+  assert.equal(h.folders.has(staleDirectory),false,
+    "the injected directory entry must have no backing directory");
+  h.staleDirectoryEntries.push({parent:dependencyRoot,name:"schemas",type:2});
+  const result=await seedExampleProject(h.vscode,uri("/extension"),uri("/global-storage"),{
+    replaceExisting:true
+  });
+  assert.equal(result.replacedExisting,true);
+  assert.equal(result.created,total);
+  assert.equal(getExampleReplacementStatus().state,"READY");
+  const rebuiltLock=JSON.parse(decode(h.files.get(root+"/.vscode/settings.json")))
+    ["connectionAgent.skillStudio.dependencyLock"];
+  const rebuiltOwner=rebuiltLock.entries.find(entry=>entry.id==="mas");
+  assert.equal(rebuiltOwner.snapshotDigest,digest,
+    "regeneration must preserve the pinned snapshot digest");
+  assert.ok(h.folders.has(staleDirectory),
+    "the staged same-digest snapshot must recreate the missing dependency directory");
+  assert.ok(h.files.has(staleDirectory+"/"+staleName),
+    "the regenerated cache must restore the schema file beneath the recreated directory");
+});
+
 test("Transaction backup retries a transient EntryNotFound when stat confirms the file still exists",async()=>{
   const h=await existingExampleWithUserData();
   h.faults.push({
