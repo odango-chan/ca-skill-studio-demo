@@ -1,6 +1,8 @@
-> **Current v0 implementation, superseded as a target design.** The frozen [Plugin-managed Studio v0.1 contract](plugin-managed-configuration-v0.1.md) removes required `lib/output` directories. Existing code and tests still use the earlier layout; this file describes the *current* implementation, not v0.1. Do not treat this note as a deployed change.
+> **Historical proposal; not the current project-layout contract.** This file documents an earlier `skills/` + `lib/` + `output/` design and Compiler integration plan. The current bundled Example uses the root and dependency snapshot lifecycle implemented by `sample-loader.mjs` / `dependency-service.mjs`; see the current snapshot in [WORK](../WORK.md). The frozen [Plugin-managed Studio v0.1 contract](plugin-managed-configuration-v0.1.md) owns the current dependency / lock boundary. Keep this file only for decision history; do not implement its proposed directory or read-only semantics as current behavior.
 
-# SKILL Project layout and future Compiler integration
+# Historical proposal · SKILL Project layout and future Compiler integration
+
+> **Status: Superseded as a current project-layout contract.** This document records an earlier `skills/` + `lib/` + `output/` proposal. Do not treat its proposed folder creation, read-only policy or Compiler integration checklist as the implemented Example workspace contract. Current Example import / dependency snapshot behavior is implemented in `experiments/ide-host/vscode/src/sample-loader.mjs`, `dependency-service.mjs` and `site/samples/v1alpha5/files.json`; see [WORK](../WORK.md) and [ADR-0004](../decisions/0004-package-first-workspace.md).
 
 **Status:** Studio workspace layout implemented in the example importer; Compiler integration remains **NOT_IMPLEMENTED** (2026-11-11).
 

@@ -1,9 +1,9 @@
 # Procedure Designer · D1 UI 迁移
 
-**Status: Accepted (completed D1 milestone record) · Date: 2026-11-03**  
-**Current behavior:** [Workbench](design/authoring-workbench.md) · [WORK](WORK.md)
+**Status: HISTORICAL — completed D1 standalone Designer milestone record · Original date: 2026-11-03**  
+**Current behavior:** native Source + read-only Preview per [ADR-0005](decisions/0005-fixed-source-preview-workbench.md) · [WORK](WORK.md)
 
-本页只描述 D1 范围与当时验收；其中有关“D2 尚未实现”的语句是历史阶段陈述，并不代表当前代码。
+本页只描述 D1 独立 Visual Designer 阶段与当时验收。该阶段的交互和 mutation 记录均为历史，不是当前 Theia UI 或当前产品验收契约。
 
 范围：**只迁移 Procedure 画布**。不修改 SKILL DSL，不重写 Source / Inspector，不增加后端，也不开发 Case/验证发布工作台。
 
@@ -107,3 +107,7 @@ D1 的 UI 迁移与上述浏览器交互验收可以标记 PASS；后续人工�
 ## 2026 D1-A2c · 局部 Node Focus 使用真实 React Flow
 
 替代 A2b 没有连线的上下游三栏卡片。可见模型为：原始前驱业务 Node → 当前业务 Node 展开的真实 PRE/OP/POST 阶段 → 原始后继业务 Node；使用同一 React Flow Route Edge / ELK，准确保留源 Route ID、Outcome、Route Source，阶段间连线仅是 `viewOnly` UI 序列。支持邻居点击换焦点、真实 Step 源行跳转与 Child Procedure 继续下钻；不会改 Source YAML 或在 Runtime 注册新 Node。详见 [Workbench](design/authoring-workbench.md)、[#70](https://github.com/odango-chan/ca-skill-studio-demo/pull/70)。
+
+## Revision record
+
+- **2026-11-26 — Marked D1 as historical.** Sections: status and current behavior. Reason: prevent the standalone Visual Designer milestone from being mistaken for the current Theia workbench. Author: ChatGPT (GPT-6.2).

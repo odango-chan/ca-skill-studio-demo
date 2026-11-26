@@ -1,11 +1,11 @@
 # D3 Route Designer · bounded source-backed authoring
 
-**Status: Accepted for bounded Studio editor scope · Date: 2026-11-03**  
-**Implementation: A1/A2 on main; A3 implemented in PR #13; Phase-specific routes deferred**  
-**Acceptance: A1/A2/A3 PASS (editor tier) · Runtime/5GC NOT_RUN**  
+**Status: HISTORICAL — bounded standalone Designer experiment; not the current Theia product contract · Original date: 2026-11-03**  
+**Historical implementation: A1/A2 in the former standalone prototype; A3 recorded in PR #13; Phase-specific routes deferred**  
+**Historical acceptance: A1/A2/A3 editor-tier PASS applies only to their recorded prototype heads · Runtime/5GC NOT_RUN**  
 **Tracking: [Issue #7](https://github.com/odango-chan/ca-skill-studio-demo/issues/7)**
 
-本页定义已实现的**有界 Studio 编辑契约**；不等于任意 Route/Phase 修改被允许，也不能当作 Runtime 验收通过。
+本页保留早期独立 Visual Designer 的历史设计和编辑器级验收记录。**当前 Theia Procedure Preview 是只读 Source 投影**；D3-A1/A2/A3 的历史 PASS 不表示这些 mutation controls 仍在当前产品中可用，也不构成当前 Theia action parity 或 Runtime qualification。当前工作台以 ADR-0005 为准，剩余可见操作与 retired affordance 清理见 Issue #237。
 
 ## Objective
 
@@ -83,3 +83,7 @@ Both use exact original YAML span and immutable revision-bound Preview → Sourc
 Evidence: [PR #13 Actions #41626562455](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41626562455) — **213/213 tests, Typecheck, Build and real Chromium mouse-drag PASS**. The browser test verifies visible start/end handles, CDP pointer press/move/release, explicit Inspector Outcome selector, Diff Preview, cancel, Apply, Undo/Redo and no ghost persisted edge.
 
 **Authority limitation:** Observed Outcome labels are editor hints, **not** operator Runtime-contract whitelists. All actual Skill/Runtime and 5GC qualification remains **NOT_RUN** in this Studio.
+
+## Revision record
+
+- **2026-11-26 — Status and current-product boundary clarified.** Sections: status, objective and current-use note. Reason: prevent historical standalone Visual Designer acceptance from being interpreted as current Theia mutation capability; align with ADR-0005 and Issue #237. Author: ChatGPT (GPT-6.2).

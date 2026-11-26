@@ -1,6 +1,6 @@
 # ADR-0003 · Native Workbench Layout, Inspector and Markdown Ownership
 
-**Status: Accepted · Native Markdown is the default Theia implementation (PR #169); host acceptance-harness closeout remains tracked by #176 · Date: 2026-11-12**
+**Status: Accepted · Native Markdown / Theia-only migration deployed; host acceptance closeout completed in #176 · Current layout partially superseded by ADR-0004 / ADR-0005 · Updated: 2026-11-26 (original decision 2026-11-12)**
 
 **Supersedes:** the view-placement and duplicate-view assumptions in the earlier Theia migration notes. It does not supersede the Source-first authority or existing bounded-edit contracts in ADR-0001.
 

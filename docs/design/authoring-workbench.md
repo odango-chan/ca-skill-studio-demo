@@ -1,11 +1,12 @@
-# Current Authoring Workbench · Source-backed Editing
+# Source-backed Authoring Workbench · Historical UI and Editing Design
 
-**Status: Accepted · Date: 2026-11-03**  
-**Verified implementation baseline: `main@69bd8ef5900c68fff85653619eda770599ac9d3a`**
+**Status: Historical implementation snapshot · Original date: 2026-11-03 · Original baseline: `main@69bd8ef5900c68fff85653619eda770599ac9d3a`**
 
-本文件描述当前浏览器应用行为；早期 [UX Consolidation](../ux/ux-consolidation.md) 的“View 菜单 / CreatedSession 只读 / 单文件视图”为已退役阶段描述。
+本文件保留早期独立浏览器应用的 Visual / Source / Split、React Flow、Inspector 与 D1/D4 编辑阶段记录。它不是当前在线 Theia 工作台的 UI / 菜单 / 布局契约。当前产品使用原生 Source Editor + 固定右侧 Preview Host，布局和宿主边界以 [ADR-0005](../decisions/0005-fixed-source-preview-workbench.md)、当前 [Studio Ownership](../architecture/studio-boundaries.md) 和 [WORK](../WORK.md) 为准。
 
-## UI / Source flow
+本文件中精确 Source Span、Revision、Diff、显式确认、Undo/Redo、未知语法 fail-closed 等约束仍可作为编辑安全原则参考；具体操作是否仍暴露、是否使用当前 v1alpha5 AST/CST，必须以当前代码和 [#237](https://github.com/odango-chan/ca-skill-studio-demo/issues/237) 的 parity 状态为准。早期 [UX Consolidation](../ux/ux-consolidation.md) 的“View 菜单 / CreatedSession 只读 / 单文件视图”同样是已退役阶段描述。
+
+## Historical standalone-app UI snapshot (not current Theia layout)
 
 - 顶部：当前文件名、Dirty、Undo/Redo、导出。内存文件工作副本为唯一可写源。
 - Explorer：固定样本 Package 实际文件和路径；`procedure.yaml` 的 Root/Child 是**当前文件内**的导航子树。Root workflow 图标、Child git-branch，不能冒充两个不同文件。
@@ -23,7 +24,7 @@
 
 固定样本的多文件切换保留内存文本；本地 Open 仅单文件。Download/ZIP 是浏览器下载，不是原位保存/磁盘 watcher。无本机 Script、Runtime 或 5GC 调用。
 
-## Current implementation invariants
+## Source-editing invariants retained as reference
 
 - `yaml@2.9.1` AST/CST/span → `site/workspace.mjs` → `site/graph.mjs`、`site/layout.mjs` → `site/react-flow-projection.mjs`、`site/react-flow-canvas.tsx`。ELK 坐标与选中状态不反写 YAML。
 - 1 文件最多 1 MiB；每 Procedure 300 Node/1600 Route entries；32 Procedure。全图超过 90 可见节点或 250 Route 使用基础布局，缩小邻居范围可回 ELK。
@@ -67,7 +68,7 @@ Phase Steps 继续是 Node Inspector 内的有序行，**不是**主业务图中
 
 在现有 Phase Step「数据依赖」展开项中，若消费者是带 `# inputSchema` 的 Package 内本地脚本，展示对应的消费参数声明 Schema、字段类型、是否必填以及尚未验证的 `const`/`pattern` 等约束。同一行与 D4-A2.2a 已解析的上游输入或脚本输出类型对照，明确标记**仅声明类型一致**、**类型不符**、**生产者类型缺失**或**消费者 ABI 缺失**。这是诊断信息，不是候选来源列表，也不授权改写 YAML；`call` 没有已映射 ABI 时保持未知。下一阶段跨生产者编辑必须先取得真实 owner 契约与 Runtime 引用语义，详见 [D4 设计](phase-designer.md)。
 
-## `establish-pdu-session` 示例同步 · 可选 Reference 文件
+## Historical sample integration · superseded by the current OpenAMSM Scheme C Example
 
 示例的最新 owner 基线为 [ca-agent-demo@7570b309](https://github.com/odango-chan/ca-agent-demo/tree/7570b309a998580a6952352e2bf4b1c19e5c710d/skills/establish-pdu-session)。
 Studio 唯一可选的 `establish-pdu-session` Package 只同步实际运行时相关材料（16 个文件），保留原始目录路径：更新的 `SKILL.md`、

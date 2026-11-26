@@ -1,10 +1,16 @@
 # ADR-0005 · Fixed Source + Preview Workbench
 
-**Status: Accepted for implementation · host integration spike pending · Date: 2026-11-19**
+**Status: Accepted · Theia 1.76 fixed Source + Preview host integration is implemented on main and deployed; tracking Issue #220 remains open for closeout · Updated: 2026-11-26 (original decision 2026-11-19)**
 
 **Issue:** [#220](https://github.com/odango-chan/ca-skill-studio-demo/issues/220)
 
 **Supersedes:** ADR-0003 §2's central-editor placement of Visual CustomEditors and its paired two-EditorGroup Markdown Preview behavior. It does not supersede ADR-0001 Source-first authority, ADR-0003's native Explorer / Outline / Problems / Output ownership or right-side Inspector, or ADR-0004 Package Explorer decisions.
+
+## Current implementation update · 2026-11-26
+
+The fixed workbench is present in current main: native Source documents remain in the single Main Editor group; one persistent `skillStudio.preview` WebviewView follows the active Source in the right Secondary Sidebar; Inspector, native Outline and Problems retain their host-owned locations. The Theia browser-only shell applies the fixed Main Editor DockPanel policy. Current code anchors include `experiments/ide-host/vscode/src/preview-host.mjs`, `workbench.mjs`, `extension.mjs`, the pinned Theia frontend integration and `experiments/ide-host/scripts/theia-fixed-layout-smoke.mjs`.
+
+The current main Pages deployment `5b666c0ef754ed32fa37c97ce2429f328c70477f` is deployed successfully by [workflow #45545634726](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/45545634726). The issue #220 remains open; deployment identity and implementation presence are not used to silently close that tracking issue. The fixed one-group guarantee applies to the online Theia shell; desktop VS Code users retain host-native split controls.
 
 ## Context
 
