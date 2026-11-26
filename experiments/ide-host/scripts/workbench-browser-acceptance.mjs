@@ -562,7 +562,7 @@ export async function runPackageOverviewAcceptance({command,evalJS,sleep,require
         frameUrl:snapshot.frameUrl,fileRow:file.text,nodeIds:file.nodeIds};
       await sleep(150);
     }
-    throw Error('Opening '+name+' assurance/contract.yaml from Package Overview did not load its exact Contract Designer Source: '+
+    throw Error('Opening '+name+' assurance/contract.yaml from Package Overview did not load its exact Contract Preview Source: '+
       JSON.stringify({file,frames:await readContractFrames(),rows:await readTreeRows()}));
   }
   // Group membership and counts are asserted from the Package scan model
@@ -773,7 +773,7 @@ export async function runWorkbenchAcceptance({
 
   const started=Date.now();
   const procedurePair=await assertSourceVisualPair(
-    evalJS,sleep,"procedure.yaml","CA-SL current Procedure Designer");
+    evalJS,sleep,"procedure.yaml","CA-SL current Procedure Preview");
   // Native TextMate is a separate baseline from CA semantic tokens and LSP.
   // Inspect real rendered Monaco text colors, not just the grammar manifest.
   let yamlTextMate=null;
@@ -1455,13 +1455,13 @@ export async function runWorkbenchAcceptance({
     visibleEditorGroups:secondMarkdown.visibleEditorGroups??1
   }));
 
-  // The native Contract, Predicate and Schema Designers render the v1alpha5
+  // The native Contract, Predicate and Schema Previews render the v1alpha5
   // source files from the same Skill Package and retain native Source pairing.
   const contractUri=await openPackageFile("skillStudio.openContract","assurance/contract.yaml");
   const contract=await waitWebview(view=>view.title==="SKILL Contract Visual"&&
     view.bodyText.includes("Package\nestablish-pdu-session-mas\n")&&
     view.bodyText.includes("validate-sm-subscription"),
-    "v1alpha5 5GC Contract Designer");
+    "v1alpha5 5GC Contract Preview");
   const expectedContractCards=["Goal & Preconditions","Schemas & Context",
     "Capabilities","Dependencies","Limits"];
   const contractCards=contract.view.cards??[];
@@ -1469,13 +1469,13 @@ export async function runWorkbenchAcceptance({
      !contract.view.bodyText.includes("pdu_session.initial_request_fulfilled")||
      !contract.view.bodyText.includes("validate-sm-subscription")||
      expectedContractCards.some(title=>!contract.view.cards.includes(title)))
-    throw Error("v1alpha5 Contract Designer did not render the current Contract Source: "+
+    throw Error("v1alpha5 Contract Preview did not render the current Contract Source: "+
       JSON.stringify(contract.view).slice(0,2600));
-  await assertSourceVisualPair(evalJS,sleep,"contract.yaml","v1alpha5 Contract Designer");
+  await assertSourceVisualPair(evalJS,sleep,"contract.yaml","v1alpha5 Contract Preview");
   const predicateUri=await openPackageFile("skillStudio.openPredicates","assurance/predicates.yaml");
   const predicates=await waitWebview(view=>view.title==="SKILL Predicate Visual"&&
     view.bodyText.includes("establishment.mas.subscription_validated"),
-    "v1alpha5 5GC Predicate Designer");
+    "v1alpha5 5GC Predicate Preview");
   const predicateDetails=await command("Runtime.evaluate",{
     contextId:predicates.contextId,returnByValue:true,
     expression:"(()=>{const item=[...document.querySelectorAll('details.predicate')].find(node=>node.querySelector('.pid')?.textContent.trim()==='establishment.mas.subscription_validated');if(!item)return {opened:false,bodyText:document.body?.innerText??''};item.open=true;return {opened:true,bodyText:document.body?.innerText??''};})()"
@@ -1487,23 +1487,23 @@ export async function runWorkbenchAcceptance({
      !predicateText.includes("Parameters → Evidence → Evaluator")||
      !predicateText.includes("Evidence Requirements")||
      predicateText.includes("Observation"))
-    throw Error("v1alpha5 Predicate Designer did not render the current PredicateSet: "+
+    throw Error("v1alpha5 Predicate Preview did not render the current PredicateSet: "+
       JSON.stringify({view:predicates.view,predicateText:predicateText.slice(-2600)}));
-  await assertSourceVisualPair(evalJS,sleep,"predicates.yaml","v1alpha5 Predicate Designer");
+  await assertSourceVisualPair(evalJS,sleep,"predicates.yaml","v1alpha5 Predicate Preview");
   const schemaUri=await openPackageFile(
     "skillStudio.openSchema","schemas/establishment-request.schema.yaml");
   const schema=await waitWebview(view=>view.title==="SKILL Schema Visual"&&
     view.bodyText.includes("Schema ID urn:connectionagent:example:mas:establishment-request:v1alpha5")&&
     view.bodyText.includes("establishment-request"),
-    "v1alpha5 5GC Schema Designer");
+    "v1alpha5 5GC Schema Preview");
   if(!schema.view.bodyText.includes("sNssai")||
      !schema.view.bodyText.includes("requestedPduSessionType")||
      !schema.view.bodyText.includes("const: IPV4")||
      !schema.view.bodyText.includes("Draft 2020-12"))
-    throw Error("v1alpha5 Schema Designer did not render the real request Schema: "+
+    throw Error("v1alpha5 Schema Preview did not render the real request Schema: "+
       JSON.stringify(schema.view).slice(0,2600));
   await assertSourceVisualPair(evalJS,sleep,"establishment-request.schema.yaml",
-    "v1alpha5 Schema Designer");
+    "v1alpha5 Schema Preview");
   console.log("STUDIO_CURRENT_LANGUAGE_DESIGNERS_CHROMIUM",JSON.stringify({
     contract:{uri:contractUri,cards:contractCards},
     predicates:{uri:predicateUri,heading:predicates.view.title},
@@ -1518,14 +1518,14 @@ export async function runWorkbenchAcceptance({
   // Keep unrelated editors open; closing every tab can block Theia's Webview command bridge.
   await nativeCommand("skillStudio.openProcedure",masProcedureUri);
   const masPair=await assertSourceVisualPair(
-    evalJS,sleep,"procedure.yaml","v1alpha5 MAS Procedure Designer");
+    evalJS,sleep,"procedure.yaml","v1alpha5 MAS Procedure Preview");
   const masGraph=await waitWebview(view=>
     view.procedureRoot&&view.procedureValue==="modify-pdu-session-mas"&&view.graphNodes>0,
     "v1alpha5 MAS Modify Procedure graph");
   // Keep unrelated editors open; closing every tab can block Theia's Webview command bridge.
   await nativeCommand("skillStudio.openProcedure",defaultProcedureUri);
   const restoredPair=await assertSourceVisualPair(
-    evalJS,sleep,"procedure.yaml","restored v1alpha5 5GC Procedure Designer");
+    evalJS,sleep,"procedure.yaml","restored v1alpha5 5GC Procedure Preview");
   const finalGraph=await waitWebview(view=>
     view.procedureRoot&&view.procedureValue==="establish-pdu-session-mas"&&view.graphNodes>0,
     "restored default v1alpha5 5GC Procedure graph");
@@ -1540,7 +1540,7 @@ export async function runWorkbenchAcceptance({
   // Keep unrelated editors open; closing every tab can block Theia's Webview command bridge.
   await nativeCommand("skillStudio.openProcedure",defaultProcedureUri);
   const finalPair=await assertSourceVisualPair(
-    evalJS,sleep,"procedure.yaml","final v1alpha5 default Procedure Designer");
+    evalJS,sleep,"procedure.yaml","final v1alpha5 default Procedure Preview");
   const finalRestoredGraph=await waitWebview(view=>
     view.procedureRoot&&view.procedureValue==="establish-pdu-session-mas"&&view.graphNodes>0,
     "final default current Procedure graph");
