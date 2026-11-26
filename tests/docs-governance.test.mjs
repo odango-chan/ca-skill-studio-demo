@@ -143,17 +143,16 @@ test("current Theia Preview is read-only and legacy Designer docs are historical
 });
 
 test("historical conventional CreatedSession fixture is separate from the default OpenAMSM Example",()=>{
-  const work=content("docs/WORK.md"),trace=content("docs/TRACEABILITY.md");
+  const work=content("docs/WORK.md"),history=content("docs/WORK-history.md"),trace=content("docs/TRACEABILITY.md");
   const docs=content("docs/design/authoring-workbench.md");
-  assert.match(work,/conventional 5GC Skill 只保留为独立 NOT_QUALIFIED 测试 fixture/);
-  assert.match(work,/不属于默认 OpenAMSM Example/);
-  assert.match(work,/eaadf9488ec3b5d6d6f60eb7090a2dee715d440b/);
+  assert.match(work,/The conventional `establish-pdu-session` 5GC Skill is a separate NOT_QUALIFIED fixture, not the default Example/);
+  assert.match(history,/eaadf9488ec3b5d6d6f60eb7090a2dee715d440b/);
   assert.match(trace,/Refreshed establish-pdu-session optional references/);
   for(const name of ["3gpp-procedure.md","session-selection.md","failure-handling.md"])
-    assert.ok(work.includes("references/"+name),name);
+    assert.ok(history.includes("references/"+name),name);
   assert.match(docs,/Historical UI and Editing Design/);
   assert.match(docs,/read_reference/);
-  assert.match(work,/cases\//);
+  assert.match(history,/cases\//);
 });
 
 test("Theia is the only published host and Classic has no runtime entrypoint",()=>{
