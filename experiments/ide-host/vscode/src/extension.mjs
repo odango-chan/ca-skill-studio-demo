@@ -68,6 +68,7 @@ export async function activate(context){
   try{replacementRecoveryResult=await recoverExampleReplacement(vscode,context.globalStorageUri);}
   catch(error){replacementRecoveryError=error;}
   let workbench=null,packageOverview=null,projectWelcome=null,workbenchReady=false;
+  let lastExampleImport=null;
   const activationFailures=[];
   const activationComponents=Object.create(null);
   let activationWarningShown=false;
@@ -150,6 +151,7 @@ export async function activate(context){
         failures:[...activationFailures],
         packageInventory,
         exampleReplacement:getExampleReplacementStatus(),
+        lastExampleImport,
         workbenchReady
       };
       console.info("SKILL_STUDIO_ACTIVATION_DIAGNOSTICS",JSON.stringify(report));
@@ -736,6 +738,12 @@ export async function activate(context){
                     else if(phase==="project-ready")report(exampleText.workspace);
                   }
                 });
+              lastExampleImport={
+                state:"success",stage:"complete",replaceRequested:replaceExisting,
+                replacedExisting:result.replacedExisting,
+                candidateFiles:result.candidateFiles,created:result.created,
+                skipped:result.skipped,readmeUpdated:result.readmeUpdated
+              };
               console.log("STUDIO_EXAMPLE_IMPORT_RESULT",JSON.stringify({
                 root:result.root.toString(),replaceRequested:replaceExisting,
                 replacedExisting:result.replacedExisting,
@@ -821,7 +829,13 @@ export async function activate(context){
                   "可在 Explorer → Package Explorer 查看当前 CA-SL Skills。"));
               return result;
             }catch(error){
-              const message=exampleText.failure+" ["+stage+"]："+String(error?.message??error);
+              const detail=String(error?.message??error);
+              lastExampleImport={
+                state:"error",stage,message:detail,
+                replacement:getExampleReplacementStatus()
+              };
+              console.error("STUDIO_EXAMPLE_IMPORT_FAILURE",JSON.stringify(lastExampleImport));
+              const message=exampleText.failure+" ["+stage+"]："+detail;
               projectWelcome?.setImportStatus({state:"error",message});
               // A pre-commit abort leaves the old Example READY; a failed
               // rollback remains blocked. Re-read either state before showing
