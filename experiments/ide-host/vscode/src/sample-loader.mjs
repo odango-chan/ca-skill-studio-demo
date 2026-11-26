@@ -253,20 +253,24 @@ function isDependencyCachePath(path){
   return path===".skill-studio/dependencies"||
     path.startsWith(".skill-studio/dependencies/");
 }
-async function assertRealTransactionDirectory(fs,uri,label){
+async function assertOptionalRealTransactionDirectory(fs,uri,label){
   if(typeof fs.stat!=="function")
     fail(label+" root cannot be verified because the host file system does not expose stat()");
   let info;
   try{info=await fs.stat(uri);}
   catch(error){
-    if(isMissingTransactionEntry(error))
-      fail(label+" root is missing during Example transaction verification");
+    if(isMissingTransactionEntry(error))return false;
     throw error;
   }
   if((info.type&64)===64)
     fail(label+" root cannot be a symbolic link during Example transaction verification");
   if((info.type&2)!==2)
     fail(label+" root is not a directory during Example transaction verification");
+  return true;
+}
+async function assertRealTransactionDirectory(fs,uri,label){
+  if(!await assertOptionalRealTransactionDirectory(fs,uri,label))
+    fail(label+" root is missing during Example transaction verification");
 }
 async function readTransactionFile(fs,uri,path){
   let lastError=null;
@@ -517,6 +521,13 @@ function validateReplacementMarker(marker,paths){
   validateInventory(marker.candidateInventory,"candidate");
 }
 async function cleanupReplacementTransaction(fs,vscode,paths,terminalState){
+  // Cleanup recursively removes both transaction trees. Re-check every root
+  // immediately before deletion so a root swapped to a symlink after manifest
+  // verification cannot redirect cleanup into the active or backup Example.
+  await assertRealTransactionDirectory(fs,paths.activeRoot,"Active Example");
+  await assertOptionalRealTransactionDirectory(fs,paths.candidateStorage,"Candidate storage");
+  await assertOptionalRealTransactionDirectory(fs,paths.candidateRoot,"Candidate Example");
+  await assertOptionalRealTransactionDirectory(fs,paths.backupRoot,"Example backup");
   // Keep the terminal marker until both recovery trees have been removed.
   await deleteIfPresent(fs,paths.candidateStorage);
   await deleteIfPresent(fs,paths.backupRoot);
