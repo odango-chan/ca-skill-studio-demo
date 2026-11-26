@@ -846,7 +846,7 @@ test("Confirmed replacement reconciles stale OPFS directory entries without trea
   const owner=settings["connectionAgent.skillStudio.dependencyLock"].entries
     .find(entry=>entry.id==="mas");
   const staleName="ssm-release_confirm_n1.output.schema.json";
-  const staleParent=root+"/.skill-studio/dependencies/"+owner.snapshotDigest+"/schemas";
+  const staleParent=root+"/.skill-studio/dependencies/"+owner.snapshotDigest.slice(7)+"/schemas";
   assert.ok(h.folders.has(staleParent),"the stale file parent must be a real directory");
   h.files.delete(staleParent+"/"+staleName);
   assert.equal(h.files.has(staleParent+"/"+staleName),false,
@@ -864,7 +864,7 @@ test("Confirmed replacement reconciles stale OPFS directory entries without trea
     ["connectionAgent.skillStudio.dependencyLock"];
   const rebuiltOwner=rebuiltLock.entries.find(entry=>entry.id==="mas");
   assert.ok(h.files.has(root+"/.skill-studio/dependencies/"+
-    rebuiltOwner.snapshotDigest+"/schemas/"+staleName),
+    rebuiltOwner.snapshotDigest.slice(7)+"/schemas/"+staleName),
     "the new pinned dependency snapshot must be complete, not reuse the stale cache");
 });
 
