@@ -77,7 +77,7 @@ test("documentation governance identifies the current dependency architecture an
   assert.match(governance,/Updated: 2026-11-26/);
   assert.match(governance,/dependency-and-interface-package\.md/);
   assert.match(governance,/#285/);
-  assert.match(governance,/historical records have not yet moved/);
+  assert.match(governance,/历史记录尚未迁出/);
 });
 
 test("current workbench and Package Explorer ADRs no longer claim implementation is pending",()=>{
