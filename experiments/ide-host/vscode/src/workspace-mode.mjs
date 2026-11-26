@@ -98,6 +98,30 @@ export function registerWorkspaceMode(vscode, context, { authoring, showWelcome 
     }
   }
 
+  const workspaceModeDiagnostics = vscode.commands.registerCommand(
+    "skillStudio.internal.workspaceModeDiagnostics", () => {
+      const documentState = document => document ? {
+        uri:document.uri?.toString?.()??null,
+        version:document.version??null,
+        dirty:document.isDirty??null,
+        closed:document.isClosed??false
+      } : null;
+      const editorState = editor => editor?.document ? {
+        ...documentState(editor.document),
+        viewColumn:editor.viewColumn??null,
+        selection:editor.selection ? String(editor.selection) : null
+      } : null;
+      return {
+        mode,switching,
+        pendingConsoleRestore:documentState(pendingConsoleRestoreDocument),
+        consoleEditor:editorState(consoleEditor),
+        activeTextEditor:editorState(vscode.window.activeTextEditor),
+        visibleTextEditors:(vscode.window.visibleTextEditors??[]).map(editorState)
+      };
+    }
+  );
+  context.subscriptions.push(workspaceModeDiagnostics);
+
   context.subscriptions.push(
     vscode.commands.registerCommand("skillStudio.openAiAuthoring", () => select("ai")),
     vscode.commands.registerCommand("skillStudio.openConsole", () => select("console")),
