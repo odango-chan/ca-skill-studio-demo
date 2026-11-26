@@ -12,7 +12,7 @@
 | `AGENTS.md` | Agent 必读和硬约束 |
 | `docs/README.md` | 文档地图、阅读顺序 |
 | `docs/WORK.md` | 当前 implementation/acceptance **唯一快照** |
-| `docs/WORK-history.md` | 已迁出的日期化实现 / 验收历史；仅用于追溯，不是当前状态 |
+| `docs/WORK-history.md` | 已迁出的日期化 WORK 快照与历史 Traceability 证据；仅用于追溯，不是当前状态 |
 | `docs/TRACEABILITY.md` | WORK scope → canonical design → code/test → acceptance/evidence |
 | `docs/architecture/` | 当前 ownership、dependency、边界；依赖 / Interface Package 以 `architecture/dependency-and-interface-package.md` 为 canonical；旧 v0.1 / skills-lib-output 提案标为历史 |
 | `docs/design/` | Studio 自有实现契约；独立 Monaco / Visual Designer 工作流等已退役设计明确标为历史，当前 Theia UI 以 ADR-0005 为准 |
@@ -32,7 +32,7 @@ Canonical prose 用 `Draft / Proposed / Accepted / Deprecated`。WORK 的 Design
 
 ## Current work / Issue / history
 
-- `WORK` 是简洁现状面板（40–120 行）。状态原位更新，不追加日期流水，不存 backlog / 长阻断说明。日期化历史已无损迁至 [WORK-history.md](WORK-history.md)；该文件保留原始 SHA、PR、Actions run 和 NOT_RUN / BLOCKED 边界，不作为当前状态入口。
+- `WORK` 是简洁现状面板（40–120 行）。状态原位更新，不追加日期流水，不存 backlog / 长阻断说明。日期化 WORK 快照与历史 Traceability 证据已无损迁至 [WORK-history.md](WORK-history.md)；该文件保留原始 SHA、PR、Actions run 和 NOT_RUN / BLOCKED 边界，不作为当前状态入口。当前 TRACEABILITY 只保留当前 main / open candidate 的 scope → design → code/test → exact-head evidence 映射。
 - Owner GitHub Issue 负责 actionable defect、需求、cleanup、blocker；Issue 需观察证据、预期、owner、影响和完成条件。合并代码后仍要核实 required gate 才能关闭。
 - `TRACEABILITY` 对每项 IMPLEMENTED 给出源码/测试，对 PASS 给出实际验收事件/CI/稳定证据。历史精确 SHA 的 PASS 只对该 SHA 和该 Gate 有效，不能沿用到新 main / PR head。
 - 旧文档整理：**Snapshot → Inventory → Classify → Migrate before delete → Verify → Compact**。唯一历史语义先迁移后删；Git/Issue/PR 负责保留过程。
