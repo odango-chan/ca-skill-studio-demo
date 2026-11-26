@@ -7,7 +7,7 @@ import {fileURLToPath} from "node:url";
 const root=fileURLToPath(new URL("../",import.meta.url));
 const pages=[
   "README.md","AGENTS.md","docs/README.md","docs/DOCUMENTATION.md",
-  "docs/WORK.md","docs/TRACEABILITY.md",
+  "docs/WORK.md","docs/WORK-history.md","docs/TRACEABILITY.md",
   "docs/architecture/studio-boundaries.md",
   "docs/architecture/dependency-and-interface-package.md",
   "docs/architecture/plugin-managed-configuration-v0.1.md",
@@ -72,12 +72,25 @@ test("current dependency architecture is canonical and old project proposals are
   assert.match(boundary,/Classic.*retired/);
 });
 
+test("WORK is a compact current snapshot and preserves dated history separately",()=>{
+  const work=content("docs/WORK.md"),history=content("docs/WORK-history.md");
+  const map=content("docs/README.md"),governance=content("docs/DOCUMENTATION.md");
+  const lines=work.trim().split(/\\r?\\n/).length;
+  assert.ok(lines>=40&&lines<=120,"WORK must remain a 40–120 line current-state panel; got "+lines);
+  assert.match(work,/WORK-history\\.md/);
+  assert.match(history,/Historical snapshots/);
+  assert.match(history,/eaadf9488ec3b5d6d6f60eb7090a2dee715d440b/);
+  assert.match(history,/NOT_RUN/);
+  assert.match(map,/WORK-history\\.md/);
+  assert.match(governance,/WORK-history\\.md/);
+});
+
 test("documentation governance identifies the current dependency architecture and WORK compaction follow-up",()=>{
   const governance=content("docs/DOCUMENTATION.md");
   assert.match(governance,/Updated: 2026-11-26/);
   assert.match(governance,/dependency-and-interface-package\.md/);
   assert.match(governance,/#285/);
-  assert.match(governance,/历史记录尚未迁出/);
+  assert.match(governance,/WORK-history\\.md/);
 });
 
 test("current workbench and Package Explorer ADRs no longer claim implementation is pending",()=>{
