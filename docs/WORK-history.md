@@ -1,4 +1,4 @@
-# Skill Studio Work History
+# Skill Studio Historical Work and Traceability Evidence
 
 This file preserves the dated implementation and acceptance narratives moved out of [WORK.md](WORK.md) during the 2026-11-26 compaction. The historical claims, exact SHAs, PR links, Actions run IDs and NOT_RUN / BLOCKED boundaries below are retained verbatim after the original separator. They describe their original checkpoints only; current state lives exclusively in WORK.md.
 
