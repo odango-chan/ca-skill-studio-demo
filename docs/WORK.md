@@ -49,3 +49,5 @@
 - **2026-11-26 — WORK compacted to a current-state panel and dated narratives moved verbatim to WORK-history.md.** Sections: current product, blockers, exact-head PRs and guardrails. Reason: satisfy #285's 40–120-line requirement without losing historical evidence. Author: ChatGPT (GPT-6.2).
 
 - **2026-11-26 — Preview lifecycle candidate exact-head acceptance updated.** Sections: Preview lifecycle blocker and open PRs. Reason: record PR #293's 5/5 PASS on the #291 base without claiming merge or main qualification. Author: ChatGPT (GPT-6.2).
+
+- **2026-11-26 — Documentation PR build acceptance advanced.** Sections: open PRs. Reason: record PR Verify and Pages Build / real Chromium PASS on the latest tested #291-based head while distinguishing PR artifact validation from main deployment. Author: ChatGPT (GPT-6.2).
