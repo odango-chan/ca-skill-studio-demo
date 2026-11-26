@@ -1,44 +1,79 @@
-> **Current v0 implementation, superseded as a target design.** The frozen [Plugin-managed Studio v0.1 contract](plugin-managed-configuration-v0.1.md) removes required `lib/output` directories. Existing code and tests still use the earlier layout; this file describes the *current* implementation, not v0.1. Do not treat this note as a deployed change.
+# Skill Studio Ownership, Source Authority and Product Boundaries
 
-# Skill Studio Ownership / Source Authority
+**Status: Current implementation boundary · Updated 2026-11-26 · Audited baseline: `main@5b666c0ef754ed32fa37c97ce2429f328c70477f`**
 
-**Status: Accepted · Date: 2026-11-03**
+This document defines what Skill Studio owns and what it must consume from authoritative repositories. Current dependency and Interface Package details are in [Dependency, Interface Package and Schema IntelliSense Architecture](dependency-and-interface-package.md). Current implementation / acceptance status is in [WORK](../WORK.md); source-to-test evidence is in [TRACEABILITY](../TRACEABILITY.md).
 
-`ca-skill-studio-demo` 拥有 Skill 编辑器的前端、浏览器临时工作副本、只读语义投影、源文本局部 Patch 和本仓验收。它是**静态网站**，不是 Agent Runtime 或另一套 Skill / Tool / 5GC truth owner。
+## 1. Studio ownership
 
-## Dependency / authority
+`ca-skill-studio-demo` owns the VS Code-compatible authoring extension and its Theia online host integration:
+
+- native Source Editor, fixed right-side Preview Host, Outline / Problems / Package Explorer composition;
+- Source projection, bounded Source Patch, Diff / confirmation / native Undo / Redo and stale-revision protection;
+- CA-SL v1alpha5 Language Service integration, semantic tokens, completion and source navigation;
+- Package inventory, project configuration, dependency acquisition, immutable snapshots, Studio lock and read-only Interface Package browsing;
+- Compiler adapter UI / worker integration, AI Authoring review UI and this repository's tests / acceptance workflows.
+
+The online Pages product is Theia 1.76 browser-only. Classic standalone browser app, Classic fallback and `/classic/` artifact are retired. The fixed workbench is one native Source Editor group plus one contextual right-side Preview Host; the online Theia shell enforces the one-group constraint. Desktop VS Code users retain host-native ability to create additional editor groups; Studio must not claim it can control the entire desktop host layout.
+
+Studio is not an Agent Runtime, 5GC controller, Owner registry, Capability authority, Host Admission service, deployment registry or production qualification system.
+
+## 2. Cross-repository authority
+
+| Authority owner | Owns | Studio must do |
+|---|---|---|
+| [ca-skills](https://github.com/odango-chan/ca-skills) | CA-SL normative syntax, v1alpha5 authoring contract and published Skill source | Consume the frozen v1alpha5 contract; do not create another grammar or compatibility parser. |
+| [ca-skill-compiler](https://github.com/odango-chan/ca-skill-compiler) | Compiler wire contracts, parsing / linking / deterministic artifacts, formal Interface Package and Development Build APIs | Use the published versioned API; do not implement a second Compiler or linker. Current Studio main integrates v2.0.2; v2.1.0 Development Build / Verify cutover remains open in #269. |
+| OpenAMSM Owner / [ca-client-tools](https://github.com/odango-chan/ca-client-tools) | Published Owner ToolCatalog / callable contracts and separate read-only SBI Interface Package | Pin source snapshots and show provenance. A ToolCatalog snapshot or Interface Package is not Owner authorization. |
+| Host Context publisher / Host | Context schema source, Host admission and request identity | Consume exact context snapshots; do not invent Host admission or execution identity. |
+| [ca-agent-demo](https://github.com/odango-chan/ca-agent-demo) | Demo Host / integration behavior and demo execution evidence | Reference only when a specific current integration or evidence boundary requires it; never infer Runtime or 5GC qualification from editor state. |
+| [ca-runtime](https://github.com/odango-chan/ca-runtime) | Runtime execution, Run / Outcome / Receipt / Reconcile and runtime qualification | Display authoritative results only when explicitly supplied; never synthesize them. |
+| [connectionagent](https://github.com/odango-chan/connectionagent) | Ecosystem ownership and central documentation governance | Follow shared governance while preserving each repository's authority boundary. |
+
+## 3. Source authority and workbench data flow
 
 ~~~text
-Actual Skill source files (only business authority in Studio)
-   ↓ YAML 1.2 AST + source spans
-Source / Semantic Projection + Editor Hints
-   ↓ ELK layout → React Flow / Inspector / Problems (derived UI)
-Qualified Typed Source Patch → Preview Diff → Confirm
+Native Skill Source + exact locked dependency snapshots
    ↓
-Same working source text → Reparse → Undo/Redo → Download/ZIP
+CA-SL v1alpha5 Language Service / bounded source projections
+   ↓
+Preview / Outline / Problems / Package Explorer (derived views)
+   ↓
+Host-validated source patch → Diff / explicit confirmation
+   ↓
+Native WorkspaceEdit → Source revision / Undo / Redo
 ~~~
 
-Graph、Edge、Node 位置、Selected Node、Collapsed Pane 不作为独立文件业务定义。只有受支持的 Source span 在用户确认后被更新。构建为 `dist/` 静态资源；无后端自动执行或跨仓写入。
+YAML Source and immutable dependency snapshots are the authoritative inputs consumed by Studio. Graph nodes, edges, layout, selected elements, Inspector state, completion items and Problems are derived projections; they are not separate business truth. A visual edit must be tied to the exact document URI, source revision and source span, then reparsed and revalidated before it is applied. Ambiguous or stale edits fail closed.
 
-## Cross-repository responsibility
+Local syntax / source diagnostics, Package Audit, Compiler diagnostics, Host Admission and Runtime Execution are separate result domains. A local hint or a successful source projection is not a Compiler PASS. A Compiler Build is not Host Admission or Runtime Execution.
 
-| Owner | 正式边界 | Studio 应做 |
-|---|---|---|
-| [ca-agent-demo](https://github.com/odango-chan/ca-agent-demo) | Demo Skill Source、Host Loader、Demo Schema/validator | 引用固定 `bf445ad777149af5af2dfa0a5bdea18d0451303e` 样本；有意升级时单独审查 |
-| [ca-runtime](https://github.com/odango-chan/ca-runtime) | RuntimeHost、真实 Run/Outcome/Reconcile 与 Capability 资格 | 不宣称 Runtime PASS，不用 UI 模拟真实执行事实 |
-| [ca-skill-compiler](https://github.com/odango-chan/ca-skill-compiler) | 无状态多 SKILL Project Check / Build；规划浏览器 WASM | Studio 仅通过未来 Compiler adapter 调用稳定 API，不复制编译/链接逻辑，不把 LSP 或 Package Audit 当 Compiler PASS |
-| [ca-skill-toolchain](https://github.com/odango-chan/ca-skill-toolchain) | 正式 Skill toolchain / qualification（与 Compiler 分开） | 不把 check/build 结果当作资格/发布证明 |
-| [tool-mcp-gw](https://github.com/odango-chan/tool-mcp-gw) | Agent-facing MCP protocol / Server Tool Catalog adapter | 不根据名字/Goal/LLM 产生 Tool eligibility |
-| [ca-sandbox](https://github.com/odango-chan/ca-sandbox) | Sandbox Environment 和受控 control facts | 不直接控制 5GC |
-| [connectionagent](https://github.com/odango-chan/connectionagent) | 生态 ownership / 文档治理 | 只继承通用治理，尊重 owner 专有实现契约 |
+## 4. Current Example and dependency boundary
 
-## Source protection & scope
+The default Example contains the three OpenAMSM Scheme C Skills:
 
-- 在线 Theia 内置演示从 `site/samples/skills/` 导入到 `<project-root>/skills/`；同一项目根目录还包含空的 `lib/` 与 `output/`。原来的浏览器 `workspaces/skills/` 会直接作为项目的 `skills/` 复用，已有内容不迁移、不删除、不覆盖；Classic 历史夹具 `site/samples/packages` 保留为兼容与测试材料。
-- `skills/` 是可编辑 Source；`lib/` 仅供用户导入 Tool 契约；`output/` 只供未来 Compiler 生成。见 [SKILL Project layout](skill-project-layout.md)。
-- YAML `'on'` 是字符串键；必须保留 `operator.on`、`preconditions.on`、`postconditions.on` 及每个 Outcome 的原身份、行号。ELK 分组不等于业务合并。
-- Span/Revision、解析、Diff 和 Undo/Redo 是 Visual 修改的硬门禁；危险或未知语法 fall back Source-only。
-- 编辑期跨文件 warning 不证明完整类型匹配、Capability 存在、Runtime 或 3GPP 业务正确性。
-- 下载 ZIP 不等于本地文件原位 Save。没有用户确认不得改外仓、提交用户 Skill 或触发副作用。
+- `establish-pdu-session-mas`
+- `modify-pdu-session-mas`
+- `release-pdu-session-mas`
 
-稳定实现契约在 [Workbench](../design/authoring-workbench.md)，当前进度/验收只在 [WORK](../WORK.md)，下一步 Source-backed Route Edit 的讨论见 [D3](../design/route-designer.md)。
+It pins three dependency kinds: `mas` Owner ToolCatalog, `ca-context` Host Context Schema Bundle and `ca-client` read-only SBI Interface Package. `ca-client` is for query Schema IntelliSense only; it is not a MAS Contract root. The current `mas` and `ca-context` sources are not formal Compiler v2.1.0 Interface Package Contract roots. See the [dependency architecture](dependency-and-interface-package.md).
+
+The Example is DRAFT / NOT_QUALIFIED. A pinned ToolCatalog, Schema Bundle or Interface Package proves snapshot provenance, not Owner authorization, Host Admission, Runtime execution or real 5GC qualification. Do not re-add the separate illustrative conventional 5GC Skill to the default Example.
+
+## 5. Workspace and project layout
+
+The current Example importer writes to the extension-owned `skill-studio-demo/` project root. Its authored source is under `skills/`; workspace settings are host-native `.vscode/settings.json`; immutable dependency snapshots are under `.skill-studio/dependencies/<digest>/`. It does not create mandatory `lib/` or `output/` folders.
+
+A user's existing Example is never silently replaced. Replacement requires explicit confirmation. The current importer validates bundled sources before mutation and verifies the resulting inventory, but its active-root writes do not yet provide a full failure-atomic rollback boundary; see [#280](https://github.com/odango-chan/ca-skill-studio-demo/issues/280). Persistent-profile restore / upgrade remains separately gated by [#225](https://github.com/odango-chan/ca-skill-studio-demo/issues/225).
+
+## 6. Qualification and non-goals
+
+- Browser / Theia / IDE Host / Pages tests prove only the named editor and host scope.
+- The bundled Example and Schema completions are authoring material; they do not authorize Tool invocation.
+- Studio does not execute user Python, Skill Runtime, Provider calls or 5GC procedures in the online Pages environment.
+- Do not add production signing, package admission, Runtime trust registries or 5GC orchestration to Studio merely to make the demo appear qualified.
+- Do not restore Classic, CA-SL legacy compatibility, an extra Source/Preview editor group, a second parser, a second LSP or a Studio-owned linker.
+
+## Revision record
+
+- **2026-11-26:** Replaced stale 2026-11-03 ownership / source-protection statements with the current Theia-only workbench, v1alpha5 authority, current OpenAMSM Example, three dependency kinds, Compiler v2.0.2 / v2.1.0 boundary and explicit non-qualification scope. Evidence: current main SHA, extension source, dependency service and Example manifest.
