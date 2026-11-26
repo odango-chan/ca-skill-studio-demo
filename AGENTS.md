@@ -15,7 +15,7 @@ Theia browser-only 是唯一在线工作台。独立 Classic 浏览器工作台�
 ## Required reading — in order
 
 1. README.md / docs/README.md — 当前产品和文档地图；
-2. docs/WORK.md — 唯一当前状态；docs/TRACEABILITY.md — contract → code → test → acceptance → evidence；
+2. docs/WORK.md — 唯一当前状态；docs/TRACEABILITY.md — contract → code → test → acceptance → evidence；仅在需要历史追溯时读 docs/WORK-history.md，历史 PASS 不得代替当前 exact-head 证据；
 3. 边界改动读 docs/architecture/studio-boundaries.md；依赖 / Interface Package 改动必须读 docs/architecture/dependency-and-interface-package.md。plugin-managed-configuration-v0.1.md 是历史提案，不是当前实现指南；
 4. Extension / Host 改动读 experiments/ide-host/README.md、experiments/ide-host/vscode/ 与对应测试；
 5. 当前 UI / Preview / Projection / lifecycle 改动读 [ADR-0005](docs/decisions/0005-fixed-source-preview-workbench.md)、docs/architecture/studio-boundaries.md、docs/design/ca-sl-v1alpha5-studio-preview.md、对应共享模块和测试；AI Change Set 改动另读 docs/design/ai-procedure-authoring.md 与 authoring/core/README.md。docs/design/authoring-workbench.md 仅作为历史 Source-editing safety principles 参考，不是当前 UI / 布局契约；
