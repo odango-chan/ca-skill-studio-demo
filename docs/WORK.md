@@ -24,6 +24,10 @@
 
 ---
 
+## Historical snapshots · superseded by the 2026-11-26 current product snapshot
+
+The dated entries below preserve their original review and acceptance history. Their implementation or product-status statements describe the named historical checkpoint only; when they conflict with the current snapshot above, the current snapshot and exact current main source take precedence.
+
 ## 2026-11-18 · AI Procedure Authoring P1（Go Gateway 集成）
 
 [Issue #200](https://github.com/odango-chan/ca-skill-studio-demo/issues/200) · [Canonical design](design/ai-procedure-authoring.md) · [Go AI Gateway](https://github.com/odango-chan/ai-gateway) · [Gateway browser CORS issue #4](https://github.com/odango-chan/ai-gateway/issues/4)
