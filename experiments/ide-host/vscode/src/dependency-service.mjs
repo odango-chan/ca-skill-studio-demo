@@ -10,8 +10,30 @@ const snapshotDirectory=(vscode,root,digest)=>{
   if(!/^sha256:[a-f0-9]{64}$/.test(digest??""))fail("ERROR","Invalid digest");
   return pathFor(vscode,root,".skill-studio","dependencies",digest.slice(7));
 };
-const missing=error=>error?.code==="FileNotFound";
+const missing=error=>error?.code==="FileNotFound"||error?.code==="EntryNotFound"||
+  /ENOENT|EntryNotFound|FileNotFound/i.test(String(error?.message??error));
 const metadataMatches=(a,b)=>canonicalJson(a)===canonicalJson(b);
+async function readSnapshotFile(fs,uri,label){
+  let lastError=null;
+  for(let attempt=0;attempt<3;attempt++){
+    try{return await fs.readFile(uri);}
+    catch(error){
+      if(!missing(error))throw error;
+      lastError=error;
+      if(typeof fs.stat!=="function")throw error;
+      try{
+        const info=await fs.stat(uri);
+        if((info.type&1)!==1)
+          fail("ERROR","Pinned dependency snapshot path is not a file: "+label);
+      }catch(statError){
+        if(missing(statError))continue;
+        throw statError;
+      }
+    }
+  }
+  fail("BLOCKED","Pinned dependency snapshot file remained unavailable after bounded read retries: "+
+    label+" ("+String(lastError?.message??lastError)+")");
+}
 
 // A published package may itself own manifest.json. Keep its bytes in the
 // snapshot and select a separate store metadata path in that case.
@@ -75,12 +97,13 @@ export async function loadVerifiedSnapshot(vscode,workspaceRoot,lockEntry){
   const fs=vscode.workspace.fs;
   const root=snapshotDirectory(vscode,workspaceRoot,lockEntry.snapshotDigest);
   let manifest;
-  try{manifest=JSON.parse(dec.decode(await fs.readFile(pathFor(vscode,root,snapshotManifestPath(lockEntry.files)))));}
+  try{manifest=JSON.parse(dec.decode(await readSnapshotFile(fs,
+    pathFor(vscode,root,snapshotManifestPath(lockEntry.files)),
+    snapshotManifestPath(lockEntry.files))));}
   catch(error){
-    // Preserve FileNotFound so writeImmutableSnapshot can distinguish a
-    // stale positive stat result from an existing but corrupt immutable
-    // snapshot. Other read/parse failures remain fail-closed.
-    if(missing(error))throw error;
+    // A bounded stat-confirmed retry handles transient OPFS read visibility;
+    // a still-missing path remains BLOCKED, never silently accepted.
+    if(error?.code==="BLOCKED"||missing(error))throw error;
     fail("ERROR","Pinned dependency manifest unreadable: "+
       String(error?.message??error));
   }
@@ -92,12 +115,13 @@ export async function loadVerifiedSnapshot(vscode,workspaceRoot,lockEntry){
   try{
     for(const entry of lockEntry.files){
       validateSnapshotPath(entry.path);
-      const bytes=await fs.readFile(pathFor(vscode,root,...entry.path.split("/")));
+      const bytes=await readSnapshotFile(fs,
+        pathFor(vscode,root,...entry.path.split("/")),entry.path);
       wireFiles.push({path:entry.path,bytes:base64Bytes(bytes)});
     }
     return await verifyLockedFiles(lockEntry,wireFiles);
   }catch(error){
-    fail(missing(error)?"BLOCKED":"ERROR",
+    fail(error?.code==="BLOCKED"||missing(error)?"BLOCKED":"ERROR",
       "Locked dependency file unavailable or corrupt: "+String(error?.message??error));
   }
 }
