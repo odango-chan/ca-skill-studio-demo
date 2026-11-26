@@ -93,6 +93,30 @@ test("pinned built-in snapshot persists, reloads and is verified byte for byte",
   assert.equal(missing.status,"BLOCKED");
   assert.equal(missing.diagnostics[0].code,"LOCKED_SNAPSHOT_MISSING");
 });
+test("immutable snapshot reads retry transient OPFS missing-entry results when stat confirms the file exists",async()=>{
+  for(const code of ["FileNotFound","EntryNotFound"]){
+    const h=host(),acquired=await acquireBuiltin({
+      bundleId:"studio-example-toolcatalog",version:"1.0.0"});
+    const fs=h.vscode.workspace.fs;
+    const originalReadFile=fs.readFile.bind(fs);
+    let injected=false,injectedPath=null;
+    fs.readFile=async target=>{
+      if(!injected&&target.path.startsWith("/workspace/.skill-studio/dependencies/")){
+        injected=true;injectedPath=target.path;
+        throw Object.assign(Error("transient OPFS missing-entry immediately after snapshot publish"),
+          {code});
+      }
+      return originalReadFile(target);
+    };
+    const ready=await applyDependency(h.vscode,h.root,"example",acquired,
+      {confirm:async()=>true});
+    assert.equal(injected,true,code+" must be injected during post-rename snapshot verification");
+    assert.match(injectedPath,/\\.skill-studio\\/dependencies|\\.skill-studio\\/dependencies/);
+    assert.equal(ready.status,"READY",code+" must be retried only after stat confirms the file");
+    assert.equal((await resolveLockedDependencies(h.vscode,h.root)).status,"READY");
+  }
+});
+
 test("Refresh is observation-only; Update Lock requires confirmation",async()=>{
   const h=host(),initial=await acquireBuiltin({
     bundleId:"studio-example-toolcatalog",version:"1.0.0"});
