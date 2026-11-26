@@ -772,6 +772,21 @@ test("A newly dirty Example editor during staging aborts before COMMITTING and l
   assert.equal(getExampleReplacementStatus().state,"READY");
 });
 
+test("A symbolic-link Example root is rejected before backup or mutation",async()=>{
+  const h=host();
+  const before=await seedExistingExample(h);
+  const stat=h.vscode.workspace.fs.stat;
+  h.vscode.workspace.fs.stat=async target=>{
+    if(target.path===root)return {type:66};
+    return stat(target);
+  };
+  await assert.rejects(seedExampleProject(h.vscode,uri("/extension"),uri("/global-storage"),{
+    replaceExisting:true
+  }),/cannot be a symbolic link/);
+  assert.deepEqual(snapshotExample(h),before);
+  assert.equal(getExampleReplacementStatus().state,"READY");
+});
+
 test("A dirty Example editor that cannot save aborts before transaction mutation",async()=>{
   const h=host();
   const before=await seedExistingExample(h);
