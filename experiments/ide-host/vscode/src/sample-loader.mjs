@@ -664,8 +664,14 @@ async function seedExampleProjectTransaction(vscode,extensionUri,storageUri,
 
     phase="stage-current-example";
     await fs.createDirectory(paths.candidateStorage);
+    // Preserve authored Studio metadata, but regenerate the plugin-managed
+    // immutable dependency cache from the pinned bundles. It is derived data,
+    // may contain stale OPFS directory entries, and is fully verified again
+    // before commit; carrying an incomplete old cache would poison the new lock.
     const metadataEntries=backupInventory.filter(entry=>
-      entry.path===".skill-studio"||entry.path.startsWith(".skill-studio/"));
+      (entry.path===".skill-studio"||entry.path.startsWith(".skill-studio/"))&&
+      entry.path!==".skill-studio/dependencies"&&
+      !entry.path.startsWith(".skill-studio/dependencies/"));
     if(metadataEntries.length)
       await copyTreeFromSource(fs,vscode,paths.backupRoot,
         paths.candidateRoot,metadataEntries);
