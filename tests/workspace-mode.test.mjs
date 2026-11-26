@@ -53,13 +53,49 @@ function harness(saved) {
   };
   const authoring = registerAiAuthoringEditor(vscode, context);
   const mode = registerWorkspaceMode(vscode, context, { authoring, showWelcome: () => false });
+  function emitEditorEvent(editor) { onEditor?.(editor); }
   function activateEditor(editor) {
     vscode.window.activeTextEditor = editor;
     vscode.window.visibleTextEditors = [editor];
-    onEditor?.(editor);
+    emitEditorEvent(editor);
   }
-  return { commands, preferences, vscode, document, editor, opened, panels, mode, activateEditor };
+  return { commands, preferences, vscode, document, editor, opened, panels, mode, activateEditor, emitEditorEvent };
 }
+
+
+
+test("a delayed stale editor event cannot replace the Console source restored from AI", async () => {
+  const host = harness();
+  assert.equal(await host.mode.restore(), true);
+  assert.equal(await host.commands.get("skillStudio.openConsole")(), true);
+
+  // The previous implementation stopped suppressing editor events after 300 ms.
+  // A delayed event for another tab could then replace the saved Console URI.
+  await new Promise(resolve => setTimeout(resolve, 350));
+  const stalePath = "/skills/demo/assurance/contract.yaml";
+  const staleDocument = { uri: { path: stalePath, toString: () => stalePath }, isClosed: false };
+  host.emitEditorEvent({ document: staleDocument });
+
+  assert.equal(await host.commands.get("skillStudio.openAiAuthoring")(), true);
+  assert.equal(await host.commands.get("skillStudio.openConsole")(), true);
+  assert.equal(host.opened.at(-1)[1], host.document.uri);
+});
+
+test("a real Console navigation after restore updates the AI return target", async () => {
+  const host = harness();
+  assert.equal(await host.mode.restore(), true);
+  assert.equal(await host.commands.get("skillStudio.openConsole")(), true);
+
+  await new Promise(resolve => setTimeout(resolve, 350));
+  const path = "/skills/demo/assurance/contract.yaml";
+  const document = { uri: { path, toString: () => path }, isClosed: false };
+  const editor = { document, selection: { anchor: 9 } };
+  host.activateEditor(editor);
+
+  assert.equal(await host.commands.get("skillStudio.openAiAuthoring")(), true);
+  assert.equal(await host.commands.get("skillStudio.openConsole")(), true);
+  assert.equal(host.opened.at(-1)[1], document.uri);
+});
 
 test("defaults to AI and restores the same dirty native buffer and AI view", async () => {
   const host = harness();
