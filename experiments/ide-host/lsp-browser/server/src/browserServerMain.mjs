@@ -249,20 +249,25 @@ function scriptToolName(text) {
   return /^# name: ([A-Za-z][A-Za-z0-9_-]*)$/m.exec(text)?.[1] ?? null;
 }
 
-function projectOperationCatalog(snapshot,index) {
+function projectOperationCatalog(snapshot) {
   const unique = new Map();
   const ambiguous = new Set();
   for (const operation of snapshot.dependencyOperations ?? []) {
-    if (!/^[A-Za-z0-9_][A-Za-z0-9_.-]{0,159}$/.test(operation?.id ?? "") ||
-        typeof operation.dependencyId !== "string") continue;
-    if (unique.has(operation.id) || index?.declarations.has("operation\u0000" + operation.id))
-      ambiguous.add(operation.id);
-    unique.set(operation.id, operation);
+    const alias = operation?.dependencyId;
+    const id = operation?.id;
+    if (!/^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/.test(alias ?? "") ||
+        !/^[A-Za-z0-9_][A-Za-z0-9_.-]*$/.test(id ?? "")) continue;
+    // A v1alpha5 external Tool reference is identified by BOTH its project
+    // Dependency Alias and the package-local Callable ID. Two packages may
+    // legitimately export the same Callable ID; they are not ambiguous until
+    // the same alias-qualified identity is declared more than once.
+    const reference = alias + "::" + id;
+    if (unique.has(reference)) ambiguous.add(reference);
+    unique.set(reference, { ...operation, reference });
   }
-  for (const id of ambiguous) unique.delete(id);
+  for (const reference of ambiguous) unique.delete(reference);
   return unique;
 }
-
 function schemaTitleCatalog(snapshot) {
   const found = new Map();
   const ambiguous = new Set();
@@ -369,7 +374,7 @@ connection.onDefinition(params => {
     if(!declaration){
       if(symbolHit.declarations.length||
          !["skillOperation","skillCapability"].includes(symbolHit.token.type))return null;
-      return projectOperationCatalog(snapshot,index).get(symbolHit.token.name)?.location??null;
+      return projectOperationCatalog(snapshot).get(symbolHit.token.name)?.location??null;
     }
     const target=snapshotDocumentFor(snapshot,declaration.uri);
     return location(declaration.uri,target,declaration.range);
@@ -453,7 +458,7 @@ connection.onHover(params => {
     const operation=!symbolHit.declarations.length&&snapshot.completeness==="complete"&&
       index?.generation===snapshot.generation&&
       ["skillOperation","skillCapability"].includes(symbolHit.token.type)
-      ? projectOperationCatalog(snapshot,index).get(symbolHit.token.name) : null;
+      ? projectOperationCatalog(snapshot).get(symbolHit.token.name) : null;
     let predicateSignature=null;
     if(resolved&&symbolHit.token.type==="skillPredicate"){
       const source=snapshot.documents.find(item=>
@@ -480,7 +485,7 @@ connection.onHover(params => {
       }
     }
     const body=operation
-      ? "**Tool Operation** `"+operation.id+"`\n\nDeclared in project dependency `"+
+      ? "**Tool Operation** `"+operation.reference+"`\n\nDeclared in project dependency `"+
         operation.dependencyId+"`."
       : resolved
       ? "**"+kind+"** `"+(scriptName??predicateSignature??symbolHit.token.name)+"`\n\nDeclared in `"+declaration.relativePath+"`"
@@ -864,11 +869,8 @@ function currentGrammarCompletions(value, document, prefix, offset, lineStart) {
   if(tool && inNode && (stage==="operation"||stage==="observation")){
     // Only list exact IDs explicitly supplied with the accepted snapshot.
     // These are source hints; membership, Scope and Effect are not inferred.
-    const ids=[...new Set((value.snapshot.dependencyOperations??[])
-      .filter(item=>typeof item?.dependencyId==="string"&&
-        /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/.test(item.dependencyId)&&
-        typeof item.id==="string"&&/^[A-Za-z0-9_][A-Za-z0-9_.-]*$/.test(item.id))
-      .map(item=>item.dependencyId+"::"+item.id))];
+    const ids=[...projectOperationCatalog(value.snapshot).values()]
+      .map(item=>item.reference);
     return make(ids,tool[1],offset-tool[1].length,CompletionItemKind.Reference,
       "Unverified imported reference; Compiler must check exact Owner/Capability");
   }
@@ -899,26 +901,6 @@ connection.onCompletion(params => {
   if(pathCompletions!==null)return pathCompletions;
   const currentCompletions = currentGrammarCompletions(value,document,prefix,offset,lineStart);
   if(currentCompletions!==null)return currentCompletions;
-
-  if (document.relativePath === "assurance/procedure.yaml" &&
-      value.analysis.state === "READY" && value.snapshot.completeness === "complete") {
-    const index = symbolIndexes.get(value.snapshot.rootUri);
-    const hit = skillSymbolAt(index,document.uri,offset) ??
-      skillSymbolAt(index,document.uri,offset-1);
-    if (hit?.token.type === "skillOperation") {
-      const range = hit.token.range;
-      const typed = document.text.slice(range.start,offset);
-      const editRange = toLspRange(document.text,range);
-      return [...projectOperationCatalog(value.snapshot,index).values()]
-        .filter(item => item.id.startsWith(typed))
-        .map(item => ({
-          label: item.id,
-          kind: CompletionItemKind.Reference,
-          detail: "Tool dependency · " + item.dependencyId,
-          ...(editRange ? { textEdit: { range: editRange, newText: item.id } } : {})
-        }));
-    }
-  }
 
   if (document.relativePath === "assurance/procedure.yaml" &&
       /^\s*script:\s*[^#]*$/.test(prefix) &&
