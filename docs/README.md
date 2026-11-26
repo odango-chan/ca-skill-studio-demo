@@ -19,7 +19,7 @@ Studio 拥有浏览器编辑器，不拥有正式 Skill/Runtime/MCP 业务真相
    - [Go AI Gateway](https://github.com/odango-chan/ai-gateway) · [Browser CORS issue #4](https://github.com/odango-chan/ai-gateway/issues/4)
 8. [D3 Route Designer](design/route-designer.md) — `operator.on` 有界编辑与剩余资格边界
 9. [D4 Phase Designer](design/phase-designer.md) — Phase Step 编辑范围与验收
-10. [E Source Editor](design/source-editor-workstream.md) — Source editor workstream
+10. [E Source Editor](design/source-editor-workstream.md) — 早期 standalone Monaco Source Editor 工作流历史；当前 Theia 编辑使用宿主原生 Source Editor
 11. [Application Shell](design/application-shell.md) — Web/Local 菜单命令与本地宿主边界
 12. [Skill Language Core / Browser LSP · L2-D1](design/skill-lsp-l2d-editor-acceptance.md) — 共享语言分析与真实 Theia Provider 验收
 13. [L2-D2 Live Problems](design/skill-lsp-l2d2-live-problems.md) — Problems 诊断与 Package generation
