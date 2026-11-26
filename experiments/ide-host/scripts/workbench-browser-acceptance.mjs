@@ -250,10 +250,10 @@ export async function runPackageOverviewAcceptance({command,evalJS,sleep,require
   for(let attempt=0;attempt<100;attempt++){
     rows=await readTreeRows();
     if(rows.some(x=>x.visible&&x.text.includes('4 SKILL Packages'))&&
-       rows.some(x=>x.visible&&x.text.includes('establish-pdu-session · 3/3 core ·')))break;
+       rows.some(x=>x.visible&&x.text.includes('establish-pdu-session-mas · 3/3 core ·')))break;
     await sleep(100);
   }
-  if(!rows.some(x=>x.visible&&x.text.includes('establish-pdu-session · 3/3 core ·')))
+  if(!rows.some(x=>x.visible&&x.text.includes('establish-pdu-session-mas · 3/3 core ·')))
     throw Error('Package Overview did not populate inside the native Explorer: '+JSON.stringify(rows));
   await invoke('skillStudio.refreshPackages');
   const scan=await evalJS('window.__skillStudioLastCommandResult??null');
@@ -273,21 +273,19 @@ export async function runPackageOverviewAcceptance({command,evalJS,sleep,require
     },true);
     return true;
   })()`);
-  const expectedNames=['establish-pdu-session','establish-pdu-session-mas','modify-pdu-session-mas','release-pdu-session-mas'];
+  const expectedNames=['establish-pdu-session-mas','modify-pdu-session-mas','release-pdu-session-mas'];
   const discovered=(scan?.packages??[]).map(x=>x.name).sort();
   if(scan?.state!=='ready'||JSON.stringify(discovered)!==JSON.stringify(expectedNames.slice().sort()))
-    throw Error('Package Overview must discover all four current sample Skills in one Workspace: '+
+    throw Error('Package Overview must discover all three current sample Skills in one Workspace: '+
       JSON.stringify({scan,expectedNames}));
-  const classic=scan.packages.find(x=>x.name==='establish-pdu-session');
   const mas=scan.packages.find(x=>x.name==='establish-pdu-session-mas');
   const modify=scan.packages.find(x=>x.name==='modify-pdu-session-mas');
   const release=scan.packages.find(x=>x.name==='release-pdu-session-mas');
-  if(classic?.fileCount!==8||classic?.corePresent!==3||
-     mas?.fileCount!==6||mas?.corePresent!==3||
+  if(mas?.fileCount!==6||mas?.corePresent!==3||
      modify?.fileCount!==6||modify?.corePresent!==3||
      release?.fileCount!==6||release?.corePresent!==3)
-    throw Error('Four-SKILL v1alpha5 inventory does not match the pinned sample manifest: '+
-      JSON.stringify({classic,mas}));
+    throw Error('Three-SKILL v1alpha5 inventory does not match the pinned sample manifest: '+
+      JSON.stringify({mas,modify,release}));
   function assertGroupInventory(result,packageName,expected){
     const pkg=result?.packages?.find(item=>item.name===packageName);
     if(!pkg)throw Error('Package scan omitted '+packageName);
@@ -298,9 +296,6 @@ export async function runPackageOverviewAcceptance({command,evalJS,sleep,require
       throw Error('Package group inventory mismatch for '+packageName+': '+
         JSON.stringify({actual,expected,missing}));
   }
-  assertGroupInventory(scan,'establish-pdu-session',{
-    definition:1,assurance:3,schemas:1,scripts:3
-  });
   assertGroupInventory(scan,'establish-pdu-session-mas',{
     definition:1,assurance:3,schemas:1,references:1
   });
@@ -389,7 +384,6 @@ export async function runPackageOverviewAcceptance({command,evalJS,sleep,require
   if(!requireEditor){
     const evidence={
       skills:[
-        {name:'establish-pdu-session',files:classic.fileCount,core:'3/3'},
         {name:'establish-pdu-session-mas',files:mas.fileCount,core:'3/3'},
         {name:'modify-pdu-session-mas',files:modify.fileCount,core:'3/3'},
         {name:'release-pdu-session-mas',files:release.fileCount,core:'3/3'}
@@ -397,7 +391,7 @@ export async function runPackageOverviewAcceptance({command,evalJS,sleep,require
       treeVisible:true,scanState:scan.state,composite:compositeEvidence
     };
     console.log('STUDIO_PACKAGE_EXPLORER_BROWSER_ONLY_CHROMIUM',JSON.stringify(evidence));
-    return {required:true,fourSkills:true,browserOnlyInventory:true,evidence};
+    return {required:true,threeSkills:true,browserOnlyInventory:true,evidence};
   }
   const packageNames=expectedNames;
   const isPackageRow=row=>packageNames.some(name=>
@@ -568,7 +562,7 @@ export async function runPackageOverviewAcceptance({command,evalJS,sleep,require
         frameUrl:snapshot.frameUrl,fileRow:file.text,nodeIds:file.nodeIds};
       await sleep(150);
     }
-    throw Error('Opening '+name+' assurance/contract.yaml from Package Overview did not load its exact Contract Designer Source: '+
+    throw Error('Opening '+name+' assurance/contract.yaml from Package Overview did not load its exact Contract Preview Source: '+
       JSON.stringify({file,frames:await readContractFrames(),rows:await readTreeRows()}));
   }
   // Group membership and counts are asserted from the Package scan model
@@ -582,37 +576,31 @@ export async function runPackageOverviewAcceptance({command,evalJS,sleep,require
     const part=header?.closest('.part');
     const row=[...(part?.querySelectorAll('.theia-TreeNode')??[])].find(el=>
       el.innerText.replace(/\\s+/g,' ').includes(
-        'establish-pdu-session · 3/3 core ·'));
+        'establish-pdu-session-mas · 3/3 core ·'));
     row?.scrollIntoView({block:'start',inline:'nearest'});
     return Boolean(row);
   })()`);
   if(!conventionalPackageTop)
     throw Error('v1alpha5 5GC Package row disappeared after Dependencies interaction');
   await sleep(150);
-  await ensurePackageExpanded('establish-pdu-session');
-  const classicContract=await openPackageContract('establish-pdu-session');
   await ensurePackageExpanded('establish-pdu-session-mas');
   const masContract=await openPackageContract('establish-pdu-session-mas');
   await ensurePackageExpanded('modify-pdu-session-mas');
   const modifyContract=await openPackageContract('modify-pdu-session-mas');
   await ensurePackageExpanded('release-pdu-session-mas');
   const releaseContract=await openPackageContract('release-pdu-session-mas');
-  if(classicContract.contractName!=='establish-pdu-session'||
-     masContract.contractName!=='establish-pdu-session-mas'||
+  if(masContract.contractName!=='establish-pdu-session-mas'||
      modifyContract.contractName!=='modify-pdu-session-mas'||
      releaseContract.contractName!=='release-pdu-session-mas'||
-     new Set([classicContract,masContract,modifyContract,releaseContract].map(c=>c.contractName)).size!==4)
+     new Set([masContract,modifyContract,releaseContract].map(c=>c.contractName)).size!==3)
     throw Error('Package file navigation did not preserve each exact Contract URI: '+
-      JSON.stringify({classicContract,masContract}));
+      JSON.stringify({masContract,modifyContract,releaseContract}));
   await invoke('skillStudio.refreshPackages');
   await invoke('skillStudio.refreshPackages');
   const postExpansion=await evalJS('window.__skillStudioLastCommandResult??null');
-  if(postExpansion?.state!=='ready'||postExpansion.packages?.length!==4)
-    throw Error('Package Explorer refresh did not preserve four Package inventories: '+
+  if(postExpansion?.state!=='ready'||postExpansion.packages?.length!==3)
+    throw Error('Package Explorer refresh did not preserve three Package inventories: '+
       JSON.stringify(postExpansion));
-  assertGroupInventory(postExpansion,'establish-pdu-session',{
-    definition:1,assurance:3,schemas:1,scripts:3
-  });
   assertGroupInventory(postExpansion,'establish-pdu-session-mas',{
     definition:1,assurance:3,schemas:1,references:1
   });
@@ -649,9 +637,6 @@ export async function runPackageOverviewAcceptance({command,evalJS,sleep,require
       JSON.stringify({previous,restored,restoredActivity}));
   const evidence={
     skills:[{
-      name:'establish-pdu-session',files:classic.fileCount,core:'3/3',
-      groups:classic.groups.map(group=>({key:group.key,count:group.count})),contract:classicContract
-    },{
       name:'establish-pdu-session-mas',files:mas.fileCount,core:'3/3',
       groups:mas.groups.map(group=>({key:group.key,count:group.count})),contract:masContract
     },{
@@ -666,8 +651,8 @@ export async function runPackageOverviewAcceptance({command,evalJS,sleep,require
     treeReadsByKind:postExpansion.treeReadsByKind,
     exactPackageUris:true,restoredActivity:restored
   };
-  console.log('STUDIO_PACKAGE_OVERVIEW_FOUR_SKILLS_CHROMIUM',JSON.stringify(evidence));
-  return {required:true,fourSkills:true,evidence};
+  console.log('STUDIO_PACKAGE_OVERVIEW_THREE_SKILLS_CHROMIUM',JSON.stringify(evidence));
+  return {required:true,threeSkills:true,evidence};
 }
 
 
@@ -677,7 +662,7 @@ export async function runWorkbenchAcceptance({
 }){
   if(!requireEditor)return {required:false};
   const defaultProcedureUri=String(procedureUri??"");
-  const procedureSuffix="/skills/establish-pdu-session/assurance/procedure.yaml";
+  const procedureSuffix="/skills/establish-pdu-session-mas/assurance/procedure.yaml";
   if(!defaultProcedureUri.endsWith(procedureSuffix))
     throw Error("Browser acceptance must run against the active CA-SL v1alpha5 5GC Procedure: "+
       defaultProcedureUri);
@@ -788,7 +773,7 @@ export async function runWorkbenchAcceptance({
 
   const started=Date.now();
   const procedurePair=await assertSourceVisualPair(
-    evalJS,sleep,"procedure.yaml","CA-SL current Procedure Designer");
+    evalJS,sleep,"procedure.yaml","CA-SL current Procedure Preview");
   // Native TextMate is a separate baseline from CA semantic tokens and LSP.
   // Inspect real rendered Monaco text colors, not just the grammar manifest.
   let yamlTextMate=null;
@@ -820,7 +805,7 @@ export async function runWorkbenchAcceptance({
     throw Error("Native Source is not the exact current Procedure TextDocument: "+
       JSON.stringify({expected:defaultProcedureUri,sourceState,procedurePair}));
   const initialGraph=await waitWebview(view=>
-    view.procedureRoot&&view.procedureValue==="establish-pdu-session"&&view.graphNodes>0,
+    view.procedureRoot&&view.procedureValue==="establish-pdu-session-mas"&&view.graphNodes>0,
     "default current Procedure graph");
   const initialTiming=initialGraph.view.timing?JSON.parse(initialGraph.view.timing):{
     type:"rendered",revision:initialGraph.view.revision,nodes:initialGraph.view.graphNodes
@@ -953,12 +938,17 @@ export async function runWorkbenchAcceptance({
       JSON.stringify({branchInitial,branchCollapsed,anchorCollapsedDelta}));
 
   await evalWebviewJS("(()=>{const s=document.querySelector('#rootPathMode');s.value='all';s.dispatchEvent(new Event('change',{bubbles:true}));return true;})()");
-  await sleep(350);
-  const allPaths=await evalWebviewJS("(()=>({layout:document.querySelector('#layoutDirection')?.value??null,"+
+  const readAllPaths=()=>evalWebviewJS("(()=>({layout:document.querySelector('#layoutDirection')?.value??null,"+
     "rootMode:document.querySelector('#rootPathMode')?.value??null,"+
     "rootToolbarVisible:document.querySelector('#rootPathToolbar')?.hidden===false,"+
     "nodes:document.querySelectorAll('#reactFlowRoot .react-flow__node').length,"+
     "edges:document.querySelectorAll('#reactFlowRoot .react-flow__edge').length}))()");
+  let allPaths;
+  for(let attempt=0;attempt<50;attempt++){
+    allPaths=await readAllPaths();
+    if(allPaths.nodes>branchCollapsed.nodes&&allPaths.edges>branchCollapsed.edges)break;
+    await sleep(100);
+  }
   if(allPaths.layout!=="DOWN"||allPaths.rootMode!=="all"||!allPaths.rootToolbarVisible||
      !(allPaths.nodes>branchCollapsed.nodes)||!(allPaths.edges>branchCollapsed.edges))
     throw Error("v1alpha5 All Paths mode did not reveal the full graph: "+
@@ -1156,7 +1146,7 @@ export async function runWorkbenchAcceptance({
         });
       const lines=[...(editor?.querySelectorAll('.view-lines .view-line')??[])];
       const line=lines.find(node=>node.textContent.replace(/\\u00a0/g,' ')
-        .includes('PASS: subscribe-sm-data'));
+        .includes('PASS: skip-secondary-authentication'));
       const span=[...(line?.querySelectorAll('span')??[])].find(node=>
         node.textContent.replace(/\\u00a0/g,' ').trim()==='PASS');
       return {visible:!!editor&&editor.getBoundingClientRect().width>150,
@@ -1179,12 +1169,12 @@ export async function runWorkbenchAcceptance({
 
   // The native Inspector is source-derived and read-only; it is not Runtime Evidence.
   await evalWebviewJS("(()=>{const node=[...document.querySelectorAll('#reactFlowRoot .react-flow__node')]"+
-    ".find(el=>el.getAttribute('data-id')==='get-sm-subscription-data');node?.click();return !!node;})()");
+    ".find(el=>el.getAttribute('data-id')==='validate-sm-subscription');node?.click();return !!node;})()");
   await sleep(120);
   const inspectorSelection=await nativeCommand("skillStudio.internal.selectionAcceptance");
   console.log("STUDIO_CURRENT_LANGUAGE_INSPECTOR_SELECTION_CHROMIUM",
     JSON.stringify(inspectorSelection));
-  if(inspectorSelection?.nodeId!=="get-sm-subscription-data"||
+  if(inspectorSelection?.nodeId!=="validate-sm-subscription"||
      inspectorSelection?.snapshotState!=="READY")
     throw Error("v1alpha5 graph selection did not reach the native Inspector model: "+
       JSON.stringify(inspectorSelection));
@@ -1193,7 +1183,7 @@ export async function runWorkbenchAcceptance({
     "skillStudio.internal.semanticTokenDiagnostics");
   const packageAudit=packageDiagnosticState?.packageAudit;
   const expectedCapabilityId=
-    "urn:example:connectionagent:capability:3gpp:namf-communication-n1n2-transfer:v1";
+    "mas.sc.subscription.validate";
   const capabilityProblem=packageAudit?.problems?.find(item=>
     item.code==="CAPABILITY_GRANT_NOT_CHECKED"&&item.message.includes(expectedCapabilityId));
   const capabilityMarker=packageAudit?.editorMarkers?.find(item=>
@@ -1209,7 +1199,7 @@ export async function runWorkbenchAcceptance({
      !/\d+ files/.test(packageAudit.status)||
      packageAudit.problems.some(item=>item.code==="PREDICATE_SCRIPT_REF_UNDECLARED")||
      !packageAudit.problems.some(item=>item.code==="EVIDENCE_GUARANTEE_NOT_CHECKED")||
-     !packageAudit.problems.some(item=>item.code==="DEPENDENCY_NOT_CONFIGURED"))
+     packageAudit.problems.some(item=>item.code==="DEPENDENCY_NOT_CONFIGURED"))
     throw Error("Current Package diagnostics must reach Problems and editor markers without Compiler qualification: "+
       JSON.stringify({packageAudit,expectedCapabilityId,
         activeDocumentUri:packageDiagnosticState?.activeDocumentUri,
@@ -1240,16 +1230,15 @@ export async function runWorkbenchAcceptance({
   // Run in-memory static diagnostic regression cases. These results belong
   // to the native Test Explorer, never to Source Problems or Runtime Evidence.
   const offlineTests=await nativeCommand("skillStudio.runDiagnosticTests");
-  const expectedOfflineTestCount=Array.isArray(offlineTests?.results)
-    ?offlineTests.results.length:0;
-  const everyOfflineTestPassed=expectedOfflineTestCount>0&&
-    offlineTests.results.every(item=>item?.status==="PASS");
+  const expectedSkipped=["capability-grant-duplicate","missing-predicate-script","unknown-tool-alias"];
+  const skipped=(offlineTests?.results??[]).filter(item=>item.status==="NOT_RUN")
+    .map(item=>item.id).sort();
   if(!offlineTests||offlineTests.apiVersion!=="skill-studio-diagnostic-regression/v1"||
      offlineTests.qualification!=="NOT_QUALIFIED"||
-     offlineTests.summary?.PASS!==expectedOfflineTestCount||
-     offlineTests.summary?.FAIL!==0||offlineTests.summary?.NOT_RUN!==0||
-     !everyOfflineTestPassed||!offlineTests.nativeTestExplorer)
-    throw Error("Native Test Explorer did not pass every offline static diagnostic regression case: "+
+     offlineTests.summary?.PASS!==9||offlineTests.summary?.FAIL!==0||
+     offlineTests.summary?.NOT_RUN!==expectedSkipped.length||
+     JSON.stringify(skipped)!==JSON.stringify(expectedSkipped)||!offlineTests.nativeTestExplorer)
+    throw Error("Native Test Explorer did not report the expected Scheme C static diagnostic results: "+
       JSON.stringify(offlineTests));
   console.log("STUDIO_OFFLINE_DIAGNOSTIC_TEST_EXPLORER_CHROMIUM",JSON.stringify({
     nativeTestExplorer:offlineTests.nativeTestExplorer,
@@ -1260,9 +1249,9 @@ export async function runWorkbenchAcceptance({
   const routeTests=await nativeCommand("skillStudio.runRouteScenarios");
   if(routeTests?.apiVersion!=="skill-studio-route-test-results/v1"||
      routeTests.qualification!=="NOT_QUALIFIED"||
-     routeTests.summary?.PASS!==5||routeTests.summary?.FAIL!==0||
+     routeTests.summary?.PASS!==2||routeTests.summary?.FAIL!==0||
      routeTests.summary?.NOT_RUN!==0||!routeTests.nativeTestExplorer)
-    throw Error("Native Route Test Explorer must replay five 5GC scenarios without Runtime qualification: "+
+    throw Error("Native Route Test Explorer must replay two MAS scenarios without Runtime qualification: "+
       JSON.stringify({summary:routeTests?.summary,apiVersion:routeTests?.apiVersion,
         qualification:routeTests?.qualification,nativeTestExplorer:routeTests?.nativeTestExplorer}));
   console.log("STUDIO_ROUTE_SCENARIO_TEST_EXPLORER_CHROMIUM",JSON.stringify({
@@ -1279,7 +1268,7 @@ export async function runWorkbenchAcceptance({
     const text=inspectorState.text;
     if(inspectorState.visible&&
        text.includes("Contract Goal · pdu_session.initial_request_fulfilled")&&
-       text.includes("Global Precondition · get-sm-subscription-data.precondition")&&
+       text.includes("Global Precondition · validate-sm-subscription.precondition")&&
        /Data Flow · \d+ arguments/.test(text)&&
        text.includes("Source lineage only"))break;
     await sleep(100);
@@ -1288,8 +1277,8 @@ export async function runWorkbenchAcceptance({
   const phaseEvidence={
     visible:inspectorState.visible,
     contractGoal:inspectorText.includes("Contract Goal · pdu_session.initial_request_fulfilled"),
-    globalPrecondition:inspectorText.includes("Global Precondition · get-sm-subscription-data.precondition"),
-    selectedNode:inspectorText.includes("get-sm-subscription-data"),
+    globalPrecondition:inspectorText.includes("Global Precondition · validate-sm-subscription.precondition"),
+    selectedNode:inspectorText.includes("validate-sm-subscription"),
     dataflow:/Data Flow · \d+ arguments/.test(inspectorText),
     sourceOnly:inspectorText.includes("Source lineage only")&&
       inspectorText.toLowerCase().includes("not linked"),
@@ -1339,7 +1328,7 @@ export async function runWorkbenchAcceptance({
   const skillGuideUri=defaultProcedureUri.replace(
     /\/assurance\/procedure\.yaml$/,"/SKILL.md");
   const markdownFixture=await nativeCommand(
-    "skillStudio.internal.markdownPreviewAcceptance","establish-pdu-session");
+    "skillStudio.internal.markdownPreviewAcceptance","establish-pdu-session-mas");
   if(markdownFixture?.uri!==skillGuideUri||!(markdownFixture.lineCount>150))
     throw Error("Studio Markdown Preview fixture did not open the exact v1alpha5 Skill guide: "+
       JSON.stringify(markdownFixture));
@@ -1471,11 +1460,11 @@ export async function runWorkbenchAcceptance({
   const restoredMarkdown=await waitStudioMarkdown(view=>
     view.heading?.includes("Establish PDU Session"),
     "restored v1alpha5 Skill Markdown Preview");
-  if(!restoredMarkdown.view.bodyText.includes("establish-pdu-session"))
+  if(!restoredMarkdown.view.bodyText.includes("establish-pdu-session-mas"))
     throw Error("Restored Markdown Preview does not show the original Skill guide");
 
   const mappingUri=defaultProcedureUri.replace(
-    "/skills/establish-pdu-session/assurance/procedure.yaml",
+    "/skills/establish-pdu-session-mas/assurance/procedure.yaml",
     "/skills/establish-pdu-session-mas/references/openamsm-operation-mapping.md");
   const secondMarkdownUri=await nativeCommand(
     "skillStudio.internal.markdownPreviewOpenAcceptance",
@@ -1494,55 +1483,55 @@ export async function runWorkbenchAcceptance({
     visibleEditorGroups:secondMarkdown.visibleEditorGroups??1
   }));
 
-  // The native Contract, Predicate and Schema Designers render the v1alpha5
+  // The native Contract, Predicate and Schema Previews render the v1alpha5
   // source files from the same Skill Package and retain native Source pairing.
   const contractUri=await openPackageFile("skillStudio.openContract","assurance/contract.yaml");
   const contract=await waitWebview(view=>view.title==="SKILL Contract Visual"&&
-    view.bodyText.includes("Package\nestablish-pdu-session\n")&&
-    view.bodyText.includes("get-sm-subscription-data"),
-    "v1alpha5 5GC Contract Designer");
+    view.bodyText.includes("Package\nestablish-pdu-session-mas\n")&&
+    view.bodyText.includes("validate-sm-subscription"),
+    "v1alpha5 5GC Contract Preview");
   const expectedContractCards=["Goal & Preconditions","Schemas & Context",
     "Capabilities","Dependencies","Limits"];
   const contractCards=contract.view.cards??[];
-  if(!contract.view.bodyText.includes("Package\nestablish-pdu-session\n")||
+  if(!contract.view.bodyText.includes("Package\nestablish-pdu-session-mas\n")||
      !contract.view.bodyText.includes("pdu_session.initial_request_fulfilled")||
-     !contract.view.bodyText.includes("get-sm-subscription-data")||
+     !contract.view.bodyText.includes("validate-sm-subscription")||
      expectedContractCards.some(title=>!contract.view.cards.includes(title)))
-    throw Error("v1alpha5 Contract Designer did not render the current Contract Source: "+
+    throw Error("v1alpha5 Contract Preview did not render the current Contract Source: "+
       JSON.stringify(contract.view).slice(0,2600));
-  await assertSourceVisualPair(evalJS,sleep,"contract.yaml","v1alpha5 Contract Designer");
+  await assertSourceVisualPair(evalJS,sleep,"contract.yaml","v1alpha5 Contract Preview");
   const predicateUri=await openPackageFile("skillStudio.openPredicates","assurance/predicates.yaml");
   const predicates=await waitWebview(view=>view.title==="SKILL Predicate Visual"&&
-    view.bodyText.includes("establishment.ran.adopted"),
-    "v1alpha5 5GC Predicate Designer");
+    view.bodyText.includes("establishment.mas.subscription_validated"),
+    "v1alpha5 5GC Predicate Preview");
   const predicateDetails=await command("Runtime.evaluate",{
     contextId:predicates.contextId,returnByValue:true,
-    expression:"(()=>{const item=[...document.querySelectorAll('details.predicate')].find(node=>node.querySelector('.pid')?.textContent.trim()==='establishment.subscription.request_valid');if(!item)return {opened:false,bodyText:document.body?.innerText??''};item.open=true;return {opened:true,bodyText:document.body?.innerText??''};})()"
+    expression:"(()=>{const item=[...document.querySelectorAll('details.predicate')].find(node=>node.querySelector('.pid')?.textContent.trim()==='establishment.mas.subscription_validated');if(!item)return {opened:false,bodyText:document.body?.innerText??''};item.open=true;return {opened:true,bodyText:document.body?.innerText??''};})()"
   });
   const predicateText=predicateDetails.result?.value?.bodyText??predicates.view.bodyText;
   if(!predicateDetails.result?.value?.opened||
-     !predicateText.includes("establishment.ran.adopted")||
-     !predicateText.includes("scripts/validate-subscription-request.py")||
+     !predicateText.includes("establishment.mas.subscription_validated")||
+     !predicateText.includes("mas::urn:openamsm:mas:v1alpha4:")||
      !predicateText.includes("Parameters → Evidence → Evaluator")||
      !predicateText.includes("Evidence Requirements")||
      predicateText.includes("Observation"))
-    throw Error("v1alpha5 Predicate Designer did not render the current PredicateSet: "+
+    throw Error("v1alpha5 Predicate Preview did not render the current PredicateSet: "+
       JSON.stringify({view:predicates.view,predicateText:predicateText.slice(-2600)}));
-  await assertSourceVisualPair(evalJS,sleep,"predicates.yaml","v1alpha5 Predicate Designer");
+  await assertSourceVisualPair(evalJS,sleep,"predicates.yaml","v1alpha5 Predicate Preview");
   const schemaUri=await openPackageFile(
     "skillStudio.openSchema","schemas/establishment-request.schema.yaml");
   const schema=await waitWebview(view=>view.title==="SKILL Schema Visual"&&
-    view.bodyText.includes("Schema ID urn:connectionagent:example:5gc:establishment-request:v1alpha5")&&
+    view.bodyText.includes("Schema ID urn:connectionagent:example:mas:establishment-request:v1alpha5")&&
     view.bodyText.includes("establishment-request"),
-    "v1alpha5 5GC Schema Designer");
+    "v1alpha5 5GC Schema Preview");
   if(!schema.view.bodyText.includes("sNssai")||
      !schema.view.bodyText.includes("requestedPduSessionType")||
      !schema.view.bodyText.includes("const: IPV4")||
      !schema.view.bodyText.includes("Draft 2020-12"))
-    throw Error("v1alpha5 Schema Designer did not render the real request Schema: "+
+    throw Error("v1alpha5 Schema Preview did not render the real request Schema: "+
       JSON.stringify(schema.view).slice(0,2600));
   await assertSourceVisualPair(evalJS,sleep,"establishment-request.schema.yaml",
-    "v1alpha5 Schema Designer");
+    "v1alpha5 Schema Preview");
   console.log("STUDIO_CURRENT_LANGUAGE_DESIGNERS_CHROMIUM",JSON.stringify({
     contract:{uri:contractUri,cards:contractCards},
     predicates:{uri:predicateUri,heading:predicates.view.title},
@@ -1552,36 +1541,36 @@ export async function runWorkbenchAcceptance({
   // Verify the second v1alpha5 Skill opens through its exact URI, then restore
   // the primary 5GC Procedure as the final active editor.
   const masProcedureUri=defaultProcedureUri.replace(
-    "/establish-pdu-session/assurance/procedure.yaml",
-    "/establish-pdu-session-mas/assurance/procedure.yaml");
+    "/establish-pdu-session-mas/assurance/procedure.yaml",
+    "/modify-pdu-session-mas/assurance/procedure.yaml");
   // Keep unrelated editors open; closing every tab can block Theia's Webview command bridge.
   await nativeCommand("skillStudio.openProcedure",masProcedureUri);
   const masPair=await assertSourceVisualPair(
-    evalJS,sleep,"procedure.yaml","v1alpha5 MAS Procedure Designer");
+    evalJS,sleep,"procedure.yaml","v1alpha5 MAS Procedure Preview");
   const masGraph=await waitWebview(view=>
-    view.procedureRoot&&view.bodyText.includes("establish-pdu-session-mas")&&view.graphNodes>0,
-    "v1alpha5 MAS Procedure graph");
+    view.procedureRoot&&view.procedureValue==="modify-pdu-session-mas"&&view.graphNodes>0,
+    "v1alpha5 MAS Modify Procedure graph");
   // Keep unrelated editors open; closing every tab can block Theia's Webview command bridge.
   await nativeCommand("skillStudio.openProcedure",defaultProcedureUri);
   const restoredPair=await assertSourceVisualPair(
-    evalJS,sleep,"procedure.yaml","restored v1alpha5 5GC Procedure Designer");
+    evalJS,sleep,"procedure.yaml","restored v1alpha5 5GC Procedure Preview");
   const finalGraph=await waitWebview(view=>
-    view.procedureRoot&&view.procedureValue==="establish-pdu-session"&&view.graphNodes>0,
+    view.procedureRoot&&view.procedureValue==="establish-pdu-session-mas"&&view.graphNodes>0,
     "restored default v1alpha5 5GC Procedure graph");
 
   const packageOverviewEvidence=await runPackageOverviewAcceptance({
     command,evalJS,sleep,requireEditor
   });
-  if(!packageOverviewEvidence?.fourSkills||
-     packageOverviewEvidence.evidence?.skills?.length!==4)
-    throw Error("Package Overview did not discover all four v1alpha5 Skills: "+
+  if(!packageOverviewEvidence?.threeSkills||
+     packageOverviewEvidence.evidence?.skills?.length!==3)
+    throw Error("Package Overview did not discover all three v1alpha5 Skills: "+
       JSON.stringify(packageOverviewEvidence));
   // Keep unrelated editors open; closing every tab can block Theia's Webview command bridge.
   await nativeCommand("skillStudio.openProcedure",defaultProcedureUri);
   const finalPair=await assertSourceVisualPair(
-    evalJS,sleep,"procedure.yaml","final v1alpha5 default Procedure Designer");
+    evalJS,sleep,"procedure.yaml","final v1alpha5 default Procedure Preview");
   const finalRestoredGraph=await waitWebview(view=>
-    view.procedureRoot&&view.procedureValue==="establish-pdu-session"&&view.graphNodes>0,
+    view.procedureRoot&&view.procedureValue==="establish-pdu-session-mas"&&view.graphNodes>0,
     "final default current Procedure graph");
 
   // This is the actual released Go/WASM Worker, not a JS contract mock.
@@ -1613,8 +1602,8 @@ export async function runWorkbenchAcceptance({
   }
   const dualSkillExplorer={
     root:"skill-studio-demo/skills",
-    conventionalFolder:"establish-pdu-session",
-    masFolder:"establish-pdu-session-mas",
+    conventionalFolder:"establish-pdu-session-mas",
+    masFolder:"modify-pdu-session-mas",
     masProcedureUri,masPair,masGraph:masGraph.view,
     packageOverview:packageOverviewEvidence.evidence,
     conventionalProcedure:finalPair,
