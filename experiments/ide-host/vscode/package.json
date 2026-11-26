@@ -466,7 +466,7 @@
           ],
           "default": "skills",
           "scope": "resource",
-          "markdownDescription": "Project Skill source root. CA Skill Compiler v1.0.0 accepts authored files under skills/<skill-name>/."
+          "markdownDescription": "Project Skill source root. Current Studio authoring and the integrated CA Skill Compiler v2.0.2 target CA-SL v1alpha5 Skills under skills/<skill-name>/."
         },
         "connectionAgent.skillStudio.dependencies": {
           "type": "array",
@@ -475,7 +475,7 @@
           "items": {
             "type": "object"
           },
-          "markdownDescription": "Project dependency declarations. Manage through Package Explorer; source schema is owned by the Compiler contract."
+          "markdownDescription": "Studio-managed dependency declarations for tool-catalog, schema-bundle and interface-package. Add, refresh and update locks through Package Explorer. Snapshot verification and Schema hints do not imply Compiler linking or Owner / Runtime authorization."
         },
         "connectionAgent.skillStudio.dependencyLock": {
           "type": "object",
@@ -484,7 +484,7 @@
             "entries": []
           },
           "scope": "resource",
-          "markdownDescription": "Legacy skillc.lock/v0.1 snapshot lock. Compiler v1alpha4 does not consume this format; only exact v1alpha4 DependencySnapshot and trusted Owner / CapabilityContracts inputs can be linked."
+          "markdownDescription": "Studio-owned skillc.lock/v0.1 provenance lock binding dependency declarations to immutable snapshots. This is not the Compiler v2.1.0 interface-dependency-lock/v1alpha1. The v2.1.0 Development Build request derives its separate lock from exact formal Contract roots and transitive Interface Package closure. Lock verification does not imply Owner / Runtime authorization."
         },
         "connectionAgent.skillStudio.defaultBuildTarget": {
           "type": "string",
@@ -493,7 +493,7 @@
           ],
           "default": "all",
           "scope": "application",
-          "markdownDescription": "Default Compiler v2.0.2 target selection. The current integration builds the selected Skill Package explicitly."
+          "markdownDescription": "Default target selection for the integrated CA Skill Compiler v2.0.2 adapter. Compiler v2.1.0 Development Build / Verify is a separate API family and is not yet integrated into Studio main."
         },
         "connectionAgent.skillStudio.ai.gatewayUrl": {
           "type": "string",
