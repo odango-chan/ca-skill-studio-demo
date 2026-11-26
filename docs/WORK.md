@@ -24,7 +24,7 @@
 | Markdown worker | [#288](https://github.com/odango-chan/ca-skill-studio-demo/issues/288) | Capture the actual worker / TreeModel stack; do not conflate with Console Source restoration |
 | Compiler v2.1.0 | [#269](https://github.com/odango-chan/ca-skill-studio-demo/issues/269) | Rebase and finish generic API integration; wait for formal MAS / Host Context Interface Package roots before claiming Example Build |
 | Diagnostics | [#211](https://github.com/odango-chan/ca-skill-studio-demo/issues/211) | Close Problems / Test Explorer / Compiler / Package Audit source and result-boundary acceptance |
-| Preview lifecycle | [#220](https://github.com/odango-chan/ca-skill-studio-demo/issues/220) | Draft [#293](https://github.com/odango-chan/ca-skill-studio-demo/pull/293) covers null-document invalidation and is stacked on #291 so Browser-Only includes the Console Source fix; combined exact-head gates are pending |
+| Preview lifecycle | [#220](https://github.com/odango-chan/ca-skill-studio-demo/issues/220) | [#293](https://github.com/odango-chan/ca-skill-studio-demo/pull/293) fixes null-document invalidation and passes 5/5 exact-head gates on #291's base; after #291 merges, retarget to main and rerun |
 | Documentation | [#285](https://github.com/odango-chan/ca-skill-studio-demo/issues/285) | WORK compacted here; TRACEABILITY still needs evidence-prose compaction and link verification |
 
 ## Open PRs — exact current state
@@ -34,7 +34,7 @@
 - [#289](https://github.com/odango-chan/ca-skill-studio-demo/pull/289) Preview labels: Browser-Only / Pages must be rerun after #291 lands.
 - [#291](https://github.com/odango-chan/ca-skill-studio-demo/pull/291) Console Source / dirty-buffer restoration: 5/5 exact-head gates PASS; ready for review, not merged.
 - [#292](https://github.com/odango-chan/ca-skill-studio-demo/pull/292) Markdown worker diagnostics: no worker stack captured; rerun after #291 lands.
-- [#293](https://github.com/odango-chan/ca-skill-studio-demo/pull/293) Preview null-document lifecycle: IDE Host / PR Verify / Browser Host / Pages PASS; stacked on #291; combined Browser-Only / Pages / host gates are in progress.
+- [#293](https://github.com/odango-chan/ca-skill-studio-demo/pull/293) Preview null-document lifecycle: 5/5 exact-head gates PASS on #291 base; Ready for Review, not merged; retarget to main and rerun after #291 merges.
 - Older drafts are not promotable: #271 has no workflow runs and is not mergeable; #272 and #275 use old main `db8353b...`; #275 Pages failed; #276 is stacked on the old #272 head. Historical PASS is not current-main evidence.
 
 ## Current guardrails
@@ -47,3 +47,5 @@
 ## Revision record
 
 - **2026-11-26 — WORK compacted to a current-state panel and dated narratives moved verbatim to WORK-history.md.** Sections: current product, blockers, exact-head PRs and guardrails. Reason: satisfy #285's 40–120-line requirement without losing historical evidence. Author: ChatGPT (GPT-6.2).
+
+- **2026-11-26 — Preview lifecycle candidate exact-head acceptance updated.** Sections: Preview lifecycle blocker and open PRs. Reason: record PR #293's 5/5 PASS on the #291 base without claiming merge or main qualification. Author: ChatGPT (GPT-6.2).
