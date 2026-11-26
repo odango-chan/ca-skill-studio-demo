@@ -1,5 +1,29 @@
 # Skill Studio 当前工作状态
 
+## 2026-11-26 · Current product snapshot（唯一当前状态入口）
+
+**Audited / deployed baseline:** `main@5b666c0ef754ed32fa37c97ce2429f328c70477f`。Pages workflow [#45545634726](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/45545634726) 的 Build 与 Deploy 均成功，部署 SHA 与该 main SHA 一致。后续提交必须重新核对 exact-head 证据。
+
+- **Host / workbench：** Theia 1.76 browser-only 是唯一在线工作台；Classic 独立工作台及 `/classic/` 发布入口已退役。工作台采用固定 Source + Preview：原生 Source Editor 在第一组，单一右侧 Preview Host；Outline / Problems 使用宿主原生视图，Package Explorer 组合 Skills 与 Plugin-managed Dependencies。
+- **Language：** 唯一活动编辑目标为 CA-SL `connectionagent.io/v1alpha5`（FROZEN / RELEASED）。v1alpha4 仅是不可变规范继承基线和历史材料，不提供兼容编辑或旧项目迁移。
+- **Example：** 内置示例已从早期 5GC + MAS 双 Skill 切换为 OpenAMSM Scheme C 的 Create、Modify、Release 三个真实 v1alpha5 Skills。Owner ToolCatalog 和 Host Context 以 immutable dependency snapshots 锁定；当前文件、来源和 resolved revisions 以 `site/samples/v1alpha5/files.json` 为准。Owner-linked static build evidence 不等于重新执行真实 E2E。
+- **Compiler：** Studio main 当前集成 CA Skill Compiler **v2.0.2**（`experiments/ide-host/vscode/src/compiler-request.mjs`、`compiler-integration.mjs`、CI workflow pins）。v2.1.0 Development Build / Verify 尚未集成到 main；由 [#269](https://github.com/odango-chan/ca-skill-studio-demo/issues/269)、Draft [#272](https://github.com/odango-chan/ca-skill-studio-demo/pull/272) 与 [#276](https://github.com/odango-chan/ca-skill-studio-demo/pull/276) 跟踪。候选分支 PASS 不能作为当前 main 产品 PASS。
+- **AI Authoring：** 独立 Editor Tab 与 Host-owned Change Set / v1alpha5 Patch Engine 属于当前产品代码；模型输出仍是不可信提案。真实 Gateway 请求、候选 Apply 与 Compiler 权威检查分别按对应设计及 Issue 状态记录，不得用 Editor Tab 已存在推导端到端模型请求或 Apply 已通过。
+- **Diagnostics：** LSP、Package Audit、Compiler Diagnostics 各有独立来源和状态；Problems 展示/导航不改变权威来源。统一 Diagnostics / Validation / Test 架构仍由 [#211](https://github.com/odango-chan/ca-skill-studio-demo/issues/211) 跟踪。
+- **Workspace / Example lifecycle：** 持久化浏览器 Profile 恢复问题 [#225](https://github.com/odango-chan/ca-skill-studio-demo/issues/225) 仍开放；Example 替换当前存在直接写入最终目录、缺少完整失败回滚边界的问题，见 [#280](https://github.com/odango-chan/ca-skill-studio-demo/issues/280)。Clean-profile Chromium PASS 不得代替 persistent-profile acceptance。
+- **Authoring completeness：** 剩余 v1alpha5 编辑操作 parity 由 [#237](https://github.com/odango-chan/ca-skill-studio-demo/issues/237) 跟踪；Schema-driven completion / immutable Interface Package 导入由 [#261](https://github.com/odango-chan/ca-skill-studio-demo/issues/261) 跟踪；Compiler v2.1.0 切换由 [#269](https://github.com/odango-chan/ca-skill-studio-demo/issues/269) 跟踪。
+- **Product audit：** 本轮产品级架构、代码、文档和 exact-head acceptance 审计由 [#279](https://github.com/odango-chan/ca-skill-studio-demo/issues/279) 统一跟踪；canonical 文档刷新由 [#281](https://github.com/odango-chan/ca-skill-studio-demo/issues/281) 跟踪。
+
+**Qualification boundary:** Studio unit / IDE Host / Theia Chromium / Pages deployment only prove their named scopes. They do not establish Compiler v2.1.0 integration, Owner / Host Admission, Runtime execution, real 5GC E2E or Production Qualification. Record `PASS`, `NOT_RUN`, `BLOCKED`, `NOT_QUALIFIED` distinctly.
+
+**Open pull requests at this snapshot:** #271, #272, #275, #276 are Draft. Their exact-head checks and base SHA must be revalidated before any promotion. Merged PR #277 defines the current main / deployment baseline.
+
+### Revision record
+
+- **2026-11-26 — Current product snapshot added.** Sections: Host, Language, Example, Compiler, AI Authoring, Diagnostics, Workspace lifecycle, open implementation work and qualification. Reason: the previous first current-state entry was dated 2026-11-18 and still described the old Compiler v1.0.0 / early Example baseline. Evidence: main `5b666c0ef754ed32fa37c97ce2429f328c70477f`, Pages workflow #45545634726, Compiler adapter v2.0.2, current Example manifest and GitHub Issue / PR state.
+
+---
+
 ## 2026-11-18 · AI Procedure Authoring P1（Go Gateway 集成）
 
 [Issue #200](https://github.com/odango-chan/ca-skill-studio-demo/issues/200) · [Canonical design](design/ai-procedure-authoring.md) · [Go AI Gateway](https://github.com/odango-chan/ai-gateway) · [Gateway browser CORS issue #4](https://github.com/odango-chan/ai-gateway/issues/4)
