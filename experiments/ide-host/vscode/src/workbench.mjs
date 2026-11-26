@@ -252,7 +252,7 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
       if(!doc||! /\/assurance\/procedure\.ya?ml$/i.test(doc.uri.path))
         throw Error("Semantic color acceptance requires the active native Procedure Source");
       const lines=doc.getText().split(/\r?\n/);
-      const line=lines.findIndex(value=>value.includes("PASS: subscribe-sm-data"));
+      const line=lines.findIndex(value=>value.includes("PASS: skip-secondary-authentication"));
       if(line<0)throw Error("Semantic color acceptance route marker is absent from the current Procedure");
       editor.revealRange(new vscode.Range(line,0,line,lines[line].length),
         vscode.TextEditorRevealType.InCenter);
