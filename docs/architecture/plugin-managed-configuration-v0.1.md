@@ -1,8 +1,8 @@
-# Skill Studio Plugin-managed Configuration & Tool Integration v0.1
+# Historical proposal · Plugin-managed Configuration & Tool Integration v0.1
 
-**Design status: FROZEN FOR IMPLEMENTATION; not yet deployed.** Date: 2026-11-11. This is the Studio-side contract for [Skill Compiler v0.1 Draft #4](https://github.com/odango-chan/ca-skill-compiler/pull/4). The existing Studio importer, Explorer, LSP and project-policy code are still implementing the earlier `skills/lib/output` model; this document does **not** claim those features have been migrated or verified.
+> **Status: Historical v0.1 design proposal; not the current implementation guide.** This document was frozen against Compiler v0.1 Draft #4 on 2026-11-11. Its ownership principles and some storage concepts remain useful, but its status statements, Compiler API references, default Example inventory and unimplemented-feature claims are superseded. The current implementation is described in [Dependency, Interface Package and Schema IntelliSense Architecture](dependency-and-interface-package.md), and current progress is in [WORK](../WORK.md). Do not use this file as an instruction to reintroduce `lib/output`, the old two-Skill Example, MCP acquisition or Compiler v0.1 APIs.
 
-## Decision / ownership
+## Historical decision / ownership rationale
 
 Skill Studio is a **VS Code-compatible IDE extension**, not a project/Tool Runtime registry. Author-facing settings come from the host's native Extension Configuration with native Settings Editor; complex dependency operations use a native TreeView + Command/QuickPick instead of a new mandatory `skill-project.yaml` or a custom configuration Webview. Dependencies, locks and source bytes are distinct from User preferences, transient Workspace UI state, cached content and Build output.
 
